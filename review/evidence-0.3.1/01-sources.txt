@@ -1,0 +1,11 @@
+== 1. Lines in the wallet's own code that print or log (expected: none)
+none
+
+== 2. Internet addresses written into the wallet's own code (expected: none; the node address comes from the setup file)
+app/src/main/res/values-cs/strings.xml:31:https://.
+app/src/main/res/values/strings.xml:33:https://.
+
+== 3. Places where the clipboard is written (expected: addresses, transaction ids and the public descriptor only)
+app/src/main/kotlin/io/github/severka_monitor/northwatch/Tabs.kt:163 label "NORTH address"
+app/src/main/kotlin/io/github/severka_monitor/northwatch/Tabs.kt:215 label "txid"
+app/src/main/kotlin/io/github/severka_monitor/northwatch/Tabs.kt:406 label "descriptor"

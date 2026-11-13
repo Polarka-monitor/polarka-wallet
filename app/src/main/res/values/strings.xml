@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">North Wallet</string>
+
+    <string name="banner_title">Test build 0.3.1</string>
+    <string name="banner_text">This wallet has not been reviewed yet. Use it with small amounts only.</string>
+
+    <string name="refresh">Refresh</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+    <string name="copy">Copy</string>
+
+    <string name="setup_title">Connect to your node</string>
+    <string name="setup_intro">North Watch asks your own TrueNorth node what your addresses hold. For that it needs a small setup file: where the node is, how to log in, and which addresses to watch.</string>
+    <string name="setup_how">Make the file on the computer that runs the node and send it to this phone. The password in it is never shown on the screen.</string>
+    <string name="setup_pick_file">Choose the setup file</string>
+    <string name="setup_paste">Paste from the clipboard</string>
+
+    <string name="offer_title">Check before saving</string>
+    <string name="offer_node">Node</string>
+    <string name="offer_user">User</string>
+    <string name="offer_password">Password</string>
+    <string name="offer_password_set">set, %1$d characters, not shown</string>
+    <string name="offer_chain">Network</string>
+    <string name="offer_addresses">Addresses to watch</string>
+    <string name="offer_delete_file">Delete the setup file from the phone after saving</string>
+    <string name="offer_save">Save and connect</string>
+
+    <string name="err_setup_too_long">The text is too long to be a setup file.</string>
+    <string name="err_setup_not_json">This is not a setup file.</string>
+    <string name="err_setup_format">This setup file is of another kind or version (%1$s).</string>
+    <string name="err_setup_url">The node address in the file is not valid.</string>
+    <string name="err_setup_https">The node address must start with https://. This app does not send the password over an unencrypted connection.</string>
+    <string name="err_setup_user">The user name in the file is missing or not valid.</string>
+    <string name="err_setup_password">The password in the file is missing or not valid.</string>
+    <string name="err_setup_chain">The file names a network this app does not know (%1$s).</string>
+    <string name="err_setup_no_address">The file names no address to watch.</string>
+    <string name="err_setup_too_many">The file names too many addresses. The limit is 20.</string>
+    <string name="err_setup_address">An address in the file is not a valid address of that network (%1$s).</string>
+
+    <string name="notice_file_deleted">The setup file was deleted from the phone.</string>
+    <string name="notice_file_not_deleted">The setup file could not be deleted from here. Delete it yourself in the Files app: it holds the password in plain text.</string>
+    <string name="notice_clipboard_cleared">The setup was read and the clipboard was cleared.</string>
+    <string name="notice_file_unreadable">The file could not be read.</string>
+    <string name="notice_clipboard_empty">The clipboard holds no text.</string>
+
+    <string name="asking_node">Asking the node…</string>
+    <string name="total">Total</string>
+    <string name="spendable">Can be spent</string>
+    <string name="immature">Rewards still maturing</string>
+    <string name="immature_note">Maturing rewards: %1$d.</string>
+    <plurals name="next_matures">
+        <item quantity="one">The next one matures in %1$d block.</item>
+        <item quantity="other">The next one matures in %1$d blocks.</item>
+    </plurals>
+
+    <string name="node_title">Your node</string>
+    <string name="node_address">Address</string>
+    <string name="node_network">Network</string>
+    <string name="node_height">Block height</string>
+    <string name="node_updated">Asked at</string>
+    <string name="node_syncing">The node is still catching up with the network (%1$d of %2$d blocks). The balance below is not complete yet.</string>
+
+    <string name="address_title">Watched addresses</string>
+    <string name="outputs_title">Unspent outputs: %1$d</string>
+    <string name="no_outputs">The node finds nothing unspent on these addresses.</string>
+    <string name="output_reward">block reward</string>
+    <string name="output_payment">payment</string>
+    <string name="output_where">block %1$d, confirmations: %2$d</string>
+    <plurals name="matures_in">
+        <item quantity="one">matures in %1$d block</item>
+        <item quantity="other">matures in %1$d blocks</item>
+    </plurals>
+
+    <string name="selftest_title">Self-test</string>
+    <string name="selftest_text">Checks on this phone that the key code and its native library give the published answers for the public test phrase: its address and a signed test transaction. It uses no key of yours.</string>
+    <string name="selftest_run">Run the self-test</string>
+    <string name="selftest_running">Running…</string>
+    <string name="selftest_passed">Passed: this phone derives the same address and signs the same transaction as the published vectors, which were checked with TrueNorth Core.</string>
+    <string name="selftest_failed">Failed: %1$s</string>
+
+    <string name="forget">Remove the setup</string>
+    <string name="forget_title">Remove the setup?</string>
+    <string name="forget_text">The app forgets the node, the password and the addresses. Your coins are not touched: this app holds no keys.</string>
+    <string name="forget_yes">Remove</string>
+
+    <string name="problem_unreachable">The node cannot be reached. Check that Tailscale is connected on this phone and that the computer with the node is running.</string>
+    <string name="problem_login">The node refused the user name or the password.</string>
+    <string name="problem_not_allowed">The node does not allow this user to ask that. Check the rpcwhitelist line of the node.</string>
+    <string name="problem_node">The node answered with an error: %1$s</string>
+    <string name="problem_other_chain">The node works on another network (%1$s) than the setup says.</string>
+    <string name="problem_foreign">The node answered with outputs that do not belong to your addresses. Nothing is shown. Check the node.</string>
+    <string name="problem_store">The stored setup cannot be read (%1$s). Import the setup file again.</string>
+    <string name="problem_unexpected">Something unexpected happened (%1$s).</string>
+
+    <string name="unlock_title">North Wallet</string>
+    <string name="unlock_subtitle">Confirm that it is you</string>
+    <string name="tab_overview">Overview</string>
+    <string name="tab_receive">Receive</string>
+    <string name="tab_send">Send</string>
+    <string name="tab_history">History</string>
+    <string name="tab_mining">Mining</string>
+    <string name="tab_more">More</string>
+    <string name="save">Save</string>
+    <string name="lock_text">The wallet is locked.</string>
+    <string name="lock_open">Unlock</string>
+    <string name="lock_setting">Ask for the fingerprint when the app opens</string>
+
+    <string name="wallet_title">Wallet in this phone</string>
+    <string name="wallet_none_title">No wallet in this phone yet</string>
+    <string name="wallet_none_text">A wallet here can receive and send coins. Its keys are made in this phone and protected by your fingerprint. Keep only amounts you can afford to lose in a phone; larger savings belong on paper.</string>
+    <string name="wallet_new">Make a new wallet</string>
+    <string name="wallet_restore_hint">To bring back a wallet from its recovery words, go to More.</string>
+    <string name="wallet_export_text">Public descriptor of the receiving addresses. It shows the whole wallet and cannot spend; a TrueNorth Core node can watch the wallet with it.</string>
+    <string name="wallet_remove">Remove the wallet from this phone</string>
+    <string name="wallet_remove_title">Remove the wallet?</string>
+    <string name="wallet_remove_text">The recovery words stored in this phone are destroyed. Coins of this wallet can then be reached only with the words you wrote on paper. If you do not have them, the coins are lost for good.</string>
+    <string name="wallet_remove_yes">I have the words, remove</string>
+    <string name="value_about">about %1$s</string>
+
+    <string name="new_title">Your recovery words</string>
+    <string name="new_intro">Write these 24 words on paper, in this order. They are the wallet: whoever has them has the coins, and without them a lost phone means lost coins.</string>
+    <string name="new_warning">Do not photograph them, do not copy them into any app or message, and never type them into a website.</string>
+    <string name="new_written">I have written all 24 words on paper</string>
+    <string name="new_next">Continue</string>
+    <string name="check_title">Check your paper</string>
+    <string name="check_intro">Type these three words from your paper.</string>
+    <string name="check_word">Word number %1$d</string>
+    <string name="check_save">Lock the wallet with my fingerprint</string>
+    <string name="check_back">Show the words again</string>
+    <string name="restore_title">Bring back a wallet</string>
+    <string name="restore_text">Type the 12 or 24 recovery words of an existing wallet, separated by spaces. They will be stored in this phone, protected by your fingerprint.</string>
+    <string name="words_label">Recovery words</string>
+    <string name="restore_go">Store the wallet</string>
+    <string name="notice_wallet_ready">The wallet is ready.</string>
+    <string name="notice_wallet_removed">The wallet was removed from this phone.</string>
+    <string name="notice_saved">Saved.</string>
+
+    <string name="receive_title">Receive</string>
+    <string name="receive_next">Next address</string>
+    <string name="receive_note">Address number %1$d of this wallet. Every address keeps working; a new one for each payer keeps your payments apart.</string>
+
+    <string name="send_title">Send</string>
+    <string name="send_to">Recipient address</string>
+    <string name="send_paste">Paste the address</string>
+    <string name="send_amount">Amount (NORTH)</string>
+    <string name="send_everything">Send everything</string>
+    <string name="send_fee_rate">Fee per vB:</string>
+    <string name="send_fee">Fee</string>
+    <string name="send_change">Returns to you</string>
+    <string name="send_inputs">Coins used</string>
+    <string name="send_size">Size</string>
+    <string name="send_check">Check the payment</string>
+    <string name="send_confirm_title">Confirm the payment</string>
+    <string name="send_confirm_text">Compare the address with its source character by character. A payment that has been sent cannot be taken back.</string>
+    <string name="send_go">Sign with my fingerprint and send</string>
+    <string name="sending">Sending…</string>
+    <string name="sent_title">Sent</string>
+    <string name="sent_text">The node accepted the transaction. Its id:</string>
+
+    <string name="history_none">Nothing to show yet.</string>
+    <string name="history_received">received</string>
+    <string name="history_paid">paid</string>
+    <string name="history_wallet">wallet</string>
+    <string name="history_watched">watched address</string>
+
+    <string name="mining_found">Found blocks</string>
+    <string name="mining_blocks">Blocks</string>
+    <string name="mining_coins">Rewards (NORTH)</string>
+    <string name="mining_last_day">In the last 24 hours</string>
+    <string name="mining_network">Network</string>
+    <string name="mining_hashrate">Hash rate</string>
+    <string name="mining_block_time">Time per block</string>
+    <string name="mining_mine">My miner</string>
+    <string name="mining_needs_wallet">Your own hash rate can be stored once this phone has a wallet.</string>
+    <string name="mining_my_hashrate">My hash rate (kH/s)</string>
+    <string name="mining_share">Share of the network</string>
+    <string name="mining_expected">Expected blocks per day</string>
+    <string name="mining_expected_coins">Expected per day (NORTH)</string>
+    <string name="mining_luck">Luck in the last 24 hours</string>
+    <string name="mining_note">Expected figures use the network of the last 120 blocks. Luck compares the blocks found in 24 hours with that expectation.</string>
+
+    <string name="price_title">Value</string>
+    <string name="price_text">There is no market price yet. If you type a price per coin, the overview shows what the total would be worth. Nothing is looked up on the internet.</string>
+    <string name="price_label">Price of 1 NORTH</string>
+    <string name="price_currency">Currency (for example USD)</string>
+
+    <string name="paper_title">Empty a paper address</string>
+    <string name="paper_text">Type the recovery words of a paper address to move its coins. The words are used once and are not stored. After that the paper is no longer safe: move everything, to this wallet or to a new paper address.</string>
+    <string name="paper_look">Look at the address</string>
+    <string name="paper_to_wallet">To this wallet</string>
+    <string name="paper_keep">Amount for this wallet (empty means everything)</string>
+    <string name="paper_rest_to">Address for the rest (a new paper address)</string>
+    <string name="paper_warning">This empties the paper address completely. Check both addresses character by character.</string>
+    <string name="paper_go">Sign and send</string>
+
+    <string name="problem_bad_address">This is not a valid address of this network.</string>
+    <string name="problem_bad_amount">The amount is not valid. Use a number such as 12.5; the smallest amount is 0.00001.</string>
+    <string name="problem_nothing_to_spend">There is nothing that can be spent now.</string>
+    <string name="problem_not_enough">Not enough coins. With the fee, the most that can be sent is %1$s.</string>
+    <string name="problem_fee_rate">The fee rate is out of bounds.</string>
+    <string name="problem_too_many_inputs">Too many small coins for one transaction. Send a smaller amount first.</string>
+    <string name="problem_wrong_words">These words belong to another wallet.</string>
+    <string name="problem_bad_words">These are not valid recovery words. Check the spelling and the order.</string>
+    <string name="problem_rejected">The node refused the transaction (%1$s). Nothing was sent.</string>
+    <string name="problem_unlock">Unlocking did not succeed (%1$s).</string>
+
+    <string name="scan_button">Scan a QR code</string>
+    <string name="scan_close">Close the camera</string>
+    <string name="scan_denied">Without the camera permission a code cannot be read. You can still paste the address.</string>
+    <string name="scan_not_address">The code does not hold an address of this network.</string>
+    <string name="notify_title">Notifications</string>
+    <string name="notify_text">About every fifteen minutes the phone asks your node whether a block reward or a payment has arrived, also while the app is closed. It works only while the phone can reach the node, and the phone decides when exactly it runs.</string>
+    <string name="notify_setting">Tell me about a new reward or payment</string>
+    <string name="notify_denied">Notifications are not allowed for this app. Allow them in the settings of the phone.</string>
+    <string name="notify_channel">Rewards and payments</string>
+    <string name="notify_reward">New block reward</string>
+    <string name="notify_payment">Payment received</string>
+    <string name="notify_block">block %1$d</string>
+
+    <string name="pending_title">Sent, waiting for a block</string>
+    <string name="pending_text">The node shows the old balance until the payment is in a block. The coins of this payment are not offered for another one meanwhile.</string>
+</resources>

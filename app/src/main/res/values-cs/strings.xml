@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="banner_title">Zkušební verze 0.3.1</string>
+    <string name="banner_text">Peněženka zatím neprošla kontrolou. Používejte ji jen s malými částkami.</string>
+
+    <string name="refresh">Obnovit</string>
+    <string name="cancel">Zrušit</string>
+    <string name="ok">OK</string>
+    <string name="copy">Kopírovat</string>
+
+    <string name="setup_title">Připojení k vašemu uzlu</string>
+    <string name="setup_intro">North Watch se ptá vašeho vlastního uzlu TrueNorth, co je na vašich adresách. Potřebuje k tomu malý soubor s nastavením: kde uzel je, jak se k němu přihlásit a které adresy sledovat.</string>
+    <string name="setup_how">Soubor vytvořte na počítači, kde uzel běží, a pošlete ho do tohoto telefonu. Heslo z něj se na obrazovce nikdy neukáže.</string>
+    <string name="setup_pick_file">Vybrat soubor s nastavením</string>
+    <string name="setup_paste">Vložit ze schránky</string>
+
+    <string name="offer_title">Zkontrolujte před uložením</string>
+    <string name="offer_node">Uzel</string>
+    <string name="offer_user">Uživatel</string>
+    <string name="offer_password">Heslo</string>
+    <string name="offer_password_set">nastaveno, znaků: %1$d, nezobrazuje se</string>
+    <string name="offer_chain">Síť</string>
+    <string name="offer_addresses">Sledované adresy</string>
+    <string name="offer_delete_file">Po uložení smazat soubor s nastavením z telefonu</string>
+    <string name="offer_save">Uložit a připojit</string>
+
+    <string name="err_setup_too_long">Text je příliš dlouhý, soubor s nastavením to není.</string>
+    <string name="err_setup_not_json">Tohle není soubor s nastavením.</string>
+    <string name="err_setup_format">Soubor s nastavením je jiného druhu nebo jiné verze (%1$s).</string>
+    <string name="err_setup_url">Adresa uzlu v souboru není platná.</string>
+    <string name="err_setup_https">Adresa uzlu musí začínat https://. Aplikace neposílá heslo nešifrovaným spojením.</string>
+    <string name="err_setup_user">Uživatelské jméno v souboru chybí nebo není platné.</string>
+    <string name="err_setup_password">Heslo v souboru chybí nebo není platné.</string>
+    <string name="err_setup_chain">Soubor uvádí síť, kterou aplikace nezná (%1$s).</string>
+    <string name="err_setup_no_address">Soubor neuvádí žádnou adresu ke sledování.</string>
+    <string name="err_setup_too_many">Soubor uvádí příliš mnoho adres. Nejvýše jich může být 20.</string>
+    <string name="err_setup_address">Adresa v souboru není platnou adresou této sítě (%1$s).</string>
+
+    <string name="notice_file_deleted">Soubor s nastavením byl z telefonu smazán.</string>
+    <string name="notice_file_not_deleted">Soubor s nastavením se odtud nepodařilo smazat. Smažte ho sami v aplikaci Soubory: je v něm heslo v čitelné podobě.</string>
+    <string name="notice_clipboard_cleared">Nastavení bylo načteno a schránka vymazána.</string>
+    <string name="notice_file_unreadable">Soubor se nepodařilo přečíst.</string>
+    <string name="notice_clipboard_empty">Ve schránce není žádný text.</string>
+
+    <string name="asking_node">Ptám se uzlu…</string>
+    <string name="total">Celkem</string>
+    <string name="spendable">Lze utratit</string>
+    <string name="immature">Odměny, které ještě dozrávají</string>
+    <string name="immature_note">Dozrávajících odměn: %1$d.</string>
+    <plurals name="next_matures">
+        <item quantity="one">Nejbližší dozraje za %1$d blok.</item>
+        <item quantity="few">Nejbližší dozraje za %1$d bloky.</item>
+        <item quantity="many">Nejbližší dozraje za %1$d bloku.</item>
+        <item quantity="other">Nejbližší dozraje za %1$d bloků.</item>
+    </plurals>
+
+    <string name="node_title">Váš uzel</string>
+    <string name="node_address">Adresa</string>
+    <string name="node_network">Síť</string>
+    <string name="node_height">Výška bloku</string>
+    <string name="node_updated">Dotaz v</string>
+    <string name="node_syncing">Uzel ještě dohání síť (%1$d z %2$d bloků). Zůstatek níže zatím není úplný.</string>
+
+    <string name="address_title">Sledované adresy</string>
+    <string name="outputs_title">Neutracené výstupy: %1$d</string>
+    <string name="no_outputs">Uzel na těchto adresách nenašel nic neutraceného.</string>
+    <string name="output_reward">odměna za blok</string>
+    <string name="output_payment">platba</string>
+    <string name="output_where">blok %1$d, potvrzení: %2$d</string>
+    <plurals name="matures_in">
+        <item quantity="one">dozraje za %1$d blok</item>
+        <item quantity="few">dozraje za %1$d bloky</item>
+        <item quantity="many">dozraje za %1$d bloku</item>
+        <item quantity="other">dozraje za %1$d bloků</item>
+    </plurals>
+
+    <string name="selftest_title">Vlastní test</string>
+    <string name="selftest_text">Ověří na tomto telefonu, že kód pro klíče a jeho nativní knihovna dají pro veřejnou zkušební frázi zveřejněné výsledky: adresu a podepsanou zkušební transakci. Žádný váš klíč nepoužívá.</string>
+    <string name="selftest_run">Spustit vlastní test</string>
+    <string name="selftest_running">Běží…</string>
+    <string name="selftest_passed">V pořádku: telefon odvodí stejnou adresu a podepíše stejnou transakci jako zveřejněné vektory ověřené proti TrueNorth Core.</string>
+    <string name="selftest_failed">Selhalo: %1$s</string>
+
+    <string name="forget">Odebrat nastavení</string>
+    <string name="forget_title">Odebrat nastavení?</string>
+    <string name="forget_text">Aplikace zapomene uzel, heslo i adresy. Vašich mincí se to netýká: aplikace nemá žádné klíče.</string>
+    <string name="forget_yes">Odebrat</string>
+
+    <string name="problem_unreachable">Uzel není dosažitelný. Zkontrolujte, že je v telefonu připojený Tailscale a že počítač s uzlem běží.</string>
+    <string name="problem_login">Uzel odmítl uživatelské jméno nebo heslo.</string>
+    <string name="problem_not_allowed">Uzel tomuto uživateli takový dotaz nedovoluje. Zkontrolujte řádek rpcwhitelist v nastavení uzlu.</string>
+    <string name="problem_node">Uzel odpověděl chybou: %1$s</string>
+    <string name="problem_other_chain">Uzel pracuje na jiné síti (%1$s), než uvádí nastavení.</string>
+    <string name="problem_foreign">Uzel vrátil výstupy, které nepatří k vašim adresám. Nic se nezobrazí. Zkontrolujte uzel.</string>
+    <string name="problem_store">Uložené nastavení nelze přečíst (%1$s). Načtěte soubor s nastavením znovu.</string>
+    <string name="problem_unexpected">Stalo se něco nečekaného (%1$s).</string>
+
+    <string name="unlock_title">North Wallet</string>
+    <string name="unlock_subtitle">Potvrďte, že jste to vy</string>
+    <string name="tab_overview">Přehled</string>
+    <string name="tab_receive">Přijmout</string>
+    <string name="tab_send">Odeslat</string>
+    <string name="tab_history">Historie</string>
+    <string name="tab_mining">Těžba</string>
+    <string name="tab_more">Více</string>
+    <string name="save">Uložit</string>
+    <string name="lock_text">Peněženka je zamčená.</string>
+    <string name="lock_open">Odemknout</string>
+    <string name="lock_setting">Při otevření aplikace chtít otisk prstu</string>
+
+    <string name="wallet_title">Peněženka v tomto telefonu</string>
+    <string name="wallet_none_title">V telefonu zatím není peněženka</string>
+    <string name="wallet_none_text">Peněženka v telefonu umí mince přijímat a odesílat. Její klíče vzniknou v tomto telefonu a chrání je váš otisk prstu. V telefonu mějte jen částky, o které můžete přijít; větší úspory patří na papír.</string>
+    <string name="wallet_new">Vytvořit novou peněženku</string>
+    <string name="wallet_restore_hint">Obnovu peněženky ze slov najdete na kartě Více.</string>
+    <string name="wallet_export_text">Veřejný deskriptor přijímacích adres. Ukazuje celou peněženku a neumí utrácet; uzel TrueNorth Core s ním může peněženku sledovat.</string>
+    <string name="wallet_remove">Odebrat peněženku z telefonu</string>
+    <string name="wallet_remove_title">Odebrat peněženku?</string>
+    <string name="wallet_remove_text">Slova uložená v tomto telefonu budou zničena. K mincím této peněženky se pak dostanete jen se slovy, která máte na papíře. Pokud je nemáte, mince jsou nenávratně ztracené.</string>
+    <string name="wallet_remove_yes">Slova mám, odebrat</string>
+    <string name="value_about">asi %1$s</string>
+
+    <string name="new_title">Vaše slova pro obnovu</string>
+    <string name="new_intro">Těchto 24 slov si zapište na papír, v tomto pořadí. Jsou to peněženka sama: kdo je má, má mince, a bez nich ztracený telefon znamená ztracené mince.</string>
+    <string name="new_warning">Nefoťte je, nekopírujte je do žádné aplikace ani zprávy a nikdy je nepište do webové stránky.</string>
+    <string name="new_written">Všech 24 slov mám zapsaných na papíře</string>
+    <string name="new_next">Pokračovat</string>
+    <string name="check_title">Kontrola papíru</string>
+    <string name="check_intro">Napište tato tři slova ze svého papíru.</string>
+    <string name="check_word">Slovo číslo %1$d</string>
+    <string name="check_save">Zamknout peněženku mým otiskem</string>
+    <string name="check_back">Ukázat slova znovu</string>
+    <string name="restore_title">Obnova peněženky</string>
+    <string name="restore_text">Napište 12 nebo 24 slov existující peněženky, oddělená mezerami. Uloží se v tomto telefonu pod ochranou vašeho otisku.</string>
+    <string name="words_label">Slova pro obnovu</string>
+    <string name="restore_go">Uložit peněženku</string>
+    <string name="notice_wallet_ready">Peněženka je připravená.</string>
+    <string name="notice_wallet_removed">Peněženka byla z telefonu odebrána.</string>
+    <string name="notice_saved">Uloženo.</string>
+
+    <string name="receive_title">Příjem</string>
+    <string name="receive_next">Další adresa</string>
+    <string name="receive_note">Adresa číslo %1$d této peněženky. Každá adresa platí dál; nová adresa pro každého plátce drží vaše platby od sebe.</string>
+
+    <string name="send_title">Odeslání</string>
+    <string name="send_to">Adresa příjemce</string>
+    <string name="send_paste">Vložit adresu</string>
+    <string name="send_amount">Částka (NORTH)</string>
+    <string name="send_everything">Odeslat vše</string>
+    <string name="send_fee_rate">Poplatek za vB:</string>
+    <string name="send_fee">Poplatek</string>
+    <string name="send_change">Vrátí se vám</string>
+    <string name="send_inputs">Použitých mincí</string>
+    <string name="send_size">Velikost</string>
+    <string name="send_check">Zkontrolovat platbu</string>
+    <string name="send_confirm_title">Potvrzení platby</string>
+    <string name="send_confirm_text">Porovnejte adresu s jejím zdrojem znak po znaku. Odeslanou platbu nelze vzít zpět.</string>
+    <string name="send_go">Podepsat otiskem a odeslat</string>
+    <string name="sending">Odesílám…</string>
+    <string name="sent_title">Odesláno</string>
+    <string name="sent_text">Uzel transakci přijal. Její označení:</string>
+
+    <string name="history_none">Zatím tu nic není.</string>
+    <string name="history_received">příjem</string>
+    <string name="history_paid">platba</string>
+    <string name="history_wallet">peněženka</string>
+    <string name="history_watched">sledovaná adresa</string>
+
+    <string name="mining_found">Nalezené bloky</string>
+    <string name="mining_blocks">Bloků</string>
+    <string name="mining_coins">Odměny (NORTH)</string>
+    <string name="mining_last_day">Za posledních 24 hodin</string>
+    <string name="mining_network">Síť</string>
+    <string name="mining_hashrate">Výkon sítě</string>
+    <string name="mining_block_time">Čas na blok</string>
+    <string name="mining_mine">Můj stroj</string>
+    <string name="mining_needs_wallet">Vlastní výkon lze uložit, až bude v telefonu peněženka.</string>
+    <string name="mining_my_hashrate">Můj výkon (kH/s)</string>
+    <string name="mining_share">Podíl na síti</string>
+    <string name="mining_expected">Čekaných bloků za den</string>
+    <string name="mining_expected_coins">Čekáno za den (NORTH)</string>
+    <string name="mining_luck">Štěstí za posledních 24 hodin</string>
+    <string name="mining_note">Čekané hodnoty vycházejí ze sítě za posledních 120 bloků. Štěstí porovnává bloky nalezené za 24 hodin s tímto očekáváním.</string>
+
+    <string name="price_title">Hodnota</string>
+    <string name="price_text">Tržní cena zatím neexistuje. Když zadáte cenu za minci, přehled ukáže, jakou hodnotu by celek měl. Na internetu se nic nevyhledává.</string>
+    <string name="price_label">Cena 1 NORTH</string>
+    <string name="price_currency">Měna (například USD)</string>
+
+    <string name="paper_title">Vybrání papírové adresy</string>
+    <string name="paper_text">Napište slova papírové adresy a přesuňte její mince. Slova se použijí jednou a neukládají se. Papír potom už není bezpečný: přesuňte vše, do této peněženky nebo na novou papírovou adresu.</string>
+    <string name="paper_look">Podívat se na adresu</string>
+    <string name="paper_to_wallet">Do této peněženky</string>
+    <string name="paper_keep">Částka pro tuto peněženku (prázdné znamená vše)</string>
+    <string name="paper_rest_to">Adresa pro zbytek (nová papírová adresa)</string>
+    <string name="paper_warning">Tímto se papírová adresa úplně vyprázdní. Obě adresy zkontrolujte znak po znaku.</string>
+    <string name="paper_go">Podepsat a odeslat</string>
+
+    <string name="problem_bad_address">Tohle není platná adresa této sítě.</string>
+    <string name="problem_bad_amount">Částka není platná. Zadejte číslo, například 12,5; nejmenší částka je 0,00001.</string>
+    <string name="problem_nothing_to_spend">Teď není co utratit.</string>
+    <string name="problem_not_enough">Mincí je málo. I s poplatkem lze odeslat nejvýše %1$s.</string>
+    <string name="problem_fee_rate">Poplatek je mimo povolené meze.</string>
+    <string name="problem_too_many_inputs">Příliš mnoho malých mincí na jednu transakci. Pošlete nejdřív menší částku.</string>
+    <string name="problem_wrong_words">Tato slova patří jiné peněžence.</string>
+    <string name="problem_bad_words">Tohle nejsou platná slova pro obnovu. Zkontrolujte pravopis a pořadí.</string>
+    <string name="problem_rejected">Uzel transakci odmítl (%1$s). Nic nebylo odesláno.</string>
+    <string name="problem_unlock">Odemknutí se nepodařilo (%1$s).</string>
+
+    <string name="scan_button">Načíst QR kód</string>
+    <string name="scan_close">Zavřít kameru</string>
+    <string name="scan_denied">Bez oprávnění ke kameře kód načíst nejde. Adresu můžete dál vložit ze schránky.</string>
+    <string name="scan_not_address">V kódu není adresa této sítě.</string>
+    <string name="notify_title">Upozornění</string>
+    <string name="notify_text">Zhruba každých patnáct minut se telefon zeptá vašeho uzlu, zda přišla odměna za blok nebo platba, i když je aplikace zavřená. Funguje to jen tehdy, když telefon na uzel dosáhne, a přesný okamžik určuje telefon.</string>
+    <string name="notify_setting">Ohlásit novou odměnu nebo platbu</string>
+    <string name="notify_denied">Upozornění nejsou pro tuto aplikaci povolena. Povolte je v nastavení telefonu.</string>
+    <string name="notify_channel">Odměny a platby</string>
+    <string name="notify_reward">Nová odměna za blok</string>
+    <string name="notify_payment">Přijatá platba</string>
+    <string name="notify_block">blok %1$d</string>
+
+    <string name="pending_title">Odesláno, čeká na blok</string>
+    <string name="pending_text">Uzel ukazuje starý zůstatek, dokud platba není v bloku. Mince této platby se mezitím nenabízejí pro další platbu.</string>
+</resources>

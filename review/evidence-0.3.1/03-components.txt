@@ -1,0 +1,6 @@
+== Components of the release package (who can start what)
+activity  exported=true    permission=-                                             io.github.severka_monitor.northwatch.MainActivity
+service   exported=false   permission=android.permission.BIND_JOB_SERVICE           io.github.severka_monitor.northwatch.WatchJob
+service   exported=false   permission=-                                             androidx.camera.core.impl.MetadataHolderService
+provider  exported=false   permission=-                                             androidx.startup.InitializationProvider
+receiver  exported=true    permission=android.permission.DUMP                       androidx.profileinstaller.ProfileInstallReceiver
