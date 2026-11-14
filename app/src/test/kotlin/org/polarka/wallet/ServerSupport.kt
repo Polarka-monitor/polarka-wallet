@@ -121,12 +121,17 @@ internal class StandIn private constructor(private val process: Process, val por
 /**
  * Stands between the wallet and a wallet server. It keeps the paths that were asked for, can do something
  * right after the server has answered and before the wallet hears of it ([after]), and can change an answer
- * on its way back ([rewrite]): a server that is slow, and a server that lies.
+ * on its way back ([rewrite]): a server that is slow, and a server that lies. It can also answer by itself
+ * without passing the question on ([instead]), and pass the question on and then lose the answer ([lost]).
  */
 internal class ServerRelay(private val target: String) : AutoCloseable {
     val paths = ArrayList<String>()
     @Volatile var after: (path: String, count: Int) -> Unit = { _, _ -> }
     @Volatile var rewrite: (path: String, answer: String) -> String = { _, answer -> answer }
+    /** A status and a body to answer with in place of the server, which is then not asked at all. */
+    @Volatile var instead: (path: String, body: String) -> Pair<Int, String>? = { _, _ -> null }
+    /** A status to answer with after the server was asked and has answered: the wallet does not get what the server said. */
+    @Volatile var lost: (path: String, count: Int) -> Int? = { _, _ -> null }
     private val server = ServerSocket(0, 50, java.net.InetAddress.getLoopbackAddress())
     val url: String get() = "http://127.0.0.1:${server.localPort}"
 
@@ -158,16 +163,30 @@ internal class ServerRelay(private val target: String) : AutoCloseable {
         }
         val path = first[1]
         val count = synchronized(paths) { paths.add(path); paths.count { it == path } }
-        val c = URL(target + path).openConnection() as HttpURLConnection
-        c.requestMethod = first[0]
-        if (first[0] == "POST") {
-            c.doOutput = true
-            c.setRequestProperty("Content-Type", headers["content-type"] ?: "application/json")
-            c.outputStream.use { it.write(raw) }
+        var status: Int
+        var answer: String
+        var retry: String? = null
+        val made = instead(path, raw.decodeToString())
+        if (made != null) {
+            status = made.first
+            answer = made.second
+        } else {
+            val c = URL(target + path).openConnection() as HttpURLConnection
+            c.requestMethod = first[0]
+            if (first[0] == "POST") {
+                c.doOutput = true
+                c.setRequestProperty("Content-Type", headers["content-type"] ?: "application/json")
+                c.outputStream.use { it.write(raw) }
+            }
+            status = c.responseCode
+            answer = ((if (status in 200..299) c.inputStream else c.errorStream)?.use { it.readBytes() } ?: ByteArray(0)).decodeToString()
+            retry = c.getHeaderField("Retry-After")
+            val gone = lost(path, count)
+            if (gone != null) {
+                status = gone
+                answer = "{\"message\":\"the answer was lost on the way\"}"
+            }
         }
-        val status = c.responseCode
-        val answer = ((if (status in 200..299) c.inputStream else c.errorStream)?.use { it.readBytes() } ?: ByteArray(0)).decodeToString()
-        val retry = c.getHeaderField("Retry-After")
         after(path, count)
         val out = rewrite(path, answer).encodeToByteArray()
         s.getOutputStream().apply {

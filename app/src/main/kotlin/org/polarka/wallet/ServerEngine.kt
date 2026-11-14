@@ -1,7 +1,11 @@
 package org.polarka.wallet
 
+import north.core.Account
 import north.core.Chain
+import north.core.Plan
+import north.core.Planner
 import north.core.Qrh
+import north.core.SignedSpend
 import north.core.Unspent
 import north.core.WatchKey
 import north.node.Balance
@@ -11,6 +15,7 @@ import north.node.NodeClient
 import north.node.NodeError
 import north.node.ServerClient
 import north.node.ServerMove
+import north.node.Utxo
 
 /**
  * The wallet's look at the chain through a Northbound wallet server, for an owner who runs no node.
@@ -38,6 +43,9 @@ import north.node.ServerMove
  *   history may not have caught up with its node. A payment in a block would show the same if it were older
  *   than the lines read for its addresses and had left the wallet no coin.
  * - There is no hash rate and no time between blocks.
+ * - A payment is signed on the phone and handed over afterwards ([deliver]); the node behind the server checks
+ *   it at the hand-over, not at the signing. The server answers every failed hand-over alike, so after one
+ *   the outcome is asked for and, if nobody knows, stays "not known" until a look settles it.
  *
  * Everything in one look has to come from the same block. If a block arrives in between, the look is made again.
  */
@@ -45,6 +53,8 @@ class ServerEngine(
     private val chain: Chain, private val watched: List<String>, private val server: ServerClient,
     /** The most lines of history read for one part of the addresses. */
     private val most: Int = MAX_LINES,
+    private val pause: (Long) -> Unit = { Thread.sleep(it) },
+    private val clock: () -> Long = { System.nanoTime() },
 ) {
     private class Keys(
         val xpub: String, val window: Int, val addresses: List<String>,
@@ -66,10 +76,10 @@ class ServerEngine(
 
     private var keys: Keys? = null
 
-    /** The wallet's addresses of both branches: some hundred keys, worked out once and kept from look to look. */
+    /** The addresses of both branches of an account: some hundred keys. The wallet's own are worked out once and kept from look to look. */
     @Synchronized
-    private fun keysOf(watch: WatchKey, window: Int): Keys {
-        keys?.let { if (it.xpub == watch.xpub && it.window == window) return it }
+    private fun keysOf(watch: WatchKey, window: Int, kept: Boolean = true): Keys {
+        if (kept) keys?.let { if (it.xpub == watch.xpub && it.window == window) return it }
         val addresses = ArrayList<String>(2 * window)
         val places = HashMap<String, Pair<Int, Int>>()
         val scripts = HashMap<String, Pair<Int, Int>>()
@@ -85,7 +95,8 @@ class ServerEngine(
             val to = minOf(from + HALF, window)
             addresses.subList(from, to) + addresses.subList(window + from, window + to)
         }
-        return Keys(watch.xpub, window, addresses, places, scripts, parts).also { keys = it }
+        // Only the wallet's own table is kept; a paper address that is looked at in between gets one that is thrown away.
+        return Keys(watch.xpub, window, addresses, places, scripts, parts).also { if (kept) keys = it }
     }
 
     /**
@@ -94,6 +105,20 @@ class ServerEngine(
      * the owner has said so ([WalletInfo.lookTo]). Keys the wallet already uses are always looked at.
      */
     fun allowed(wallet: WalletInfo): Int = maxOf(AUTO, wallet.lookTo, maxOf(wallet.receiveIndex, wallet.changeIndex) + 1)
+
+    /** The keys of each branch that every look covers: all that the app may look at for this wallet. */
+    fun windowOf(wallet: WalletInfo): Int = allowed(wallet)
+
+    private fun key(coin: Unspent): String = coin.txid + ":" + coin.vout
+
+    private fun scriptFor(address: String): ByteArray =
+        try { Qrh.scriptForAddress(chain, address.trim()) } catch (e: Exception) { throw EngineError(Problem.Kind.BAD_ADDRESS) }
+
+    /** The server's coins, each on the key it sits on. The server is trusted for what exists, not for whose it is: every coin must sit on one of these keys. */
+    private fun placed(utxos: List<Utxo>, keys: Keys): List<Unspent> = utxos.map { u ->
+        val place = keys.scripts[u.script] ?: throw EngineError(Problem.Kind.FOREIGN_OUTPUTS)
+        Unspent(u.txid, u.vout, u.amountSat, place.first, place.second, u.height, u.coinbase)
+    }
 
     private fun plus(vararg amounts: Long): Long {
         var sum = 0L
@@ -239,11 +264,7 @@ class ServerEngine(
             tips.add(found.tipHash)
             tip = found.tip
             tipHash = found.tipHash
-            // the server is trusted for what exists, not for what is the wallet's: every coin must sit on one of its keys
-            coins = found.utxos.map { u ->
-                val place = keys.scripts[u.script] ?: throw EngineError(Problem.Kind.FOREIGN_OUTPUTS)
-                Unspent(u.txid, u.vout, u.amountSat, place.first, place.second, u.height, u.coinbase)
-            }
+            coins = placed(found.utxos, keys)
             val rewards = found.utxos.filter { it.coinbase }.map { it.txid }.toSet()
             val told = histories(keys.parts)
             tips.addAll(told.tips)
@@ -341,6 +362,119 @@ class ServerEngine(
         if (tip < 0) tip = top
         // The answers may be of different heights. What is above the lowest of them is told the next time, so that nothing is told twice.
         return tip to result.filter { it.move.height <= tip }.sortedBy { it.move.height }
+    }
+
+    /**
+     * A payment from the wallet, worked out from a fresh list of its coins. [amountSat] null means everything.
+     *
+     * A coin that a waiting transaction spends is not in the server's list, whoever made that transaction, so
+     * a payment is not built on it a second time. [used] are the coins the app itself knows to be tied up;
+     * they are left out as well, for a server whose index is a moment behind its node. As with a node, the
+     * payment spends one coin of every payment that did not go through and that nothing stands against yet
+     * ([WalletInfo.unanswered]): whatever happens later, only one of the two can be in a block.
+     */
+    fun plan(wallet: WalletInfo, to: String, amountSat: Long?, feeRate: Long, used: Set<String> = emptySet()): Plan {
+        val script = scriptFor(to)
+        val watch = wallet.watchKey()
+        val keys = keysOf(watch, allowed(wallet))
+        val found = server.utxos(keys.addresses)
+        val spendable = placed(found.utxos, keys).filter { it.spendableAt(found.tip) && key(it) !in used }
+        val must = Engine.against(wallet.unanswered, spendable)
+        return if (amountSat == null) Planner.sweep(spendable, script, feeRate, must)
+        else Planner.pay(spendable, script, amountSat, feeRate, watch.script(1, wallet.changeIndex), must)
+    }
+
+    /**
+     * Signs with the given words. Nothing leaves the phone here: the server sees the transaction when it is
+     * handed over ([deliver]), which the app does only after it has written the payment down.
+     */
+    fun sign(expectedXpub: String, plan: Plan, words: List<String>): SignedSpend {
+        val account = try { Account.fromWords(words, chain) } catch (e: Exception) { throw EngineError(Problem.Kind.BAD_WORDS) }
+        if (account.watchKey().xpub != expectedXpub) throw EngineError(Problem.Kind.WRONG_WORDS)
+        return plan.sign(account)
+    }
+
+    /** What a node says of a transaction that it already has, waiting or in a block. */
+    private fun onItsWay(reason: String?): Boolean {
+        val said = reason.orEmpty().lowercase()
+        return "txn-already" in said || "already in" in said || "already known" in said || "same-nonwitness-data" in said
+    }
+
+    /**
+     * Hands a signed transaction to the server. True: the node behind it has the transaction. False: that
+     * could not be found out.
+     *
+     * The node is first asked whether it would take the transaction. Its no at this point is a refusal and is
+     * thrown, and so is a server that could not be asked. In both cases nothing was handed over for sending.
+     *
+     * After that nothing is thrown any more. The server answers every failed hand-over in the same way, a node
+     * that said no like a node that was away, so a failed hand-over says nothing by itself. The server is then
+     * asked whether it knows the transaction, and the same transaction is handed over again; doing that twice
+     * cannot pay twice. An answer that names another transaction is not believed either. There are at most
+     * three tries, and none is started later than forty seconds after the first.
+     */
+    fun deliver(signed: SignedSpend): Boolean {
+        val verdict = try {
+            server.validate(signed.hex)
+        } catch (e: NodeError) {
+            val problem = Problem.of(e)
+            throw EngineError(problem.kind, problem.detail)
+        }
+        if (!verdict.allowed) {
+            if (onItsWay(verdict.reason)) return true
+            throw EngineError(Problem.Kind.REJECTED, verdict.reason.orEmpty())
+        }
+        val deadline = clock() + Engine.DELIVERY_MILLIS * 1_000_000
+        for (attempt in 1..Engine.DELIVERY_TRIES) {
+            if (runCatching { server.broadcast(signed.hex) }.getOrNull() == signed.txid) return true
+            if (runCatching { server.known(signed.txid) }.getOrDefault(false)) return true
+            if (clock() > deadline) return false
+            if (attempt < Engine.DELIVERY_TRIES) runCatching { pause(Engine.DELIVERY_PAUSE_MILLIS) }
+        }
+        return false
+    }
+
+    /** Signs and hands over. Returns the id of the transaction that was signed; the server's answer is not taken for it. */
+    fun send(expectedXpub: String, plan: Plan, words: List<String>): String {
+        val signed = sign(expectedXpub, plan, words)
+        deliver(signed)
+        return signed.txid
+    }
+
+    /**
+     * Looks at what the account of some recovery words holds (a paper address). The words are not kept. The
+     * server is named the first twenty addresses of each branch of that account, so it learns that this phone
+     * asked about them. [spent] are coins already sent away in an earlier part of the same emptying. Coins
+     * that a waiting transaction spends are not in the server's list.
+     */
+    fun paperLook(words: List<String>, spent: Set<String> = emptySet()): PaperFound {
+        val account = try { Account.fromWords(words, chain) } catch (e: Exception) { throw EngineError(Problem.Kind.BAD_WORDS) }
+        val keys = keysOf(account.watchKey(), WalletInfo.GAP, kept = false)
+        val found = server.utxos(keys.addresses)
+        return PaperFound(account.address(0, 0), found.tip, placed(found.utxos, keys).filter { key(it) !in spent })
+    }
+
+    /**
+     * Empties a paper address. With [keepSat] null everything goes to [to]. Otherwise [keepSat] goes to [to]
+     * and the rest to [restTo]. One transaction takes at most a thousand coins; the plan says how many are left.
+     */
+    fun paperPlan(found: PaperFound, to: String, feeRate: Long, keepSat: Long? = null, restTo: String? = null): Plan {
+        val script = scriptFor(to)
+        if (keepSat == null) return Planner.sweep(found.spendable, script, feeRate)
+        val rest = scriptFor(restTo ?: throw EngineError(Problem.Kind.BAD_ADDRESS))
+        return Planner.split(found.spendable, script, keepSat, feeRate, rest)
+    }
+
+    fun paperSign(found: PaperFound, plan: Plan, words: List<String>): SignedSpend {
+        val account = try { Account.fromWords(words, chain) } catch (e: Exception) { throw EngineError(Problem.Kind.BAD_WORDS) }
+        if (account.address(0, 0) != found.address) throw EngineError(Problem.Kind.WRONG_WORDS)
+        return sign(account.watchKey().xpub, plan, words)
+    }
+
+    fun paperSend(found: PaperFound, plan: Plan, words: List<String>): String {
+        val signed = paperSign(found, plan, words)
+        deliver(signed)
+        return signed.txid
     }
 
     companion object {

@@ -350,27 +350,6 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
         throw EngineError(Problem.Kind.IN_WAITING_PAYMENT)
     }
 
-    /**
-     * The coins a new payment must spend to stand against every payment in [unanswered]: one free coin of
-     * each. A coin that several of them share is taken first, so that few coins are enough. If one of them
-     * has no free coin at this moment, no payment can be made that is safe beside it, and none is made.
-     */
-    private fun against(unanswered: List<Dropped>, spendable: List<Unspent>): List<Unspent> {
-        if (unanswered.isEmpty()) return emptyList()
-        val free = spendable.associateBy { key(it) }
-        if (unanswered.any { payment -> payment.inputs.none { it in free } }) throw EngineError(Problem.Kind.EARLIER_PAYMENT)
-        val left = ArrayList(unanswered)
-        val must = ArrayList<Unspent>()
-        while (left.isNotEmpty()) {
-            val shared = HashMap<String, Int>()
-            for (payment in left) for (coin in payment.inputs) if (coin in free) shared[coin] = (shared[coin] ?: 0) + 1
-            val best = shared.entries.sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key }).first().key
-            must.add(free.getValue(best))
-            left.removeAll { best in it.inputs }
-        }
-        return must
-    }
-
     /** Signs with the given words and lets the node check the result. Nothing is sent here. */
     fun sign(expectedXpub: String, plan: Plan, words: List<String>): SignedSpend {
         val account = try { Account.fromWords(words, setup.chain) } catch (e: Exception) { throw EngineError(Problem.Kind.BAD_WORDS) }
@@ -495,5 +474,26 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
         const val DELIVERY_PAUSE_MILLIS = 1500L
         /** After this long no further try is started; the payment is then kept as "outcome not known". */
         const val DELIVERY_MILLIS = 40_000L
+
+        /**
+         * The coins a new payment must spend to stand against every payment in [unanswered]: one free coin of
+         * each. A coin that several of them share is taken first, so that few coins are enough. If one of them
+         * has no free coin at this moment, no payment can be made that is safe beside it, and none is made.
+         */
+        fun against(unanswered: List<Dropped>, spendable: List<Unspent>): List<Unspent> {
+            if (unanswered.isEmpty()) return emptyList()
+            val free = spendable.associateBy { it.txid + ":" + it.vout }
+            if (unanswered.any { payment -> payment.inputs.none { it in free } }) throw EngineError(Problem.Kind.EARLIER_PAYMENT)
+            val left = ArrayList(unanswered)
+            val must = ArrayList<Unspent>()
+            while (left.isNotEmpty()) {
+                val shared = HashMap<String, Int>()
+                for (payment in left) for (coin in payment.inputs) if (coin in free) shared[coin] = (shared[coin] ?: 0) + 1
+                val best = shared.entries.sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key }).first().key
+                must.add(free.getValue(best))
+                left.removeAll { best in it.inputs }
+            }
+            return must
+        }
     }
 }
