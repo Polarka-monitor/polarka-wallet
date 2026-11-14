@@ -473,11 +473,11 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
 
     // ------------------------------------------------------------------------------------------ the wallet's words
 
-    /** Makes new words and shows them. Nothing is stored until the owner has written them down and confirmed. */
-    fun startNewWallet() {
+    /** Makes new words, 12 or 24, and shows them. Nothing is stored until the owner has written them down and confirmed. */
+    fun startNewWallet(count: Int = 24) {
         if (state.wallet != null) return
         state = if (state.wordsWithoutWallet) state.copy(walletProblem = Problem(Problem.Kind.WORDS_EXIST))
-        else state.copy(newWords = SecretWords(Words.generate()), walletProblem = null)
+        else state.copy(newWords = SecretWords(Words.generate(count)), walletProblem = null)
     }
 
     fun cancelNewWallet() {

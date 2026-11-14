@@ -6,9 +6,10 @@ import java.security.SecureRandom
 
 /** New recovery words, and the checks on words somebody types in. */
 object Words {
-    /** 24 words from 256 bits of the system's randomness. */
-    fun generate(random: SecureRandom = SecureRandom()): List<String> {
-        val entropy = ByteArray(32)
+    /** New words from the system's randomness: 24 words from 256 bits, or 12 words from 128 bits. */
+    fun generate(count: Int = 24, random: SecureRandom = SecureRandom()): List<String> {
+        require(count == 12 || count == 24) { "a wallet has 12 or 24 words" }
+        val entropy = ByteArray(if (count == 12) 16 else 32)
         random.nextBytes(entropy)
         try {
             return MnemonicCode.toMnemonics(entropy)

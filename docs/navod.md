@@ -17,26 +17,39 @@ Mějte v ní jen malé částky. Větší úspory patří na papír (studená ad
   `f441275239c880d0855a40525ca2449a2aa4992b4d4c2e63143d36c088ce103b`. Pokud se cokoli liší, soubor neinstalujte.
 - Android se zeptá, zda smí aplikace, kterou jste soubor otevřeli, instalovat. Povolte to pro tento jeden případ.
 
-## První spuštění: uzel
+## První spuštění: server, nebo vlastní uzel
 
-Peněženka nemá vlastní server. Na stav vašich adres se ptá uzlu sítě TrueNorth.
+Peněženka nemá vlastní server. Na stav vašich adres se ptá jinde a je na vás, kde.
 
+- **Veřejný server** je nejrychlejší cesta a nabízí se jako první. Předvyplněný je server projektu Northbound
+  (`https://api.northboundwallet.org`); neprovozují ho autoři této aplikace. Server vidí všechny adresy vaší
+  peněženky pohromadě a vaši internetovou adresu. Mohl by vám ukázat nepravdivý zůstatek, zatajit příchozí
+  platbu nebo platbu zdržet. Mince vám vzít nemůže: slova ani klíče telefon neopouštějí. Když server neběží,
+  peněženka nic neukáže; mince zůstávají vaše a připojíte se jinam. Místo předvyplněné adresy lze napsat
+  adresu jiného serveru se stejným rozhraním.
 - **Vlastní uzel** nechá vaše adresy jen vám. Viz poslední kapitolu.
-- **Veřejný uzel** je rychlá cesta tam, kde nějaký je: napište jeho adresu. Tento projekt zatím vlastní veřejný
-  uzel neprovozuje, proto aplikace žádný jménem nenabízí. Veřejný uzel vidí vaše adresy a vaši internetovou
-  adresu a mohl by vám ukázat nepravdivý zůstatek nebo platbu zadržet. Mince vám vzít nemůže.
+
+Co je přes server jinak než s vlastním uzlem:
+
+- Platba, která čeká na blok, se v zůstatku projeví hned: mince, ze které se platí, se nepočítá a zbytek
+  z ní je uveden zvlášť jako částka na cestě.
+- U peněženky s více než sto adresami (zhruba po padesáti platbách) může v historii u některých plateb chybět
+  poplatek a výjimečně celý řádek. Stránka Historie to řekne. Zůstatek a mince jsou úplné vždy.
+- Stránka těžby neukazuje výkon sítě a odměnu za blok pozná jen do chvíle, než je utracena.
 
 Jednou spusťte vlastní test (první obrazovka nebo Více). Ukáže, že kód pro klíče na vašem telefonu funguje.
 
 ## Založení peněženky
 
-1. Přehled, "Vytvořit novou peněženku". Telefon ukáže 24 slov.
+1. Přehled: zvolte 24 nebo 12 slov a "Vytvořit novou peněženku". 24 slov nese 256 bitů náhodnosti, 12 slov
+   128 bitů; dvanáct slov se opisuje snáz a otevře je i peněženka Northbound pro počítač. Počet slov nelze
+   u hotové peněženky změnit. Telefon slova ukáže.
 2. Opište je rukou na papír, v daném pořadí. Nefoťte je, nikam je nepište, neukládejte je do žádné aplikace.
    Kdo má slova, má mince. Bez nich znamená ztracený nebo rozbitý telefon ztracené mince.
 3. Aplikace se zeptá na tři ze slov a potom slova zapečetí vaším otiskem nebo zámkem obrazovky.
 4. Než na peněženku pošlete mince, zkontrolujte celý papír: Více, "Kontrola celého papíru". Napište všechna slova
    z papíru. Aplikace řekne, zda jsou to slova této peněženky. Tři slova, na která se aplikace zeptala,
-   neukážou, že je správně zbylých jedenadvacet; tato kontrola ano. Aplikace slova už nikdy neukáže, takže
+   neukážou, že jsou správně ta ostatní; tato kontrola ano. Aplikace slova už nikdy neukáže, takže
    chybu nalezenou později lze napravit jen přesunem mincí do nové peněženky.
 5. Papír uložte tam, kam se nedostane oheň, voda ani zvědaví lidé.
 
@@ -56,7 +69,7 @@ během několika minut; dřív ji peněženka nevidí. Po použití adresy nabí
 3. "Podepsat otiskem a odeslat". Odeslanou platbu nelze vzít zpět.
 
 Dokud nepřijde blok, je platba v Přehledu uvedena jako čekající a její mince se znovu nenabízejí. Pokud uzel
-nepotvrdí, že platbu převzal, aplikace řekne, že výsledek není znám. Neplaťte pak znovu: za minutu obnovte
+nebo server nepotvrdí, že platbu převzal, aplikace řekne, že výsledek není znám. Neplaťte pak znovu: za minutu obnovte
 přehled a aplikace ukáže, zda platba čeká na blok, nebo neproběhla.
 
 Platba, která neproběhla, zůstane v Přehledu jako "Neproběhla, ještě může dorazit": uzel, kterého se aplikace
@@ -83,7 +96,7 @@ podívejte se nejdřív znovu na papír.
 Papír, který nikdo nevyzkoušel, je naděje, ne záloha. Zkontrolujte ho, dokud je peněženka v telefonu
 (Více, "Kontrola celého papíru"), nebo z něj peněženku jednou obnovte s malou částkou.
 
-Sama od sebe aplikace prohlíží prvních 200 adres peněženky, u veřejného uzlu 40. Pokud uzel ukazuje, že jich
+Sama od sebe aplikace prohlíží prvních 200 adres peněženky, u veřejného uzlu a u serveru 40. Pokud uzel ukazuje, že jich
 je použito víc, zeptá se Přehled, zda má aplikace hledat dál. Řekněte ano, pokud jste peněženku opravdu tolik
 používali. Pokud ne, uzel ukazuje něco, co není pravda: řekněte ne a použijte jiný uzel. Pokud po obnově
 chybí mince, o kterých víte, je na stránce Více volba "Prohlédnout dvakrát tolik".

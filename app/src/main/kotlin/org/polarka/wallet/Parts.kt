@@ -32,7 +32,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -154,6 +156,17 @@ fun Banner() {
     }
 }
 
+/**
+ * True while the setup names a wallet server. The pages then speak of the server where they would speak of
+ * the node: it is the server that is asked, that may be busy, and that takes a payment.
+ */
+val LocalOverServer = staticCompositionLocalOf { false }
+
+/** The sentence for a node, or the one for a wallet server while the app asks one. */
+@Composable
+@ReadOnlyComposable
+fun pick(node: Int, server: Int): Int = if (LocalOverServer.current) server else node
+
 @Composable
 fun NoticeCard(model: WalletModel, state: WalletState) {
     val notice = state.notice ?: return
@@ -167,13 +180,13 @@ fun NoticeCard(model: WalletModel, state: WalletState) {
         Notice.WALLET_MADE -> R.string.notice_wallet_made
         Notice.WALLET_REMOVED -> R.string.notice_wallet_removed
         Notice.SAVED -> R.string.notice_saved
-        Notice.PAYMENT_GONE -> R.string.notice_payment_gone
+        Notice.PAYMENT_GONE -> pick(R.string.notice_payment_gone, R.string.notice_payment_gone_server)
         Notice.ADDRESS_LIMIT -> R.string.notice_address_limit
         Notice.WORDS_REMOVED -> R.string.notice_words_removed
         Notice.LOOK_LIMIT -> R.string.notice_look_limit
         Notice.PAYMENT_BEATEN -> R.string.notice_payment_beaten
         Notice.PAYMENT_ARRIVED -> R.string.notice_payment_arrived
-        Notice.PAYMENT_BACK -> R.string.notice_payment_back
+        Notice.PAYMENT_BACK -> pick(R.string.notice_payment_back, R.string.notice_payment_back_server)
     }
     val withAmount = notice == Notice.PAYMENT_GONE || notice == Notice.PAYMENT_BEATEN || notice == Notice.PAYMENT_ARRIVED || notice == Notice.PAYMENT_BACK
     Card(Modifier.fillMaxWidth()) {
@@ -189,15 +202,15 @@ fun NoticeCard(model: WalletModel, state: WalletState) {
 
 @Composable
 fun problemText(problem: Problem): String = when (problem.kind) {
-    Problem.Kind.UNREACHABLE -> stringResource(R.string.problem_unreachable)
-    Problem.Kind.TIMEOUT -> stringResource(R.string.problem_timeout)
-    Problem.Kind.BUSY -> stringResource(R.string.problem_busy)
+    Problem.Kind.UNREACHABLE -> stringResource(pick(R.string.problem_unreachable, R.string.problem_unreachable_server))
+    Problem.Kind.TIMEOUT -> stringResource(pick(R.string.problem_timeout, R.string.problem_timeout_server))
+    Problem.Kind.BUSY -> stringResource(pick(R.string.problem_busy, R.string.problem_busy_server))
     Problem.Kind.LOGIN -> stringResource(R.string.problem_login)
     Problem.Kind.NOT_ALLOWED -> stringResource(R.string.problem_not_allowed)
-    Problem.Kind.NODE -> stringResource(R.string.problem_node, problem.detail)
-    Problem.Kind.OTHER_CHAIN -> stringResource(R.string.problem_other_chain, problem.detail)
-    Problem.Kind.FOREIGN_OUTPUTS -> stringResource(R.string.problem_foreign)
-    Problem.Kind.STORE -> stringResource(R.string.problem_store, problem.detail)
+    Problem.Kind.NODE -> stringResource(pick(R.string.problem_node, R.string.problem_node_server), problem.detail)
+    Problem.Kind.OTHER_CHAIN -> stringResource(pick(R.string.problem_other_chain, R.string.problem_other_chain_server), problem.detail)
+    Problem.Kind.FOREIGN_OUTPUTS -> stringResource(pick(R.string.problem_foreign, R.string.problem_foreign_server))
+    Problem.Kind.STORE -> stringResource(pick(R.string.problem_store, R.string.problem_store_server), problem.detail)
     Problem.Kind.UNEXPECTED -> stringResource(R.string.problem_unexpected, problem.detail)
     Problem.Kind.BAD_ADDRESS -> stringResource(R.string.problem_bad_address)
     Problem.Kind.BAD_AMOUNT -> stringResource(R.string.problem_bad_amount)
@@ -207,10 +220,10 @@ fun problemText(problem: Problem): String = when (problem.kind) {
     Problem.Kind.TOO_MANY_INPUTS -> stringResource(R.string.problem_too_many_inputs)
     Problem.Kind.WRONG_WORDS -> stringResource(R.string.problem_wrong_words)
     Problem.Kind.BAD_WORDS -> wordsProblemText(problem.detail)
-    Problem.Kind.REJECTED -> stringResource(R.string.problem_rejected, problem.detail)
+    Problem.Kind.REJECTED -> stringResource(pick(R.string.problem_rejected, R.string.problem_rejected_server), problem.detail)
     Problem.Kind.UNLOCK -> stringResource(R.string.problem_unlock, problem.detail)
     Problem.Kind.IN_WAITING_PAYMENT -> stringResource(R.string.problem_in_waiting)
-    Problem.Kind.UNSURE -> stringResource(R.string.problem_unsure, problem.detail)
+    Problem.Kind.UNSURE -> stringResource(pick(R.string.problem_unsure, R.string.problem_unsure_server), problem.detail)
     Problem.Kind.KEY_GONE -> stringResource(R.string.problem_key_gone)
     Problem.Kind.WORDS_EXIST -> stringResource(R.string.problem_words_exist)
     Problem.Kind.WALLET_FILE -> stringResource(R.string.problem_wallet_file, problem.detail)

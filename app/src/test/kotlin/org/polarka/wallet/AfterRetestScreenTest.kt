@@ -75,7 +75,7 @@ class AfterRetestScreenTest {
     @Test
     fun checkBeforeSavingSaysWhatTheNodeWillBeGiven() {
         val model = Robolectric.buildActivity(MainActivity::class.java).setup().get().model
-        waitFor("public-go")
+        waitFor("server-go")
         model.offer("""{"format":"north-watch-setup/1","node":{"url":"https://node.example/","user":"phone","password":"Pass-1"},"chain":"main","addresses":["$mainAddress"]}""")
         waitFor("offer-sees")
         val own = textOf("offer-sees")
@@ -83,6 +83,10 @@ class AfterRetestScreenTest {
         model.dropOffer()
         model.offerPublic("https://node.example/")
         screen.waitUntil(10_000) { shown("offer-sees") && "A public node sees your addresses" in textOf("offer-sees") }
+        // 0.6: and for a wallet server it says what a server sees
+        model.dropOffer()
+        model.offerServer("https://server.example/")
+        screen.waitUntil(10_000) { shown("offer-sees") && "The server sees all the addresses of your wallet together" in textOf("offer-sees") }
     }
 
     /**

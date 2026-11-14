@@ -18,26 +18,42 @@ Keep only small amounts in it. Larger savings belong on paper (a cold address).
   do not install the file.
 - Android asks for permission to install from the app you opened the file with. Allow it for that once.
 
-## First start: the node
+## First start: a server, or a node of your own
 
-The wallet has no server of its own. It asks a TrueNorth node what your addresses hold.
+The wallet has no server of its own. It asks elsewhere what your addresses hold, and where is your choice.
 
+- **A public server** is the quickest way and is offered first. The one filled in is the server of the
+  Northbound project (`https://api.northboundwallet.org`); it is not run by the authors of this app. The
+  server sees all the addresses of your wallet together and your internet address. It could show a false
+  balance, keep an incoming payment from you, or hold a payment back. It cannot take your coins: the words
+  and the keys never leave the phone. While the server is down the wallet shows nothing; the coins stay
+  yours and you connect elsewhere. The address of another server with the same interface can be typed in
+  place of the one filled in.
 - **A node of your own** keeps your addresses to yourself. See the last chapter.
-- **A public node** is the quick way where there is one: type its address. This project does not run a public
-  node of its own yet, so the app offers none by name. A public node sees your addresses and your internet
-  address, and it could show a false balance or hold a payment back. It cannot take your coins.
+
+What is different through a server:
+
+- A payment that waits for a block shows in the balance at once: the coin it is paid from is not counted,
+  and the change from it is shown apart as an amount on its way.
+- For a wallet with more than a hundred addresses (after about fifty payments) the history may lack the fee
+  of some payments and, rarely, a whole line. The History page says so. The balance and the coins are
+  always complete.
+- The mining page does not show the hash rate of the network, and a block reward is known as one only
+  until it is spent.
 
 Run the self-test once (first screen, or More). It shows that the key code works on your phone.
 
 ## Making a wallet
 
-1. Overview, "Make a new wallet". The phone shows 24 words.
+1. Overview: choose 24 or 12 words and "Make a new wallet". 24 words carry 256 bits of randomness, 12 words
+   128 bits; twelve words are easier to write down, and the Northbound wallet for computers opens them too.
+   The number of words of a finished wallet cannot be changed. The phone shows the words.
 2. Write them on paper, in order, by hand. Do not photograph them, do not type them anywhere, do not store them
    in any app. Whoever has the words has the coins. Without them, a lost or broken phone means lost coins.
 3. The app asks three of the words back, then seals the words with your fingerprint or screen lock.
 4. Check the paper in full before you send coins to the wallet: More, "Check the whole paper".
    Type all the words from the paper. The app says whether they are the words of this wallet. Three words
-   asked back cannot show that the other twenty-one are right; this check can. The app never shows the words
+   asked back cannot show that the others are right; this check can. The app never shows the words
    again, so a mistake found later can only be mended by moving the coins to a new wallet.
 5. Keep the paper where fire, water and curious people do not reach it.
 
@@ -58,7 +74,7 @@ offers a fresh one; old addresses keep working.
 3. "Sign with my fingerprint and send". A payment that has been sent cannot be taken back.
 
 Until its block arrives the payment is listed on the Overview as waiting, and its coins are not offered again.
-If the node does not confirm that it took the payment, the app says that the outcome is not known. Do not pay
+If the node or the server does not confirm that it took the payment, the app says that the outcome is not known. Do not pay
 again then: refresh after a minute, and the app shows whether the payment waits for a block or did not go
 through.
 
@@ -87,7 +103,7 @@ look at the paper again before anything else.
 A paper that has never been tried is a hope, not a backup. Check it while the wallet is still in the phone
 (More, "Check the whole paper"), or bring the wallet back from it once with a small amount.
 
-By itself the app looks at the first 200 addresses of the wallet, 40 with a public node. If the node shows
+By itself the app looks at the first 200 addresses of the wallet, 40 with a public node or a server. If the node shows
 more of them in use, the Overview asks whether the app may look further. Say yes if you have used the wallet
 that much. If you have not, the node is showing something that is not true: say no and use another node. If
 coins that you know of are missing after a wallet was brought back, More has "Look at twice as many".

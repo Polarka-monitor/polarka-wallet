@@ -37,6 +37,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -100,58 +101,58 @@ enum class Section(val title: Int) {
     HISTORY(R.string.tab_history), MINING(R.string.tab_mining), MORE(R.string.tab_more),
 }
 
-/**
- * The public node offered on the first screen; the user may type another one. Empty while the project has no
- * public node of its own: a name that leads nowhere must not be the first thing a new user is offered.
- */
-const val PUBLIC_NODE = ""
-
 val screenPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
 val gap = Arrangement.spacedBy(12.dp)
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WalletApp(model: WalletModel, owner: Owner) {
     PolarkaTheme {
-        val state = model.state
-        var section by rememberSaveable { mutableStateOf(Section.OVERVIEW) }
-        val inside = state.loaded && !state.locked && state.setup != null && state.newWords == null
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Brand() },
-                    actions = {
-                        if (inside) {
-                            IconButton(onClick = model::refresh, enabled = !state.busy, modifier = Modifier.testTag("refresh")) {
-                                Icon(Drawn.refresh, contentDescription = stringResource(R.string.refresh))
-                            }
-                            // locking by hand is offered where the app locks at all
-                            if (state.wallet?.lockOnOpen == true) {
-                                IconButton(onClick = model::lockNow, modifier = Modifier.testTag("lock-now")) {
-                                    Icon(Drawn.lock, contentDescription = stringResource(R.string.lock_now))
-                                }
+        // the pages speak of the server where they would speak of the node, while the setup names one
+        CompositionLocalProvider(LocalOverServer provides (model.state.setup?.server == true)) { Screens(model, owner) }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun Screens(model: WalletModel, owner: Owner) {
+    val state = model.state
+    var section by rememberSaveable { mutableStateOf(Section.OVERVIEW) }
+    val inside = state.loaded && !state.locked && state.setup != null && state.newWords == null
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Brand() },
+                actions = {
+                    if (inside) {
+                        IconButton(onClick = model::refresh, enabled = !state.busy, modifier = Modifier.testTag("refresh")) {
+                            Icon(Drawn.refresh, contentDescription = stringResource(R.string.refresh))
+                        }
+                        // locking by hand is offered where the app locks at all
+                        if (state.wallet?.lockOnOpen == true) {
+                            IconButton(onClick = model::lockNow, modifier = Modifier.testTag("lock-now")) {
+                                Icon(Drawn.lock, contentDescription = stringResource(R.string.lock_now))
                             }
                         }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Sky.night, scrolledContainerColor = Sky.night, actionIconContentColor = Sky.quiet),
-                )
-            },
-            bottomBar = { if (inside) BottomBar(section) { section = it } },
-        ) { inner ->
-            Column(Modifier.padding(inner).fillMaxSize()) {
-                when {
-                    !state.loaded -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                    state.locked -> LockScreen(model, owner)
-                    state.setup == null -> SetupScreen(model, state)
-                    state.newWords != null -> NewWalletScreen(model, state, owner)
-                    else -> when (section) {
-                        Section.OVERVIEW -> OverviewTab(model, state, owner) { section = it }
-                        Section.RECEIVE -> ReceiveTab(model, state, owner)
-                        Section.SEND -> SendTab(model, state, owner)
-                        Section.HISTORY -> HistoryTab(state)
-                        Section.MINING -> MiningTab(model, state)
-                        Section.MORE -> MoreTab(model, state, owner) { section = it }
                     }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Sky.night, scrolledContainerColor = Sky.night, actionIconContentColor = Sky.quiet),
+            )
+        },
+        bottomBar = { if (inside) BottomBar(section) { section = it } },
+    ) { inner ->
+        Column(Modifier.padding(inner).fillMaxSize()) {
+            when {
+                !state.loaded -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                state.locked -> LockScreen(model, owner)
+                state.setup == null -> SetupScreen(model, state)
+                state.newWords != null -> NewWalletScreen(model, state, owner)
+                else -> when (section) {
+                    Section.OVERVIEW -> OverviewTab(model, state, owner) { section = it }
+                    Section.RECEIVE -> ReceiveTab(model, state, owner)
+                    Section.SEND -> SendTab(model, state, owner)
+                    Section.HISTORY -> HistoryTab(state)
+                    Section.MINING -> MiningTab(model, state)
+                    Section.MORE -> MoreTab(model, state, owner) { section = it }
                 }
             }
         }
@@ -178,7 +179,7 @@ private fun LockScreen(model: WalletModel, owner: Owner) {
 private fun SetupScreen(model: WalletModel, state: WalletState) {
     val context = LocalContext.current
     var deleteFile by rememberSaveable { mutableStateOf(true) }
-    var publicUrl by rememberSaveable { mutableStateOf(PUBLIC_NODE) }
+    var serverUrl by rememberSaveable { mutableStateOf(Setup.DEFAULT_SERVER) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) model.offerFile(uri) }
 
     val scroll = rememberScrollState()
@@ -193,18 +194,18 @@ private fun SetupScreen(model: WalletModel, state: WalletState) {
             state.offerError?.let { reason ->
                 Text(setupErrorText(reason, state.offerDetail), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("setup-error"))
             }
-            val publicNode: @Composable () -> Unit = {
-                Block(stringResource(R.string.public_title)) {
-                    Text(stringResource(R.string.public_intro))
-                    if (PUBLIC_NODE.isEmpty()) Text(stringResource(R.string.public_none), modifier = Modifier.testTag("public-none"))
-                    Text(stringResource(R.string.public_sees), style = MaterialTheme.typography.bodySmall)
+            // A wallet server, for an owner without a node. The one that is filled in is not ours, and the screen says whose it is.
+            val server: @Composable () -> Unit = {
+                Block(stringResource(R.string.server_setup_title)) {
+                    Text(stringResource(R.string.server_intro), modifier = Modifier.testTag("server-intro"))
+                    Text(stringResource(R.string.server_sees), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("server-sees"))
                     OutlinedTextField(
-                        value = publicUrl, onValueChange = { publicUrl = it.trim() }, singleLine = true, label = { Text(stringResource(R.string.public_address)) },
+                        value = serverUrl, onValueChange = { serverUrl = it.trim() }, singleLine = true, label = { Text(stringResource(R.string.server_address)) },
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, keyboardType = KeyboardType.Uri),
-                        modifier = Modifier.fillMaxWidth().testTag("public-url"),
+                        modifier = Modifier.fillMaxWidth().testTag("server-url"),
                     )
-                    Button(onClick = { model.offerPublic(publicUrl) }, enabled = publicUrl.isNotBlank(), modifier = Modifier.fillMaxWidth().testTag("public-go")) {
-                        Text(stringResource(R.string.public_go))
+                    Button(onClick = { model.offerServer(serverUrl) }, enabled = serverUrl.isNotBlank(), modifier = Modifier.fillMaxWidth().testTag("server-go")) {
+                        Text(stringResource(R.string.server_go))
                     }
                 }
             }
@@ -229,18 +230,15 @@ private fun SetupScreen(model: WalletModel, state: WalletState) {
                     ) { Text(stringResource(R.string.setup_paste)) }
                 }
             }
-            // a public node that can be named comes first; while there is none, the node of one's own does
-            if (PUBLIC_NODE.isEmpty()) {
-                ownNode()
-                publicNode()
-            } else {
-                publicNode()
-                ownNode()
-            }
+            // the start that needs nothing else comes first; a node of one's own is for those who run one
+            server()
+            ownNode()
         } else {
             Block(stringResource(R.string.offer_title)) {
-                Field(stringResource(R.string.offer_node), offered.url)
-                if (offered.isPublic) {
+                Field(stringResource(if (offered.server) R.string.offer_server else R.string.offer_node), offered.url)
+                if (offered.server) {
+                    // a wallet server has no account
+                } else if (offered.isPublic) {
                     Field(stringResource(R.string.offer_user), stringResource(R.string.offer_no_account))
                 } else {
                     Field(stringResource(R.string.offer_user), offered.user)
@@ -252,13 +250,13 @@ private fun SetupScreen(model: WalletModel, state: WalletState) {
                     offered.addresses.forEach { Mono(it) }
                 }
                 Text(
-                    stringResource(if (offered.isPublic) R.string.public_sees else R.string.offer_own_sees),
+                    stringResource(if (offered.server) R.string.server_sees else if (offered.isPublic) R.string.public_sees else R.string.offer_own_sees),
                     style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("offer-sees"),
                 )
-                if (state.offeredFrom != null && !offered.isPublic) {
+                if (state.offeredFrom != null && !offered.isPublic && !offered.server) {
                     Tick(deleteFile, { deleteFile = it }, stringResource(R.string.offer_delete_file))
                 }
-                Button(onClick = { model.acceptOffer(deleteFile && !offered.isPublic) }, modifier = Modifier.fillMaxWidth().testTag("save")) { Text(stringResource(R.string.offer_save)) }
+                Button(onClick = { model.acceptOffer(deleteFile && !offered.isPublic && !offered.server) }, modifier = Modifier.fillMaxWidth().testTag("save")) { Text(stringResource(R.string.offer_save)) }
                 TextButton(onClick = model::dropOffer, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cancel)) }
             }
         }
@@ -299,7 +297,7 @@ private fun NewWalletScreen(model: WalletModel, state: WalletState, owner: Owner
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(screenPadding), verticalArrangement = gap) {
         if (!checking) {
             Block(stringResource(R.string.new_title)) {
-                Text(stringResource(R.string.new_intro))
+                Text(stringResource(R.string.new_intro, words.size.toString()))
                 for (row in 0 until words.size / 2) {
                     Row(Modifier.fillMaxWidth()) {
                         for (i in listOf(row, row + words.size / 2)) {
@@ -308,7 +306,7 @@ private fun NewWalletScreen(model: WalletModel, state: WalletState, owner: Owner
                     }
                 }
                 Text(stringResource(R.string.new_warning), color = MaterialTheme.colorScheme.error)
-                Tick(written, { written = it }, stringResource(R.string.new_written), "written")
+                Tick(written, { written = it }, stringResource(R.string.new_written, words.size.toString()), "written")
                 Button(onClick = { checking = true }, enabled = written, modifier = Modifier.fillMaxWidth().testTag("new-next")) { Text(stringResource(R.string.new_next)) }
                 TextButton(onClick = model::cancelNewWallet, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cancel)) }
             }

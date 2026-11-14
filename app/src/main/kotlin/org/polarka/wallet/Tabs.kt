@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -87,9 +88,16 @@ private fun NoWallet(model: WalletModel, state: WalletState, owner: Owner) {
         }
         return
     }
+    var count by rememberSaveable { mutableIntStateOf(24) }
     Block(stringResource(R.string.wallet_none_title)) {
         Text(stringResource(R.string.wallet_none_text))
-        Button(onClick = model::startNewWallet, modifier = Modifier.fillMaxWidth().testTag("wallet-new")) { Text(stringResource(R.string.wallet_new)) }
+        Text(stringResource(R.string.words_count_title), style = MaterialTheme.typography.labelMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = count == 24, onClick = { count = 24 }, label = { Text(stringResource(R.string.words_count_24)) }, modifier = Modifier.testTag("words-24"))
+            FilterChip(selected = count == 12, onClick = { count = 12 }, label = { Text(stringResource(R.string.words_count_12)) }, modifier = Modifier.testTag("words-12"))
+        }
+        Text(stringResource(R.string.words_count_text), style = MaterialTheme.typography.bodySmall)
+        Button(onClick = { model.startNewWallet(count) }, modifier = Modifier.fillMaxWidth().testTag("wallet-new")) { Text(stringResource(R.string.wallet_new)) }
         Text(stringResource(R.string.wallet_restore_hint), style = MaterialTheme.typography.bodySmall)
     }
 }
@@ -98,7 +106,7 @@ private fun NoWallet(model: WalletModel, state: WalletState, owner: Owner) {
 @Composable
 private fun LookFurther(model: WalletModel, snapshot: Snapshot) {
     Block(stringResource(R.string.further_title)) {
-        Text(stringResource(R.string.further_text, snapshot.lookedTo.toString()), modifier = Modifier.testTag("further-text"))
+        Text(stringResource(pick(R.string.further_text, R.string.further_text_server), snapshot.lookedTo.toString()), modifier = Modifier.testTag("further-text"))
         if (snapshot.lookedTo < WalletInfo.MAX_LOOK) {
             Button(onClick = model::lookFurther, modifier = Modifier.fillMaxWidth().testTag("look-further")) {
                 Text(stringResource(R.string.further_go, minOf(WalletInfo.MAX_LOOK, snapshot.lookedTo * 2).toString()))
@@ -118,7 +126,7 @@ fun OverviewTab(model: WalletModel, state: WalletState, owner: Owner, go: (Secti
         Banner()
         NoticeCard(model, state)
         ProblemCard(state.problem)
-        if (state.busy) Busy(R.string.asking_node)
+        if (state.busy) Busy(pick(R.string.asking_node, R.string.asking_server))
         if (snapshot != null) {
             if (snapshot.info.syncing || snapshot.info.blocks < snapshot.info.headers) {
                 Warning(stringResource(R.string.node_syncing, snapshot.info.blocks, snapshot.info.headers))
@@ -134,10 +142,10 @@ fun OverviewTab(model: WalletModel, state: WalletState, owner: Owner, go: (Secti
             if (state.wallet != null) ReceiveAndSend({ go(Section.RECEIVE) }, { go(Section.SEND) })
         }
         state.pending.forEach { waiting ->
-            Block(stringResource(if (waiting.unsure) R.string.pending_unsure_title else R.string.pending_title)) {
+            Block(stringResource(if (waiting.unsure) pick(R.string.pending_unsure_title, R.string.pending_unsure_title_server) else R.string.pending_title)) {
                 Field(stringResource(R.string.send_amount), "-" + Format.coins(waiting.sentSat + waiting.feeSat), "pending-amount")
                 Mono(waiting.txid)
-                Text(stringResource(if (waiting.unsure) R.string.pending_unsure_text else R.string.pending_text), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(if (waiting.unsure) pick(R.string.pending_unsure_text, R.string.pending_unsure_text_server) else pick(R.string.pending_text, R.string.pending_text_server)), style = MaterialTheme.typography.bodySmall)
             }
         }
         // The coins the node shows for the wallet. A payment that did not go through and has none of its coins
@@ -147,9 +155,9 @@ fun OverviewTab(model: WalletModel, state: WalletState, owner: Owner, go: (Secti
             Block(stringResource(R.string.dropped_title)) {
                 Field(stringResource(R.string.send_amount), "-" + Format.coins(gone.sentSat + gone.feeSat), "dropped-amount")
                 Mono(gone.txid)
-                Text(stringResource(R.string.dropped_text), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("dropped-text"))
+                Text(stringResource(pick(R.string.dropped_text, R.string.dropped_text_server)), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("dropped-text"))
                 if (shown != null && gone.inputs.none { it in shown }) {
-                    Text(stringResource(R.string.dropped_no_coin), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("dropped-no-coin"))
+                    Text(stringResource(pick(R.string.dropped_no_coin, R.string.dropped_no_coin_server)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("dropped-no-coin"))
                 }
                 TextButton(onClick = { askForgetPayment = gone.txid }, modifier = Modifier.testTag("dropped-forget")) { Text(stringResource(R.string.dropped_forget)) }
             }
@@ -165,6 +173,7 @@ fun OverviewTab(model: WalletModel, state: WalletState, owner: Owner, go: (Secti
                     Field(stringResource(R.string.spendable), Format.coins(snapshot.spendableSat - aside), "wallet-spendable")
                     if (snapshot.waitingSat + aside > 0) Field(stringResource(R.string.in_waiting), Format.coins(snapshot.waitingSat + aside), "wallet-waiting")
                     if (snapshot.immatureSat > 0) Field(stringResource(R.string.immature), Format.coins(snapshot.immatureSat))
+                    if (snapshot.arrivingSat > 0) Field(stringResource(R.string.arriving_label), Format.coins(snapshot.arrivingSat), "wallet-arriving")
                 }
             }
         }
@@ -186,8 +195,8 @@ fun OverviewTab(model: WalletModel, state: WalletState, owner: Owner, go: (Secti
         }
         if (snapshot != null) {
             Recent(snapshot)
-            Block(stringResource(R.string.node_title)) {
-                Lit(stringResource(R.string.node_answers, snapshot.tip), "node-answers")
+            Block(stringResource(pick(R.string.node_title, R.string.server_title))) {
+                Lit(stringResource(pick(R.string.node_answers, R.string.server_answers), snapshot.tip), "node-answers")
                 Field(stringResource(R.string.node_address), setup.host)
                 Field(stringResource(R.string.node_network), snapshot.info.chain)
                 Field(stringResource(R.string.node_height), snapshot.tip.toString(), "height")
@@ -295,7 +304,7 @@ fun SendTab(model: WalletModel, state: WalletState, owner: Owner) {
         }
         state.sentTxid?.let { txid ->
             Block(stringResource(R.string.sent_title)) {
-                Text(stringResource(R.string.sent_text))
+                Text(stringResource(pick(R.string.sent_text, R.string.sent_text_server)))
                 Mono(txid, "sent-txid")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { copyToClipboard(context, "txid", txid) }) { Text(stringResource(R.string.copy)) }
@@ -337,7 +346,7 @@ fun SendTab(model: WalletModel, state: WalletState, owner: Owner) {
                 Tick(everything, { everything = it }, stringResource(R.string.send_everything), "send-all")
                 FeeChips(rate) { rate = it }
                 ProblemCard(state.sendProblem, "send-problem")
-                if (state.sending) Busy(R.string.asking_node)
+                if (state.sending) Busy(pick(R.string.asking_node, R.string.asking_server))
                 Button(onClick = { model.prepare(to, amount, everything, rate) }, enabled = !state.sending && to.isNotEmpty(), modifier = Modifier.fillMaxWidth().testTag("send-check")) {
                     Text(stringResource(R.string.send_check))
                 }
@@ -372,6 +381,9 @@ fun HistoryTab(state: WalletState) {
         (snapshot.moves.map { Line(it, true) } + snapshot.watchedMoves.map { Line(it, false) }).sortedWith(compareByDescending<Line> { it.move.height }.thenBy { it.move.txid })
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = screenPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (!snapshot.historyWhole) {
+            item { Text(stringResource(R.string.history_not_whole), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("history-not-whole")) }
+        }
         if (lines.isEmpty()) item { Text(stringResource(R.string.history_none)) }
         items(lines, key = { (if (it.own) "w" else "a") + it.move.txid }) { line ->
             val m = line.move
@@ -413,6 +425,7 @@ fun MiningTab(model: WalletModel, state: WalletState) {
             Field(stringResource(R.string.mining_blocks), rewards.size.toString(), "mining-blocks")
             Field(stringResource(R.string.mining_coins), Format.coins(rewards.sumOf { it.receivedSat }))
             Field(stringResource(R.string.mining_last_day), lastDay.toString())
+            if (LocalOverServer.current) Text(stringResource(R.string.mining_found_note_server), style = MaterialTheme.typography.bodySmall)
             val waiting = snapshot.coins.filter { it.coinbase && !it.spendableAt(snapshot.tip) }.map { it.height } + (snapshot.watched?.immature?.map { it.height } ?: emptyList())
             if (waiting.isNotEmpty()) {
                 val next = waiting.min() + Planner.MATURITY - snapshot.tip
@@ -422,6 +435,9 @@ fun MiningTab(model: WalletModel, state: WalletState) {
         Block(stringResource(R.string.mining_network)) {
             snapshot.hashps?.let { Field(stringResource(R.string.mining_hashrate), Format.hashrate(it)) }
             snapshot.secondsPerBlock?.let { Field(stringResource(R.string.mining_block_time), Format.decimal(it, 0) + " s") }
+            if (LocalOverServer.current && snapshot.hashps == null) {
+                Text(stringResource(R.string.mining_network_none_server), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("mining-no-network"))
+            }
         }
         Block(stringResource(R.string.mining_mine)) {
             if (state.wallet == null) {
@@ -501,11 +517,11 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner, go: (Section) 
                 Tick(wallet.lockOnOpen, { model.saveLock(it, owner) }, stringResource(R.string.lock_setting), "lock-setting")
                 val looked = state.snapshot?.lookedTo ?: 0
                 if (looked > 1) {
-                    Text(stringResource(R.string.further_more_text, looked.toString()), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("looked-to"))
+                    Text(stringResource(pick(R.string.further_more_text, R.string.further_more_text_server), looked.toString()), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("looked-to"))
                     if (looked < WalletInfo.MAX_LOOK) {
                         OutlinedButton(onClick = model::lookFurther, modifier = Modifier.testTag("look-further-more")) { Text(stringResource(R.string.further_more_go)) }
                     }
-                    Text(stringResource(R.string.renumber_text), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(pick(R.string.renumber_text, R.string.renumber_text_server)), style = MaterialTheme.typography.bodySmall)
                     OutlinedButton(onClick = model::renumberKeys, modifier = Modifier.testTag("renumber")) { Text(stringResource(R.string.renumber_go)) }
                 }
                 OutlinedButton(onClick = { askRemoveWallet = true }, modifier = Modifier.testTag("wallet-remove")) { Text(stringResource(R.string.wallet_remove)) }
@@ -531,7 +547,7 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner, go: (Section) 
             OutlinedButton(onClick = { go(Section.MINING) }, modifier = Modifier.testTag("tab-MINING")) { Text(stringResource(R.string.mining_more_go)) }
         }
         Block(stringResource(R.string.notify_title)) {
-            Text(stringResource(R.string.notify_text), style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(pick(R.string.notify_text, R.string.notify_text_server)), style = MaterialTheme.typography.bodySmall)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(
                     checked = notify,
@@ -551,7 +567,7 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner, go: (Section) 
             if (notifyDenied) Text(stringResource(R.string.notify_denied), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
         PaperBlock(model, state)
-        Block(stringResource(R.string.node_title)) {
+        Block(stringResource(pick(R.string.node_title, R.string.server_title))) {
             state.setup?.let { Field(stringResource(R.string.node_address), it.host) }
             OutlinedButton(onClick = { askForget = true }, modifier = Modifier.testTag("forget")) { Text(stringResource(R.string.forget)) }
         }
@@ -581,7 +597,7 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner, go: (Section) 
         AlertDialog(
             onDismissRequest = { askForget = false },
             title = { Text(stringResource(R.string.forget_title)) },
-            text = { Text(stringResource(R.string.forget_text)) },
+            text = { Text(stringResource(pick(R.string.forget_text, R.string.forget_text_server))) },
             confirmButton = { TextButton(onClick = { askForget = false; model.forgetSetup(owner) }, modifier = Modifier.testTag("forget-yes")) { Text(stringResource(R.string.forget_yes)) } },
             dismissButton = { TextButton(onClick = { askForget = false }) { Text(stringResource(R.string.cancel)) } },
         )
@@ -606,7 +622,7 @@ private fun PaperBlock(model: WalletModel, state: WalletState) {
     Block(stringResource(R.string.paper_title)) {
         Text(stringResource(R.string.paper_text), style = MaterialTheme.typography.bodySmall)
         state.paperTxid?.let { txid ->
-            Text(stringResource(R.string.sent_text))
+            Text(stringResource(pick(R.string.sent_text, R.string.sent_text_server)))
             Mono(txid, "paper-txid")
             if (state.paper == null && !state.paperBusy) TextButton(onClick = model::paperDrop) { Text(stringResource(R.string.ok)) }
         }
@@ -617,7 +633,7 @@ private fun PaperBlock(model: WalletModel, state: WalletState) {
                 keyboardOptions = secretKeyboard, modifier = Modifier.fillMaxWidth().testTag("paper-words"), minLines = 3,
             )
             ProblemCard(state.paperProblem, "paper-problem")
-            if (state.paperBusy) Busy(R.string.asking_node)
+            if (state.paperBusy) Busy(pick(R.string.asking_node, R.string.asking_server))
             Button(onClick = { if (model.paperLook(words)) words = "" }, enabled = words.isNotBlank() && !state.paperBusy, modifier = Modifier.testTag("paper-look")) {
                 Text(stringResource(R.string.paper_look))
             }

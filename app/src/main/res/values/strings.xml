@@ -113,9 +113,9 @@
     <string name="value_about">about %1$s</string>
 
     <string name="new_title">Your recovery words</string>
-    <string name="new_intro">Write these 24 words on paper, in this order. They are the wallet: whoever has them has the coins, and without them a lost phone means lost coins.</string>
+    <string name="new_intro">Write these %1$s words on paper, in this order. They are the wallet: whoever has them has the coins, and without them a lost phone means lost coins.</string>
     <string name="new_warning">Do not photograph them, do not copy them into any app or message, and never type them into a website.</string>
-    <string name="new_written">I have written all 24 words on paper</string>
+    <string name="new_written">I have written all %1$s words on paper</string>
     <string name="new_next">Continue</string>
     <string name="check_title">Check your paper</string>
     <string name="check_intro">Type these three words from your paper.</string>
@@ -215,12 +215,7 @@
 
     <string name="pending_title">Sent, waiting for a block</string>
     <string name="pending_text">The node shows the old balance until the payment is in a block. The coins of this payment are not offered for another one meanwhile.</string>
-    <string name="public_title">Connect to a public node</string>
-    <string name="public_intro">The quickest way to start. The wallet asks a public TrueNorth node what your addresses hold and hands it your signed payments.</string>
     <string name="public_sees">A public node sees your addresses and your internet address, and it could show you a false balance or hold a payment back. It cannot take your coins: your keys never leave this phone. For more privacy use a node of your own.</string>
-    <string name="public_address">Address of the public node</string>
-    <string name="public_none">This project does not run a public node of its own yet. If you know a public node, type its address.</string>
-    <string name="public_go">Connect</string>
     <string name="offer_no_account">none (public node)</string>
     <string name="problem_timeout">The node did not answer in time. It may be busy. Try again in a moment.</string>
     <string name="problem_busy">The node is busy. Try again in a moment.</string>
@@ -285,4 +280,44 @@
     <string name="backup_go">Check the words</string>
     <string name="backup_same">They match: these are the words of the wallet in this phone.</string>
     <string name="backup_other">These are valid recovery words, but of another wallet, not of the one in this phone. A paper with one wrong word can also look like this.</string>
+    <!-- 0.6: a wallet server, the number of words -->
+    <string name="server_setup_title">Connect through a public server</string>
+    <string name="server_intro">The quickest start, without a node of your own. The wallet asks a server for TrueNorth wallets what your addresses hold and hands it your signed payments. The server filled in below is run by the Northbound project, not by the authors of this app.</string>
+    <string name="server_sees">The server sees all the addresses of your wallet together and the internet address of this phone. It could show a balance that is not true, keep an incoming payment from you, or hold a payment back. It cannot take your coins: the recovery words and the keys never leave this phone. For more privacy use a node of your own.</string>
+    <string name="server_address">Server address</string>
+    <string name="server_go">Continue</string>
+    <string name="offer_server">Server</string>
+    <string name="server_title">Server</string>
+    <string name="server_answers">The server answers, block %1$d</string>
+    <string name="asking_server">Asking the server…</string>
+    <string name="forget_text_server">The app forgets the server and the watched addresses. The wallet in this phone and your coins are not touched.</string>
+    <string name="problem_unreachable_server">The server cannot be reached. Check the internet connection of this phone. If that is fine, the server may be out of service. Your coins are not touched by that, and the wallet can be connected elsewhere.</string>
+    <string name="problem_node_server">The server answered with an error: %1$s</string>
+    <string name="problem_other_chain_server">The server did not take what the wallet asked (%1$s). It probably works for another network than the setup says, or it is not a server for TrueNorth wallets.</string>
+    <string name="problem_foreign_server">The server answered with outputs that do not belong to your addresses. Nothing is shown. Consider another server.</string>
+    <string name="problem_timeout_server">The server did not answer in time. It may be busy. Try again in a moment.</string>
+    <string name="problem_busy_server">The server is busy. Try again in a moment.</string>
+    <string name="problem_rejected_server">The node behind the server refused the transaction (%1$s). Nothing was sent.</string>
+    <string name="problem_unsure_server">It is not known whether the payment went out: the server did not confirm that it took it (id %1$s). Do not pay again now. Refresh in a minute: the payment then shows as waiting for a block, or the app tells you that it did not go through.</string>
+    <string name="problem_store_server">Something stored in this phone cannot be read or written (%1$s). If the server setup is missing, enter it again.</string>
+    <string name="sent_text_server">The server took the transaction. Its id:</string>
+    <string name="pending_text_server">Until the payment is in a block, the balance leaves out the coin it is paid from, and the change from it is shown as an amount on its way.</string>
+    <string name="pending_unsure_title_server">Handed to the server, outcome not known</string>
+    <string name="pending_unsure_text_server">The server did not confirm that it took this payment. Its coins are kept aside meanwhile. Refresh in a minute: it then shows as waiting for a block, or the app tells you that it did not go through.</string>
+    <string name="notice_payment_gone_server">A payment of %1$s NORTH is not known to the server and is in no block: it did not go through. It could still arrive from elsewhere, so the app keeps it on the Overview page and builds your next payment on one of its coins. Only one of the two can then arrive.</string>
+    <string name="notice_payment_back_server">A payment of %1$s NORTH that had not gone through is known to the server again and waits for a block.</string>
+    <string name="dropped_text_server">The server does not know this payment and it is in no block. Its transaction stays valid while its coins are unspent, so it could still arrive from elsewhere. Your next payment is therefore built on one of its coins: only one of the two can then arrive. The entry disappears when a block settles it.</string>
+    <string name="dropped_no_coin_server">The server does not show a coin of this payment among the addresses the app looks at, so no payment can be made for now. That passes when the server catches up with the network. If it stays so, a wallet that has used many addresses may need Look at twice as many on the More page. Forget this payment only if you are sure that it can no longer arrive.</string>
+    <string name="further_text_server">The server shows payments close to address number %1$s of this wallet, and the app looks no further by itself. If you have used the wallet that much, let it look further; otherwise coins on later addresses are not shown. If you have not, the server may be showing something that is not true: do not look further, and consider another server.</string>
+    <string name="further_more_text_server">At the moment the app looks at the first %1$s addresses of this wallet. If coins that you know of are missing, for example after the wallet was brought back from its words, let it look at twice as many. The server is then told twice as many addresses.</string>
+    <string name="renumber_text_server">If the address numbers of this wallet have run ahead (a server that did not show the truth can cause that), they can be worked out again from what the current server shows.</string>
+    <string name="notify_text_server">About every fifteen minutes the phone asks the server whether a block reward or a payment has arrived, also while the app is closed. It works only while the phone can reach the server, and the phone decides when exactly it runs.</string>
+    <string name="arriving_label">On its way, waiting for a block</string>
+    <string name="history_not_whole">Some movements are missing from the history. For a wallet with more than a hundred addresses the server cannot sum them up so that the app could show them rightly. The balance and the coins are complete.</string>
+    <string name="mining_network_none_server">The server does not tell the hash rate of the network nor the time between blocks, so your share and the expected values are missing here.</string>
+    <string name="mining_found_note_server">Through a server a reward is known as one only while its coin is unspent. Rewards that were spent are not counted here.</string>
+    <string name="words_count_title">Number of words</string>
+    <string name="words_count_24">24 words</string>
+    <string name="words_count_12">12 words</string>
+    <string name="words_count_text">24 words carry 256 bits of randomness, 12 words 128 bits. Twelve words are easier to write down, and the Northbound wallet for computers opens them too. The number of words of a finished wallet cannot be changed.</string>
 </resources>
