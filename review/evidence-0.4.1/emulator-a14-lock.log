@@ -1,0 +1,6 @@
+Android 14
+ok     1  twenty seconds away: the wallet stays open
+ok     2  more than a minute away: locked, and opened again with the fingerprint
+ok     3  more than a minute away with the screen rebuilt meanwhile (dark mode switched): locked as well
+LOCK STEPS PASSED: 3 on Android 14
+exit 0

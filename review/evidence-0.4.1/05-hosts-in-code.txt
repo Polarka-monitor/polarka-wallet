@@ -1,0 +1,10 @@
+== Internet hosts that appear as text anywhere in the release's code (libraries included)
+   4 https://issuetracker.google.com
+   3 https://youtrack.jetbrains.com
+   3 http://ns.google.com
+   2 http://www.w3.org
+   2 http://ns.adobe.com
+   1 https://r.android.com
+   1 https://node.polarka.org
+   1 https://goo.gle
+   1 http://schemas.android.com

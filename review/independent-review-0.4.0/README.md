@@ -56,8 +56,14 @@ Of the weak points the reviewer named in the gateway, two more were dealt with i
 - The proof of work behind what a node shows is not checked (R-03 in full). A node that lies can still show a
   false balance or history, and it can lead its user to say yes to looking further.
 - N-1, N-2 and N-6 in the table.
+- "It did not go through" rests on one node. A payment that this node has let go of can still be held by other
+  nodes and arrive later; a new payment made with other coins would then be a second one. The notice sends
+  the owner to the History before paying again. The lasting answer, building the new payment on a coin of the
+  old one, is not in 0.4.1.
 - The reviewer checked nothing on a phone or an emulator. The emulator runs are described in `../emulator`.
-- The fixes in this table have not been looked at by the reviewer.
+- The fixes in this table have not been reviewed. The reviewer began a third look at 0.4.1 on the same day:
+  it ran the whole suite in a clone of its own (93 tests, none failed, none skipped) and had started on a
+  test with a node that is stopped and started again when its work was cut short. It gave no report.
 
 ## Files
 

@@ -75,6 +75,11 @@ its coins, it is at least a minute old, and two looks in a row agree.
   beyond the first hundred.
 - A block whose description is larger than 16 MB cannot be read, and a look that needs it fails. Today's
   blocks are far smaller.
+- "It did not go through" is said from what one node shows. A payment that this node no longer holds can still
+  be held by other nodes, for example after the node was restarted without its waiting transactions, and it
+  can then still arrive. Whoever pays again after that notice should look at the History first and, if in
+  doubt, wait for a few blocks. A later version will build the new payment on a coin of the old one, so that
+  the two can never both arrive.
 - Tried on one real phone (Android 16) and on emulators with Android 12, 14 and 16.
 
 ## Code

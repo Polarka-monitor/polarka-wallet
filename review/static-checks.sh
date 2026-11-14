@@ -12,7 +12,7 @@ MAIN="app/src/main core/src/main node/src/main"
     echo "== 1. Lines in the wallet's own code that print or log (expected: none)"
     grep -rnE '(^|[^A-Za-z])(Log\.[a-z]+\(|println\(|print\(|printStackTrace|System\.(out|err))' $MAIN --include=*.kt || echo "none"
     echo
-    echo "== 2. Internet addresses written into the wallet's own code (expected: none; the node address comes from the setup file)"
+    echo "== 2. Internet addresses written into the wallet's own code (expected: only the public node offered on the first screen; any other node address comes from the user)"
     grep -rnoE 'https?://[A-Za-z0-9._~:/?#@!$&*+,;=%-]+' $MAIN --include=*.kt --include=*.xml | grep -v 'schemas.android.com' || echo "none"
     echo
     echo "== 3. Places where the clipboard is written (expected: addresses, transaction ids and the public descriptor only)"
