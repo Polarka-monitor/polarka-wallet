@@ -130,7 +130,7 @@ class Incoming(val move: Movement, val own: Boolean)
  * To a node of one's own the wallet is named by its two public descriptors. To a public node it is named
  * address by address, so that the node never gets the key that shows the whole wallet, past and future.
  */
-class Engine(private val setup: Setup, private val node: NodeClient = NodeClient(setup.url, setup.user, setup.password, TIMEOUT_MILLIS)) {
+class Engine(private val setup: Setup, private val node: NodeClient = NodeClient(setup.url, setup.user, setup.password, TIMEOUT_MILLIS)) : Gateway {
     private val blocks = HashMap<String, ChainBlock>()
     private var scannedTo = -1
     private var scannedWindow = 0
@@ -171,7 +171,7 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
      * make the wallet name address after address to it. Up to here the app looks by itself; further only after
      * the owner has said so ([WalletInfo.lookTo]). Keys the wallet already uses are always looked at.
      */
-    fun allowed(wallet: WalletInfo): Int =
+    override fun allowed(wallet: WalletInfo): Int =
         maxOf(if (setup.isPublic) AUTO_PUBLIC else AUTO_OWN, wallet.lookTo, maxOf(wallet.receiveIndex, wallet.changeIndex) + 1)
 
     /**
@@ -179,7 +179,7 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
      * fewer (twenty past the keys in use, widened when needed) left a gap: a node could lead the app to an
      * address that a wallet brought back from its words did not look at.
      */
-    fun windowOf(wallet: WalletInfo): Int = allowed(wallet)
+    override fun windowOf(wallet: WalletInfo): Int = allowed(wallet)
 
     /** The coins of an account, each placed on its own key. The node is trusted for what exists, not for what is ours. */
     private fun coinsOf(watch: WatchKey, window: Int, kept: Boolean = true): Pair<Int, List<Unspent>> {
@@ -213,7 +213,7 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
      * the snapshot says so.
      */
     @Synchronized
-    fun fetch(wallet: WalletInfo?): Snapshot {
+    override fun fetch(wallet: WalletInfo?): Snapshot {
         val info = node.chainInfo()
         if (info.chain != setup.chainName) throw EngineError(Problem.Kind.OTHER_CHAIN, info.chain)
         val watch = wallet?.watchKey()
@@ -297,7 +297,7 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
      * the watched addresses. Change that returns from the wallet's own payments is not counted. Returns the
      * height the node has reached together with the list. Only the new blocks are read.
      */
-    fun incomingSince(wallet: WalletInfo?, afterHeight: Int): Pair<Int, List<Incoming>> {
+    override fun incomingSince(wallet: WalletInfo?, afterHeight: Int): Pair<Int, List<Incoming>> {
         val info = node.chainInfo()
         if (info.chain != setup.chainName) throw EngineError(Problem.Kind.OTHER_CHAIN, info.chain)
         if (afterHeight < 0 || afterHeight >= info.blocks) return info.blocks to emptyList()
@@ -332,7 +332,7 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
      * other nodes. The new payment therefore spends one coin of every such payment that nothing stands
      * against yet: whatever happens later, only one of the two can be in a block.
      */
-    fun plan(wallet: WalletInfo, to: String, amountSat: Long?, feeRate: Long, used: Set<String> = emptySet()): Plan {
+    override fun plan(wallet: WalletInfo, to: String, amountSat: Long?, feeRate: Long, used: Set<String>): Plan {
         val script = scriptFor(to)
         val watch = wallet.watchKey()
         val (tip, coins) = coinsOf(watch, windowOf(wallet))
@@ -351,7 +351,7 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
     }
 
     /** Signs with the given words and lets the node check the result. Nothing is sent here. */
-    fun sign(expectedXpub: String, plan: Plan, words: List<String>): SignedSpend {
+    override fun sign(expectedXpub: String, plan: Plan, words: List<String>): SignedSpend {
         val account = try { Account.fromWords(words, setup.chain) } catch (e: Exception) { throw EngineError(Problem.Kind.BAD_WORDS) }
         if (account.watchKey().xpub != expectedXpub) throw EngineError(Problem.Kind.WRONG_WORDS)
         val signed = plan.sign(account)
@@ -386,7 +386,7 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
      * There are at most three tries, and none is started later than forty seconds after the first. One try can
      * itself wait for a busy node (see NodeClient), so the whole can last about a minute and a half.
      */
-    fun deliver(signed: SignedSpend): Boolean {
+    override fun deliver(signed: SignedSpend): Boolean {
         val deadline = System.nanoTime() + DELIVERY_MILLIS * 1_000_000
         var open = false
         for (attempt in 1..DELIVERY_TRIES) {
@@ -423,7 +423,7 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
      * Looks at what the account of some recovery words holds (a paper address). The words are not kept.
      * [spent] are coins already sent away in an earlier part of the same emptying.
      */
-    fun paperLook(words: List<String>, spent: Set<String> = emptySet()): PaperFound {
+    override fun paperLook(words: List<String>, spent: Set<String>): PaperFound {
         val account = try { Account.fromWords(words, setup.chain) } catch (e: Exception) { throw EngineError(Problem.Kind.BAD_WORDS) }
         val (tip, coins) = coinsOf(account.watchKey(), WalletInfo.GAP, kept = false)
         var free = coins.filter { key(it) !in spent }
@@ -437,14 +437,14 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
      * and the rest to [restTo], for example a small amount to the phone and the rest to a new paper address.
      * One transaction takes at most a thousand coins; the plan says how many are left for the next one.
      */
-    fun paperPlan(found: PaperFound, to: String, feeRate: Long, keepSat: Long? = null, restTo: String? = null): Plan {
+    override fun paperPlan(found: PaperFound, to: String, feeRate: Long, keepSat: Long?, restTo: String?): Plan {
         val script = scriptFor(to)
         if (keepSat == null) return Planner.sweep(found.spendable, script, feeRate)
         val rest = scriptFor(restTo ?: throw EngineError(Problem.Kind.BAD_ADDRESS))
         return Planner.split(found.spendable, script, keepSat, feeRate, rest)
     }
 
-    fun paperSign(found: PaperFound, plan: Plan, words: List<String>): SignedSpend {
+    override fun paperSign(found: PaperFound, plan: Plan, words: List<String>): SignedSpend {
         val account = try { Account.fromWords(words, setup.chain) } catch (e: Exception) { throw EngineError(Problem.Kind.BAD_WORDS) }
         if (account.address(0, 0) != found.address) throw EngineError(Problem.Kind.WRONG_WORDS)
         return sign(account.watchKey().xpub, plan, words)

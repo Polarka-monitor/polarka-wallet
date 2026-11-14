@@ -58,7 +58,7 @@ object Notifier {
         val setup = Stores.open(context).load() ?: return
         val wallet = Stores.wallet(context).load()
         val last = prefs(context).getInt(LAST_HEIGHT, -1)
-        val (tip, incoming) = Engine(setup).incomingSince(wallet, last)
+        val (tip, incoming) = Gateway.of(setup).incomingSince(wallet, last)
         if (last >= 0) incoming.forEachIndexed { n, item -> show(context, item, n) }
         prefs(context).edit().putInt(LAST_HEIGHT, tip).apply()
     }

@@ -55,7 +55,7 @@ class ServerEngine(
     private val most: Int = MAX_LINES,
     private val pause: (Long) -> Unit = { Thread.sleep(it) },
     private val clock: () -> Long = { System.nanoTime() },
-) {
+) : Gateway {
     private class Keys(
         val xpub: String, val window: Int, val addresses: List<String>,
         val places: Map<String, Pair<Int, Int>>,        // address -> branch and number of its key
@@ -104,10 +104,10 @@ class ServerEngine(
      * the wallet name address after address to it: the app looks this far by itself, and further only after
      * the owner has said so ([WalletInfo.lookTo]). Keys the wallet already uses are always looked at.
      */
-    fun allowed(wallet: WalletInfo): Int = maxOf(AUTO, wallet.lookTo, maxOf(wallet.receiveIndex, wallet.changeIndex) + 1)
+    override fun allowed(wallet: WalletInfo): Int = maxOf(AUTO, wallet.lookTo, maxOf(wallet.receiveIndex, wallet.changeIndex) + 1)
 
     /** The keys of each branch that every look covers: all that the app may look at for this wallet. */
-    fun windowOf(wallet: WalletInfo): Int = allowed(wallet)
+    override fun windowOf(wallet: WalletInfo): Int = allowed(wallet)
 
     private fun key(coin: Unspent): String = coin.txid + ":" + coin.vout
 
@@ -309,7 +309,7 @@ class ServerEngine(
      * steady, so that nothing is judged from it.
      */
     @Synchronized
-    fun fetch(wallet: WalletInfo?): Snapshot {
+    override fun fetch(wallet: WalletInfo?): Snapshot {
         var seen: Snapshot? = null
         repeat(TRIES) {
             val now = try {
@@ -331,7 +331,7 @@ class ServerEngine(
      * Change that returns from the wallet's own payments is not counted, nor is what the wallet pays to
      * itself. Returns the height that every answer had reached, and what arrived up to that height.
      */
-    fun incomingSince(wallet: WalletInfo?, afterHeight: Int): Pair<Int, List<Incoming>> {
+    override fun incomingSince(wallet: WalletInfo?, afterHeight: Int): Pair<Int, List<Incoming>> {
         val top = server.tipHeight()
         if (afterHeight < 0 || afterHeight >= top) return top to emptyList()
         val result = ArrayList<Incoming>()
@@ -373,7 +373,7 @@ class ServerEngine(
      * payment spends one coin of every payment that did not go through and that nothing stands against yet
      * ([WalletInfo.unanswered]): whatever happens later, only one of the two can be in a block.
      */
-    fun plan(wallet: WalletInfo, to: String, amountSat: Long?, feeRate: Long, used: Set<String> = emptySet()): Plan {
+    override fun plan(wallet: WalletInfo, to: String, amountSat: Long?, feeRate: Long, used: Set<String>): Plan {
         val script = scriptFor(to)
         val watch = wallet.watchKey()
         val keys = keysOf(watch, allowed(wallet))
@@ -388,7 +388,7 @@ class ServerEngine(
      * Signs with the given words. Nothing leaves the phone here: the server sees the transaction when it is
      * handed over ([deliver]), which the app does only after it has written the payment down.
      */
-    fun sign(expectedXpub: String, plan: Plan, words: List<String>): SignedSpend {
+    override fun sign(expectedXpub: String, plan: Plan, words: List<String>): SignedSpend {
         val account = try { Account.fromWords(words, chain) } catch (e: Exception) { throw EngineError(Problem.Kind.BAD_WORDS) }
         if (account.watchKey().xpub != expectedXpub) throw EngineError(Problem.Kind.WRONG_WORDS)
         return plan.sign(account)
@@ -413,7 +413,7 @@ class ServerEngine(
      * cannot pay twice. An answer that names another transaction is not believed either. There are at most
      * three tries, and none is started later than forty seconds after the first.
      */
-    fun deliver(signed: SignedSpend): Boolean {
+    override fun deliver(signed: SignedSpend): Boolean {
         val verdict = try {
             server.validate(signed.hex)
         } catch (e: NodeError) {
@@ -447,7 +447,7 @@ class ServerEngine(
      * asked about them. [spent] are coins already sent away in an earlier part of the same emptying. Coins
      * that a waiting transaction spends are not in the server's list.
      */
-    fun paperLook(words: List<String>, spent: Set<String> = emptySet()): PaperFound {
+    override fun paperLook(words: List<String>, spent: Set<String>): PaperFound {
         val account = try { Account.fromWords(words, chain) } catch (e: Exception) { throw EngineError(Problem.Kind.BAD_WORDS) }
         val keys = keysOf(account.watchKey(), WalletInfo.GAP, kept = false)
         val found = server.utxos(keys.addresses)
@@ -458,14 +458,14 @@ class ServerEngine(
      * Empties a paper address. With [keepSat] null everything goes to [to]. Otherwise [keepSat] goes to [to]
      * and the rest to [restTo]. One transaction takes at most a thousand coins; the plan says how many are left.
      */
-    fun paperPlan(found: PaperFound, to: String, feeRate: Long, keepSat: Long? = null, restTo: String? = null): Plan {
+    override fun paperPlan(found: PaperFound, to: String, feeRate: Long, keepSat: Long?, restTo: String?): Plan {
         val script = scriptFor(to)
         if (keepSat == null) return Planner.sweep(found.spendable, script, feeRate)
         val rest = scriptFor(restTo ?: throw EngineError(Problem.Kind.BAD_ADDRESS))
         return Planner.split(found.spendable, script, keepSat, feeRate, rest)
     }
 
-    fun paperSign(found: PaperFound, plan: Plan, words: List<String>): SignedSpend {
+    override fun paperSign(found: PaperFound, plan: Plan, words: List<String>): SignedSpend {
         val account = try { Account.fromWords(words, chain) } catch (e: Exception) { throw EngineError(Problem.Kind.BAD_WORDS) }
         if (account.address(0, 0) != found.address) throw EngineError(Problem.Kind.WRONG_WORDS)
         return sign(account.watchKey().xpub, plan, words)

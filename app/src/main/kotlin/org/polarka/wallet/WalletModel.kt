@@ -118,7 +118,7 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
     private val setups: SetupStore = Stores.open(app)
     private val wallets: WalletStore = Stores.wallet(app)
     private val vault: WordVault = Stores.words(app)
-    private var engine: Engine? = null
+    private var engine: Gateway? = null
     private var paperWords: List<String>? = null        // only between looking at a paper address and emptying it
     private var paperSpent: Set<String> = emptySet()    // coins sent away in earlier parts of the same emptying
     private var lockWanted = false
@@ -155,7 +155,7 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
                 walletProblem = wallet.exceptionOrNull()?.let { Problem(Problem.Kind.WALLET_FILE, it.javaClass.simpleName) },
                 wordsWithoutWallet = words && wallet.getOrNull() == null,
             )
-            state.setup?.let { engine = Engine(it) }
+            state.setup?.let { engine = Gateway.of(it) }
             if (!state.locked) refresh()
         }
     }
@@ -288,7 +288,7 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
                 }
                 notice = if (gone) Notice.FILE_DELETED else Notice.FILE_NOT_DELETED
             }
-            engine = Engine(setup)
+            engine = Gateway.of(setup)
             state = state.copy(setup = setup, offered = null, offeredFrom = null, offerError = null, snapshot = null, problem = null, notice = notice)
             // The owner's yes to looking at more keys was given for the node that was asked then. Another node is
             // not told more by itself; the keys in use are looked at in any case.
@@ -746,7 +746,7 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private suspend fun sendNow(engine: Engine, wallet: WalletInfo, draft: Draft, owner: Owner) {
+    private suspend fun sendNow(engine: Gateway, wallet: WalletInfo, draft: Draft, owner: Owner) {
         run {
             val signing = runCatching {
                 val cipher = withContext(io) { vault.decryptor() }
@@ -829,7 +829,7 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         return true
     }
 
-    private fun look(engine: Engine, words: List<String>) {
+    private fun look(engine: Gateway, words: List<String>) {
         state = state.copy(paperBusy = true, paperProblem = null, paper = null, paperDraft = null)
         viewModelScope.launch {
             val spent = paperSpent
