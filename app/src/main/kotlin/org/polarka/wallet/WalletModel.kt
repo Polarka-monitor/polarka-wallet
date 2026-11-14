@@ -40,7 +40,7 @@ enum class SelfTest { NOT_RUN, RUNNING, PASSED, FAILED }
 /** A short message about something the app has just done. */
 enum class Notice {
     FILE_DELETED, FILE_NOT_DELETED, CLIPBOARD_CLEARED, FILE_UNREADABLE, CLIPBOARD_EMPTY, WALLET_READY, WALLET_REMOVED, SAVED,
-    PAYMENT_GONE, ADDRESS_LIMIT, WORDS_REMOVED, LOOK_LIMIT, PAYMENT_BEATEN, PAYMENT_ARRIVED, PAYMENT_BACK,
+    PAYMENT_GONE, ADDRESS_LIMIT, WORDS_REMOVED, LOOK_LIMIT, PAYMENT_BEATEN, PAYMENT_ARRIVED, PAYMENT_BACK, WALLET_MADE,
 }
 
 /** Recovery words on their way through the app's state. A printed state or a log line never shows them. */
@@ -88,6 +88,10 @@ data class WalletState(
     val paperBusy: Boolean = false,
     val paperProblem: Problem? = null,
     val paperTxid: String? = null,
+    val backupSame: Boolean? = null,            // typed words were compared with the wallet in this phone: true if they are its words
+    val backupProblem: Problem? = null,
+    val backupBusy: Boolean = false,
+    val typedEpoch: Int = 0,                    // goes up when recovery words that were typed have to leave the screen
     val selfTest: SelfTest = SelfTest.NOT_RUN,
     val selfTestDetail: String = "",
 ) {
@@ -197,7 +201,9 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         val locks = wallet != null && wallet.lockOnOpen && state.newWords == null
         state = state.copy(
             locked = locks || state.locked, draft = if (locks) null else state.draft,
-            paper = null, paperDraft = null, paperProblem = null,
+            paper = null, paperDraft = null, paperProblem = null, backupSame = null, backupProblem = null,
+            // words that were typed and not used go too, with what was said about them
+            walletProblem = notAboutTypedWords(state.walletProblem), typedEpoch = state.typedEpoch + 1,
         )
     }
 
@@ -469,16 +475,30 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
 
     fun confirmNewWallet(owner: Owner) {
         val words = state.newWords?.words ?: return
-        keepWords(words, owner)
+        keepWords(words, owner, made = true)
     }
 
-    fun restoreWallet(text: String, owner: Owner) {
+    /** False if these are not valid recovery words: [WalletState.walletProblem] then says what is wrong, and the screen keeps what was typed. */
+    fun restoreWallet(text: String, owner: Owner): Boolean {
         val words = Words.split(text)
-        if (!Words.valid(words)) {
-            state = state.copy(walletProblem = Problem(Problem.Kind.BAD_WORDS))
-            return
+        Words.fault(words)?.let {
+            state = state.copy(walletProblem = Problem(Problem.Kind.BAD_WORDS, wordsDetail(it, words)))
+            return false
         }
-        keepWords(words, owner)
+        keepWords(words, owner, made = false)
+        return true
+    }
+
+    /**
+     * What is wrong with typed words, in the short form that the screen turns into a sentence (Parts.kt,
+     * wordsProblemText). A word that is not on the list is not a recovery word; it is named as it was typed,
+     * cut short, so that a slip of the finger can be found among twenty-four words.
+     */
+    private fun wordsDetail(fault: Words.Fault, words: List<String>): String = when (fault) {
+        is Words.Fault.NotOnList -> "list:" + fault.places.take(NAMED_STRANGERS).joinToString(", ") { "$it (${words[it - 1].take(16)})" } +
+            if (fault.places.size > NAMED_STRANGERS) ", ..." else ""
+        is Words.Fault.Count -> "count:" + fault.words
+        Words.Fault.Mismatch -> "fit"
     }
 
     private fun walletProblemOf(t: Throwable): Problem = when (t) {
@@ -488,7 +508,8 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         else -> Problem(Problem.Kind.STORE, t.javaClass.simpleName)
     }
 
-    private fun keepWords(words: List<String>, owner: Owner) {
+    /** [made]: the words are new and were only read from the screen, so the owner is told to check the paper in full. */
+    private fun keepWords(words: List<String>, owner: Owner, made: Boolean) {
         val chain = state.setup?.chain ?: Chain.MAIN
         viewModelScope.launch {
             val outcome = runCatching {
@@ -502,7 +523,12 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             state = outcome.fold(
-                { state.copy(wallet = it, newWords = null, walletProblem = null, wordsWithoutWallet = false, notice = Notice.WALLET_READY) },
+                {
+                    state.copy(
+                        wallet = it, newWords = null, walletProblem = null, wordsWithoutWallet = false,
+                        notice = if (made) Notice.WALLET_MADE else Notice.WALLET_READY,
+                    )
+                },
                 { state.copy(walletProblem = walletProblemOf(it), wordsWithoutWallet = state.wordsWithoutWallet || (it is EngineError && it.kind == Problem.Kind.WORDS_EXIST)) },
             )
             if (state.wallet != null) refresh()
@@ -548,7 +574,10 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
                 runCatching { vault.destroy() }
                 runCatching { wallets.clear() }
             }
-            state = state.copy(wallet = null, draft = null, sentTxid = null, locked = false, wordsWithoutWallet = false, notice = Notice.WALLET_REMOVED)
+            state = state.copy(
+                wallet = null, draft = null, sentTxid = null, locked = false, wordsWithoutWallet = false, notice = Notice.WALLET_REMOVED,
+                backupSame = null, backupProblem = null,
+            )
             refresh()
         }
     }
@@ -778,15 +807,16 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
     // ------------------------------------------------------------------------------------------ a paper address
 
     /** Looks at what the words of a paper address hold. The words stay in memory until the address is emptied, the look is dropped, or the app locks. */
-    fun paperLook(text: String) {
-        val engine = engine ?: return
+    fun paperLook(text: String): Boolean {
+        val engine = engine ?: return false
         val words = Words.split(text)
-        if (!Words.valid(words)) {
-            state = state.copy(paperProblem = Problem(Problem.Kind.BAD_WORDS))
-            return
+        Words.fault(words)?.let {
+            state = state.copy(paperProblem = Problem(Problem.Kind.BAD_WORDS, wordsDetail(it, words)))
+            return false
         }
         paperSpent = emptySet()
         look(engine, words)
+        return true
     }
 
     private fun look(engine: Engine, words: List<String>) {
@@ -863,6 +893,51 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         state = state.copy(paper = null, paperDraft = null, paperProblem = null, paperTxid = null, paperBusy = false)
     }
 
+    // ------------------------------------------------------------------------------------------ checking the paper
+
+    /**
+     * Are the typed words those of the wallet in this phone? When a wallet is made the app asks back three of
+     * its words; this compares all of them, at any later time. The stored words are not opened, nothing is
+     * written, and the typed words are used for this one comparison only.
+     * False if these are not valid recovery words: the screen then keeps what was typed.
+     */
+    fun checkBackup(text: String): Boolean {
+        val wallet = state.wallet ?: return false
+        if (state.backupBusy) return false
+        val words = Words.split(text)
+        Words.fault(words)?.let {
+            state = state.copy(backupSame = null, backupProblem = Problem(Problem.Kind.BAD_WORDS, wordsDetail(it, words)))
+            return false
+        }
+        state = state.copy(backupBusy = true, backupSame = null, backupProblem = null)
+        viewModelScope.launch {
+            val same = withContext(io) { runCatching { Account.fromWords(words, wallet.chain).watchKey().xpub == wallet.xpub } }
+            // the answer is about the wallet that was asked about; if that one is gone meanwhile, it is dropped
+            state = if (state.wallet?.xpub != wallet.xpub) state.copy(backupBusy = false)
+            else same.fold({ state.copy(backupBusy = false, backupSame = it) }, { state.copy(backupBusy = false, backupProblem = Problem.of(it)) })
+        }
+        return true
+    }
+
+    /** The words on the screen were changed: what was said about the earlier ones no longer stands. */
+    fun backupEdited() {
+        if (state.backupSame != null || state.backupProblem != null) state = state.copy(backupSame = null, backupProblem = null)
+    }
+
+    /**
+     * The page where recovery words are typed has left the screen, and what was typed went with it. What was
+     * said about those words goes too: a message can name a word as it was typed.
+     */
+    fun typedWordsGone() {
+        val next = state.copy(
+            walletProblem = notAboutTypedWords(state.walletProblem), paperProblem = notAboutTypedWords(state.paperProblem),
+            backupSame = null, backupProblem = null,
+        )
+        if (next != state) state = next
+    }
+
+    private fun notAboutTypedWords(problem: Problem?): Problem? = problem?.takeUnless { it.kind == Problem.Kind.BAD_WORDS }
+
     // ------------------------------------------------------------------------------------------ self-test
 
     /**
@@ -893,3 +968,6 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         val FEE_RATES = listOf(1L, Planner.DEFAULT_FEE_RATE, 5L)
     }
 }
+
+/** How many words that are not on the list are named in one message. */
+private const val NAMED_STRANGERS = 6

@@ -21,10 +21,10 @@ Keep only small amounts in it. Larger savings belong on paper (a cold address).
 
 The wallet has no server of its own. It asks a TrueNorth node what your addresses hold.
 
-- **A public node** is the quick way: confirm the address that is offered, or type another one. A public node
-  sees your addresses and your internet address, and it could show a false balance or hold a payment back.
-  It cannot take your coins.
 - **A node of your own** keeps your addresses to yourself. See the last chapter.
+- **A public node** is the quick way where there is one: type its address. This project does not run a public
+  node of its own yet, so the app offers none by name. A public node sees your addresses and your internet
+  address, and it could show a false balance or hold a payment back. It cannot take your coins.
 
 Run the self-test once (first screen, or More). It shows that the key code works on your phone.
 
@@ -34,7 +34,11 @@ Run the self-test once (first screen, or More). It shows that the key code works
 2. Write them on paper, in order, by hand. Do not photograph them, do not type them anywhere, do not store them
    in any app. Whoever has the words has the coins. Without them, a lost or broken phone means lost coins.
 3. The app asks three of the words back, then seals the words with your fingerprint or screen lock.
-4. Keep the paper where fire, water and curious people do not reach it.
+4. Check the paper in full before you send coins to the wallet: More, "Check the whole paper".
+   Type all the words from the paper. The app says whether they are the words of this wallet. Three words
+   asked back cannot show that the other twenty-one are right; this check can. The app never shows the words
+   again, so a mistake found later can only be mended by moving the coins to a new wallet.
+5. Keep the paper where fire, water and curious people do not reach it.
 
 If you remove the screen lock of the phone, Android destroys the key that protects the words. The app then
 tells you so; the paper is what brings the wallet back.
@@ -66,8 +70,16 @@ sure the old payment can no longer arrive.
 ## Bringing a wallet back
 
 More, "Bring back a wallet": type the 12 or 24 words, separated by spaces. The coins are found from the chain,
-however long the wallet had been in use. Do this once with a small amount before you rely on it: it is the
-only test that your paper is right.
+however long the wallet had been in use.
+
+If the words are not valid, the app says what is wrong and keeps what you typed, so that you can put it right:
+a word that is not a recovery word is named with its place ("5 (wordx)" is the fifth word), a wrong number of
+words is counted, and words that are all on the list but do not fit each other mean that one of them is a
+different word than on your paper, or that the order is different. What you typed goes when you leave the
+page, and when the app has been in the background for a minute.
+
+A paper that has never been tried is a hope, not a backup. Check it while the wallet is still in the phone
+(More, "Check the whole paper"), or bring the wallet back from it once with a small amount.
 
 By itself the app looks at the first 200 addresses of the wallet, 40 with a public node. If the node shows
 more of them in use, the Overview asks whether the app may look further. Say yes if you have used the wallet

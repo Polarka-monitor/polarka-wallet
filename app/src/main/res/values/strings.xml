@@ -127,6 +127,7 @@
     <string name="words_label">Recovery words</string>
     <string name="restore_go">Store the wallet</string>
     <string name="notice_wallet_ready">The wallet is ready.</string>
+    <string name="notice_wallet_made">The wallet is ready. Before you send coins to it, check your paper in full on the More page.</string>
     <string name="notice_wallet_removed">The wallet was removed from this phone.</string>
     <string name="notice_saved">Saved.</string>
 
@@ -218,6 +219,7 @@
     <string name="public_intro">The quickest way to start. The wallet asks a public TrueNorth node what your addresses hold and hands it your signed payments.</string>
     <string name="public_sees">A public node sees your addresses and your internet address, and it could show you a false balance or hold a payment back. It cannot take your coins: your keys never leave this phone. For more privacy use a node of your own.</string>
     <string name="public_address">Address of the public node</string>
+    <string name="public_none">This project does not run a public node of its own yet. If you know a public node, type its address.</string>
     <string name="public_go">Connect</string>
     <string name="offer_no_account">none (public node)</string>
     <string name="problem_timeout">The node did not answer in time. It may be busy. Try again in a moment.</string>
@@ -275,4 +277,12 @@
     <string name="problem_outcome_open">It is not yet known whether your last payment went out. Until that is settled no other payment is made: refresh in a minute. The payment then shows as waiting for a block, or the app tells you that it did not go through.</string>
     <string name="dropped_no_coin">The node does not show a coin of this payment among the addresses the app looks at, so no payment can be made for now. That passes when the node catches up with the network. If it stays so, a wallet that has used many addresses may need Look at twice as many on the More page. Forget this payment only if you are sure that it can no longer arrive.</string>
     <string name="wallet_remove_open">This phone also remembers payments that wait for a block or that did not go through. That memory goes with the wallet: one of those payments could then arrive beside a new one made with the same words.</string>
+    <string name="problem_words_list">Not on the list of recovery words: %1$s. The number is the place of the word in what you typed. Check the spelling.</string>
+    <string name="problem_words_count">Words typed: %1$s. A wallet has 12 or 24.</string>
+    <string name="problem_words_fit">Every word is on the list, but together they are not a valid set of recovery words. One of them is a different word than on your paper, or the order is different.</string>
+    <string name="backup_title">Check the whole paper</string>
+    <string name="backup_text">Type the words from your paper. The app says whether they are the words of the wallet in this phone. Nothing is stored and nothing is changed.</string>
+    <string name="backup_go">Check the words</string>
+    <string name="backup_same">They match: these are the words of the wallet in this phone.</string>
+    <string name="backup_other">These are valid recovery words, but of another wallet, not of the one in this phone.</string>
 </resources>

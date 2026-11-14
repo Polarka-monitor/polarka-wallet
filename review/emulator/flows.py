@@ -171,6 +171,62 @@ def restore_wallet(p, words):
     fingerprint(p)
 
 
+def field_of(p, title, label="Recovery words"):
+    """The field with that label in the block with that title: the first one below the title. More has two
+    fields for recovery words since 0.5.1 (the check of the whole paper, and the paper address)."""
+    seek(p, title)
+    for _ in range(5):
+        nodes = visible(p.nodes())
+        head = p.find(title, nodes=nodes)
+        below = [n for n in p.find(label, True, nodes=nodes) if head and n.center[1] > head[0].center[1]]
+        if below:
+            return min(below, key=lambda n: n.center[1])
+        p.sh("input swipe 540 1500 540 1200 250")       # a little further: the title stays, the field comes up
+        time.sleep(0.6)
+    raise RuntimeError("no field %r under %r; the screen shows: %s" % (label, title, p.texts()[:30]))
+
+
+def check_paper(p, words):
+    """More, "Check the whole paper": types the words into that block and presses its button (since 0.5.1)."""
+    tab(p, "More")
+    top(p)
+    field = field_of(p, "Check the whole paper")
+    p.tap_xy(*field.center)
+    time.sleep(0.6)
+    type_words(p, words)
+    button = seek(p, "Check the words", exact=True)
+    p.tap_xy(*button.center)
+    time.sleep(1.0)
+
+
+def restore_wallet_with_a_slip(p, words):
+    """Brings a wallet back, with one letter too many in the last word at first (since 0.5.1): the app has to
+    name that word and its place, ask for no fingerprint, and keep what was typed; one letter is then deleted."""
+    tab(p, "More")
+    top(p)
+    seek(p, "Bring back a wallet")
+    field = seek(p, "Recovery words", exact=True)
+    p.tap_xy(*field.center)
+    time.sleep(0.6)
+    type_words(p, words[:-1] + [words[-1] + "x"])
+    button = seek(p, "Store the wallet")
+    p.tap_xy(*button.center)
+    said = "Not on the list of recovery words: %d (%sx)" % (len(words), words[-1])
+    p.wait(said, 15)
+    if p.has("Confirm that it is you"):
+        raise RuntimeError("the fingerprint is asked for although the words are not valid")
+    field = seek(p, "Recovery words", exact=True)
+    p.tap_xy(*field.center)
+    time.sleep(0.6)
+    p.sh("input keyevent 123")          # to the end of what was typed, wherever the tap put the cursor
+    p.sh("input keyevent 67")           # and the one letter too many is deleted
+    time.sleep(0.4)
+    button = seek(p, "Store the wallet")
+    p.tap_xy(*button.center)
+    fingerprint(p)
+    return said
+
+
 def receive_address(p):
     tab(p, "Receive")
     found = [t for t in p.texts() if re.match(r"^r?north1[a-z0-9]{20,}$", t)]

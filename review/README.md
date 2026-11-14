@@ -15,10 +15,10 @@ build tools 36.0.0) on the path. `TN_BIN` must point to a folder with the offici
 
 | Check | Command | Passes when |
 |---|---|---|
-| All tests (116) | `gradle :core:test :node:test :app:testDebugUnitTest`, then `sh review/tests-summary.sh` | exit 0; 116 tests, 0 failures, 0 skipped |
+| All tests (122) | `gradle :core:test :node:test :app:testDebugUnitTest`, then `sh review/tests-summary.sh` | exit 0; 122 tests, 0 failures, 0 skipped |
 | The findings of the independent review, of its retest and of its third look stay fixed | the `Audit*Test` classes in the three modules, `RetestModelTest`, `AfterRetestTest`, `AfterRetestScreenTest`, `Retest2ModelTest`, `Retest3ModelTest`, `ThirdLookTest` | all pass |
 | A payment that did not go through cannot arrive beside the next one | `NotGoneThroughTest`, `NotGoneThroughPlainTest`, `NotGoneThroughScreenTest`, core test `PlannerMustTest`, node test `SpendersTest` | all pass |
-| The package on emulators (Android 12, 14, 16) | `review/emulator/README.md` | each script ends with its line of success (`ALL 11 STEPS PASSED`, `LOCK STEPS PASSED`, `NOT GONE THROUGH: ALL 6 STEPS PASSED`, `UPGRADE: ALL 3 STEPS PASSED`) |
+| The package on emulators (Android 12, 14, 16) | `review/emulator/README.md` | each script ends with its line of success (`ALL 12 STEPS PASSED`, `LOCK STEPS PASSED`, `NOT GONE THROUGH: ALL 6 STEPS PASSED`, `UPGRADE: ALL 4 STEPS PASSED`) |
 | A public node never gets the account key | app test `PublicNodeTest` (needs python3 and `gateway.py` of polarka-node) | prints `PUBLIC NODE OK: ...` |
 | Nothing secret leaves the phone | app test `ReviewTest.nothingSecretLeavesThePhone` | prints `REVIEW OK: ... no word, seed, extended private key or private key in any of them` |
 | A lying node cannot make the wallet lose coins | app test `ReviewTest.aLyingNodeCannotMakeTheWalletLoseCoins` | prints `REVIEW OK: foreign coin refused, ...` |

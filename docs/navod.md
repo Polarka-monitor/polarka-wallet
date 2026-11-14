@@ -20,9 +20,10 @@ Mějte v ní jen malé částky. Větší úspory patří na papír (studená ad
 
 Peněženka nemá vlastní server. Na stav vašich adres se ptá uzlu sítě TrueNorth.
 
-- **Veřejný uzel** je rychlá cesta: potvrďte nabídnutou adresu, nebo napište jinou. Veřejný uzel vidí vaše adresy
-  a vaši internetovou adresu a mohl by vám ukázat nepravdivý zůstatek nebo platbu zadržet. Mince vám vzít nemůže.
 - **Vlastní uzel** nechá vaše adresy jen vám. Viz poslední kapitolu.
+- **Veřejný uzel** je rychlá cesta tam, kde nějaký je: napište jeho adresu. Tento projekt zatím vlastní veřejný
+  uzel neprovozuje, proto aplikace žádný jménem nenabízí. Veřejný uzel vidí vaše adresy a vaši internetovou
+  adresu a mohl by vám ukázat nepravdivý zůstatek nebo platbu zadržet. Mince vám vzít nemůže.
 
 Jednou spusťte vlastní test (první obrazovka nebo Více). Ukáže, že kód pro klíče na vašem telefonu funguje.
 
@@ -32,7 +33,11 @@ Jednou spusťte vlastní test (první obrazovka nebo Více). Ukáže, že kód p
 2. Opište je rukou na papír, v daném pořadí. Nefoťte je, nikam je nepište, neukládejte je do žádné aplikace.
    Kdo má slova, má mince. Bez nich znamená ztracený nebo rozbitý telefon ztracené mince.
 3. Aplikace se zeptá na tři ze slov a potom slova zapečetí vaším otiskem nebo zámkem obrazovky.
-4. Papír uložte tam, kam se nedostane oheň, voda ani zvědaví lidé.
+4. Než na peněženku pošlete mince, zkontrolujte celý papír: Více, "Kontrola celého papíru". Napište všechna slova
+   z papíru. Aplikace řekne, zda jsou to slova této peněženky. Tři slova, na která se aplikace zeptala,
+   neukážou, že je správně zbylých jedenadvacet; tato kontrola ano. Aplikace slova už nikdy neukáže, takže
+   chybu nalezenou později lze napravit jen přesunem mincí do nové peněženky.
+5. Papír uložte tam, kam se nedostane oheň, voda ani zvědaví lidé.
 
 Pokud v telefonu zrušíte zámek obrazovky, Android zničí klíč, který slova chrání. Aplikace vám to oznámí;
 peněženku pak vrátí jen papír.
@@ -62,8 +67,15 @@ dorazit nemůže.
 ## Obnova peněženky
 
 Více, "Obnova peněženky": napište 12 nebo 24 slov oddělených mezerami. Mince se najdou v řetězci, ať byla
-peněženka používaná jakkoli dlouho. Vyzkoušejte to jednou s malou částkou, než se na to spolehnete: je to
-jediná zkouška, že máte papír správně.
+peněženka používaná jakkoli dlouho.
+
+Pokud slova nejsou platná, aplikace řekne, co je špatně, a napsaný text nechá, abyste ho mohli opravit:
+slovo, které není v seznamu, pojmenuje i s pořadím ("5 (slovox)" je páté slovo), špatný počet slov spočítá
+a u slov, která v seznamu jsou, ale nepatří k sobě, je některé jiné než na papíře, nebo je jiné pořadí.
+Napsaný text zmizí, když stránku opustíte, a když je aplikace minutu na pozadí.
+
+Papír, který nikdo nevyzkoušel, je naděje, ne záloha. Zkontrolujte ho, dokud je peněženka v telefonu
+(Více, "Kontrola celého papíru"), nebo z něj peněženku jednou obnovte s malou částkou.
 
 Sama od sebe aplikace prohlíží prvních 200 adres peněženky, u veřejného uzlu 40. Pokud uzel ukazuje, že jich
 je použito víc, zeptá se Přehled, zda má aplikace hledat dál. Řekněte ano, pokud jste peněženku opravdu tolik

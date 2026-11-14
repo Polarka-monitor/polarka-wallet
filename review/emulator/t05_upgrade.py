@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""A package installed over an older one keeps the wallet: 0.4.1, then the package under test, on an emulator.
+"""A package installed over an older one keeps the wallet: an older signed package, then the package under test.
 
   t05_upgrade.py SERIAL OLD_APK NEW_APK
 
 With the old package a wallet is made, receives, and sends a payment that is left waiting for a block. The new
 package is installed over it (both are signed with the same key, or Android refuses). It must open the same
 wallet after the fingerprint, still know the waiting payment, and sign a new payment with the words that the old
-package stored. The screens of 0.4.1 differ from the later ones, so the first part uses the steps as they were
-then (flows_0_4.py).
+package stored, and it must find the paper that was written with the old package right (the check of the
+whole paper, since 0.5.1). The screens of 0.4.1 differ from the later ones, so with an old package of 0.4 the
+first part uses the steps as they were then (flows_0_4.py).
 
 The emulator must be running with a screen lock and a fingerprint and must trust the test authority, as for
 t02_wallet.py.
@@ -18,7 +19,7 @@ import time
 
 from emu import Phone
 import flows
-import flows_0_4 as old
+import flows_0_4
 from flows import bench, bench_state, number_after
 
 PKG = "org.polarka.wallet"
@@ -62,6 +63,7 @@ p.adb("uninstall", PKG)
 out = p.adb("install", old_apk, timeout=180)
 expect("Success" in out, "the old package was not installed: %s" % out[-200:])
 was = version()
+old = flows_0_4 if was.startswith("0.4") else flows
 p.start(PKG + "/.MainActivity")
 p.wait("Connect to a public node", 30)
 old.import_setup(p, bench("setup", "own", st["bench_address"]))
@@ -69,7 +71,7 @@ p.tap("Save and connect")
 p.wait("Total", 40, exact=True)
 if p.has("The setup file was deleted"):
     p.tap("OK", exact=True)
-old.make_wallet(p)
+words = old.make_wallet(p)
 address = old.receive_address(p)
 bench("pay", address, 25)
 bench("mine", 1)
@@ -103,4 +105,7 @@ expect(amount("Can be spent") == "16.99999348", "after the second block: " + amo
 flows.tab(p, "History")
 expect(p.has("paid") and p.has("received"), "the history lacks the payments or the receipt")
 step("the new package signs with the words the old one stored: a payment of 3 NORTH went through, 16.99999348 NORTH are left")
+flows.check_paper(p, words)
+p.wait("They match", 20)
+step("the paper written with version %s is found right by version %s" % (was, now))
 print("UPGRADE: ALL %d STEPS PASSED (%s -> %s)" % (len(done), was, now), flush=True)

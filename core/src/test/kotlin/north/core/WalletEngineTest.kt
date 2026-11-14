@@ -5,6 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** The parts of the wallet that need no node: the watch key and its descriptors, new words, choosing coins. */
@@ -57,6 +58,26 @@ class WalletEngineTest {
         assertFalse(Words.valid(words.dropLast(1) + "abandon"))      // wrong checksum
         assertFalse(Words.valid(words.dropLast(1)))                   // eleven words
         assertFalse(Words.valid(words.dropLast(1) + "sever"))         // not on the list
+    }
+
+    @Test
+    fun whatIsWrongWithTypedWordsIsNamed() {
+        assertNull(Words.fault(words))
+        repeat(50) { assertNull(Words.fault(Words.generate())) }
+        // words that are not on the list are named by their place, before anything else is said
+        assertEquals(Words.Fault.NotOnList(listOf(3, 12)), Words.fault(words.toMutableList().also { it[2] = "abandn"; it[11] = "abuot" }))
+        assertEquals(Words.Fault.NotOnList(listOf(1)), Words.fault(listOf("sever") + words))
+        assertEquals(Words.Fault.NotOnList(listOf(2)), Words.fault(Words.split("abandon abandon, abandon")))    // a comma is not part of a word
+        // then the number of words
+        assertEquals(Words.Fault.Count(11), Words.fault(words.dropLast(1)))
+        assertEquals(Words.Fault.Count(13), Words.fault(words + "zoo"))
+        assertEquals(Words.Fault.Count(0), Words.fault(Words.split("   ")))
+        // then whether they fit each other
+        assertEquals(Words.Fault.Mismatch, Words.fault(words.dropLast(1) + "abandon"))
+        // fault and valid never disagree
+        for (typed in listOf(words, words.dropLast(1), words.dropLast(1) + "abandon", words.dropLast(1) + "sever", Words.generate())) {
+            assertEquals(Words.valid(typed), Words.fault(typed) == null)
+        }
     }
 
     private val account = Account.fromWords(words, Chain.REGTEST)

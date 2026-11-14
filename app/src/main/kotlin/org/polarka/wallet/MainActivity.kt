@@ -100,8 +100,11 @@ enum class Section(val title: Int) {
     HISTORY(R.string.tab_history), MINING(R.string.tab_mining), MORE(R.string.tab_more),
 }
 
-/** The public node offered on the first screen. The user may type another one. */
-const val PUBLIC_NODE = "https://node.polarka.org"
+/**
+ * The public node offered on the first screen; the user may type another one. Empty while the project has no
+ * public node of its own: a name that leads nowhere must not be the first thing a new user is offered.
+ */
+const val PUBLIC_NODE = ""
 
 val screenPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
 val gap = Arrangement.spacedBy(12.dp)
@@ -190,36 +193,49 @@ private fun SetupScreen(model: WalletModel, state: WalletState) {
             state.offerError?.let { reason ->
                 Text(setupErrorText(reason, state.offerDetail), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("setup-error"))
             }
-            Block(stringResource(R.string.public_title)) {
-                Text(stringResource(R.string.public_intro))
-                Text(stringResource(R.string.public_sees), style = MaterialTheme.typography.bodySmall)
-                OutlinedTextField(
-                    value = publicUrl, onValueChange = { publicUrl = it.trim() }, singleLine = true, label = { Text(stringResource(R.string.public_address)) },
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, keyboardType = KeyboardType.Uri),
-                    modifier = Modifier.fillMaxWidth().testTag("public-url"),
-                )
-                Button(onClick = { model.offerPublic(publicUrl) }, enabled = publicUrl.isNotBlank(), modifier = Modifier.fillMaxWidth().testTag("public-go")) {
-                    Text(stringResource(R.string.public_go))
+            val publicNode: @Composable () -> Unit = {
+                Block(stringResource(R.string.public_title)) {
+                    Text(stringResource(R.string.public_intro))
+                    if (PUBLIC_NODE.isEmpty()) Text(stringResource(R.string.public_none), modifier = Modifier.testTag("public-none"))
+                    Text(stringResource(R.string.public_sees), style = MaterialTheme.typography.bodySmall)
+                    OutlinedTextField(
+                        value = publicUrl, onValueChange = { publicUrl = it.trim() }, singleLine = true, label = { Text(stringResource(R.string.public_address)) },
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, keyboardType = KeyboardType.Uri),
+                        modifier = Modifier.fillMaxWidth().testTag("public-url"),
+                    )
+                    Button(onClick = { model.offerPublic(publicUrl) }, enabled = publicUrl.isNotBlank(), modifier = Modifier.fillMaxWidth().testTag("public-go")) {
+                        Text(stringResource(R.string.public_go))
+                    }
                 }
             }
-            Block(stringResource(R.string.setup_title)) {
-                Text(stringResource(R.string.setup_intro))
-                Text(stringResource(R.string.setup_how))
-                // every file type: phones do not agree on what kind of file a .json is, and the content is checked anyway
-                Button(onClick = { picker.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.setup_pick_file)) }
-                OutlinedButton(
-                    onClick = {
-                        val text = readClipboard(context)
-                        if (text.isNullOrBlank()) {
-                            model.note(Notice.CLIPBOARD_EMPTY)
-                        } else if (model.offer(text)) {
-                            // the clipboard held the password in plain text; other apps can read the clipboard
-                            runCatching { context.getSystemService(ClipboardManager::class.java).clearPrimaryClip() }
-                                .onSuccess { model.note(Notice.CLIPBOARD_CLEARED) }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().testTag("paste"),
-                ) { Text(stringResource(R.string.setup_paste)) }
+            val ownNode: @Composable () -> Unit = {
+                Block(stringResource(R.string.setup_title)) {
+                    Text(stringResource(R.string.setup_intro))
+                    Text(stringResource(R.string.setup_how))
+                    // every file type: phones do not agree on what kind of file a .json is, and the content is checked anyway
+                    Button(onClick = { picker.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.setup_pick_file)) }
+                    OutlinedButton(
+                        onClick = {
+                            val text = readClipboard(context)
+                            if (text.isNullOrBlank()) {
+                                model.note(Notice.CLIPBOARD_EMPTY)
+                            } else if (model.offer(text)) {
+                                // the clipboard held the password in plain text; other apps can read the clipboard
+                                runCatching { context.getSystemService(ClipboardManager::class.java).clearPrimaryClip() }
+                                    .onSuccess { model.note(Notice.CLIPBOARD_CLEARED) }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().testTag("paste"),
+                    ) { Text(stringResource(R.string.setup_paste)) }
+                }
+            }
+            // a public node that can be named comes first; while there is none, the node of one's own does
+            if (PUBLIC_NODE.isEmpty()) {
+                ownNode()
+                publicNode()
+            } else {
+                publicNode()
+                ownNode()
             }
         } else {
             Block(stringResource(R.string.offer_title)) {

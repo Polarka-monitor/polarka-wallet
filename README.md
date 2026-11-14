@@ -3,9 +3,10 @@
 A wallet for TrueNorth (NORTH) on Android. It keeps its keys in the phone, signs there, and asks a TrueNorth
 Core node what the addresses hold. There is no server of the wallet's own, no account and no analytics.
 
-**State: test build 0.5.0, not released.** The wallet has been checked by its author and, three times, by an
+**State: test build 0.5.1, not released.** The wallet has been checked by its author and, three times, by an
 independent reviewer that had not seen the code being written (`review/independent-review-0.3.1`,
-`review/independent-review-0.4.0` and `review/independent-review-0.4.2`). All of that was AI-assisted; a review
+`review/independent-review-0.4.0` and `review/independent-review-0.4.2`); what 0.5.1 changed after that, and
+how that was checked, is in `review/changes-0.5.1.md`. All of that was AI-assisted; a review
 by an independent human expert is still recommended. Until then it is for small amounts.
 It is an independent community project and not a product of the TrueNorth developers.
 
@@ -15,6 +16,11 @@ It is an independent community project and not a product of the TrueNorth develo
   was in use, its coins are found again: used keys are searched until twenty unused ones follow. The app
   looks at the first 200 addresses of each kind by itself (40 with a public node) and asks its owner before
   it looks further.
+- Checks a paper in full: the words typed from the paper are compared with the wallet in the phone, without
+  opening the stored words. When a wallet is made the app asks back three of the 24 words, which would miss
+  seven of eight copying mistakes; this check misses none. Words that are not valid are answered with what
+  is wrong: which word is not on the list (by its place), how many words there are, or that they do not fit
+  each other.
 - Receives to P2QRH addresses (`north1z...`), a fresh one whenever the last one has been used; shows a QR code.
 - Sends: the payment is worked out, shown, and signed only after the owner's fingerprint or screen lock.
   The fee is exact before signing. Addresses can be pasted or read from a QR code.
@@ -29,7 +35,8 @@ It is an independent community project and not a product of the TrueNorth develo
 
 The wallet talks to one node, over https only.
 
-- **A public node.** Nothing to set up: the address of the node is enough. The wallet names its addresses to
+- **A public node.** Nothing to set up: the address of the node is enough. (The project does not run one of
+  its own yet, so the first screen names none.) The wallet names its addresses to
   the node one by one and never sends the key that shows the whole wallet. A public node sees those addresses
   and the phone's internet address, and it could show a false balance or hold a payment back. It cannot take
   coins: a transaction built on false figures is not valid, and keys never leave the phone. The gateway that
@@ -61,6 +68,10 @@ and only one of the two can ever be in a block.
 - The recovery words are sealed with a key that lives in the Android Keystore (the phone's security chip
   where there is one) and is released only after the owner unlocks it, once per use. The app cannot read the
   words on its own. They are never shown again after the wallet is made, never logged, never sent.
+- Words that are typed (to bring a wallet back, to check a paper, to empty a paper address) live only in the
+  field they are typed into. They are not written into the saved state of the screen. They go when they have
+  done their work, when the page is left, and when the app has been in the background for a minute; a
+  message that names a mistyped word goes with them.
 - The node setup and the wallet's public information are sealed with a second Keystore key. The app is excluded
   from backups; nothing travels to a cloud or to another phone.
 - Screens cannot be captured; no other app may draw over the wallet; from Android 14 on, the screens with words
@@ -115,7 +126,7 @@ a real network.
     TN_BIN=/path/to/bin gradle :core:test :node:test :app:testDebugUnitTest :app:lintDebug
     sh review/tests-summary.sh
 
-116 tests. A test that cannot run (no node programs, or no `gateway.py` of polarka-node next to this
+122 tests. A test that cannot run (no node programs, or no `gateway.py` of polarka-node next to this
 repository or named by `POLARKA_GATEWAY`) is reported as skipped; for a release none may be skipped. Every library is pinned by its SHA-256 in `gradle/verification-metadata.xml`:
 the build stops if one differs from the day it was first downloaded. The pins were made by Gradle on that day
 (trust on first download); signatures of the libraries are not verified.

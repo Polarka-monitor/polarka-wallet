@@ -31,6 +31,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -455,8 +457,12 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner, go: (Section) 
     val wallet = state.wallet
     SecureWindow()                              // recovery words are typed on this page
     WordsOnScreen()
-    // remember, not rememberSaveable: what is typed here must not be written into the saved state of the screen
-    var restoring by remember { mutableStateOf("") }
+    // remember, not rememberSaveable: what is typed here must not be written into the saved state of the screen;
+    // and a new, empty field whenever the model says that typed words have to go (the app was away, or was locked)
+    var restoring by remember(state.typedEpoch) { mutableStateOf("") }
+    DisposableEffect(Unit) { onDispose { model.typedWordsGone() } }
+    // what was typed stays while it is being put right, and goes as soon as there is a wallet
+    LaunchedEffect(wallet?.xpub) { if (wallet != null) restoring = "" }
     var askRemoveWallet by rememberSaveable { mutableStateOf(false) }
     var askForget by rememberSaveable { mutableStateOf(false) }
     var price by rememberSaveable(wallet?.price) { mutableStateOf(wallet?.price.orEmpty()) }
@@ -479,7 +485,7 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner, go: (Section) 
                     modifier = Modifier.fillMaxWidth().testTag("restore-words"), minLines = 3,
                 )
                 ProblemCard(state.walletProblem, "wallet-problem")
-                Button(onClick = { model.restoreWallet(restoring, owner); restoring = "" }, enabled = restoring.isNotBlank(), modifier = Modifier.testTag("restore-go")) {
+                Button(onClick = { model.restoreWallet(restoring, owner) }, enabled = restoring.isNotBlank(), modifier = Modifier.testTag("restore-go")) {
                     Text(stringResource(R.string.restore_go))
                 }
             }
@@ -501,6 +507,7 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner, go: (Section) 
                 }
                 OutlinedButton(onClick = { askRemoveWallet = true }, modifier = Modifier.testTag("wallet-remove")) { Text(stringResource(R.string.wallet_remove)) }
             }
+            BackupBlock(model, state)
             Block(stringResource(R.string.price_title)) {
                 Text(stringResource(R.string.price_text), style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(
@@ -587,7 +594,7 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner, go: (Section) 
 @Composable
 private fun PaperBlock(model: WalletModel, state: WalletState) {
     val wallet = state.wallet
-    var words by remember { mutableStateOf("") }
+    var words by remember(state.typedEpoch) { mutableStateOf("") }
     var keep by rememberSaveable { mutableStateOf("") }
     var restTo by rememberSaveable { mutableStateOf("") }
     var other by rememberSaveable { mutableStateOf("") }
@@ -608,7 +615,7 @@ private fun PaperBlock(model: WalletModel, state: WalletState) {
             )
             ProblemCard(state.paperProblem, "paper-problem")
             if (state.paperBusy) Busy(R.string.asking_node)
-            Button(onClick = { model.paperLook(words); words = "" }, enabled = words.isNotBlank() && !state.paperBusy, modifier = Modifier.testTag("paper-look")) {
+            Button(onClick = { if (model.paperLook(words)) words = "" }, enabled = words.isNotBlank() && !state.paperBusy, modifier = Modifier.testTag("paper-look")) {
                 Text(stringResource(R.string.paper_look))
             }
         } else {
@@ -659,6 +666,33 @@ private fun PaperBlock(model: WalletModel, state: WalletState) {
                 Button(onClick = model::paperSend, enabled = !state.paperBusy, modifier = Modifier.fillMaxWidth().testTag("paper-go")) { Text(stringResource(R.string.paper_go)) }
             }
             TextButton(onClick = model::paperDrop, enabled = !state.paperBusy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cancel)) }
+        }
+    }
+}
+
+/**
+ * Typed words are compared with the wallet in this phone. This is how a paper is checked in full: when a
+ * wallet is made, the app asks back three of its words only. Nothing is stored, and the stored words stay closed.
+ */
+@Composable
+private fun BackupBlock(model: WalletModel, state: WalletState) {
+    // remember, not rememberSaveable: what is typed here must not be written into the saved state of the screen
+    var words by remember(state.typedEpoch) { mutableStateOf("") }
+    LaunchedEffect(state.backupSame) { if (state.backupSame == true) words = "" }
+    Block(stringResource(R.string.backup_title)) {
+        Text(stringResource(R.string.backup_text), style = MaterialTheme.typography.bodySmall)
+        OutlinedTextField(
+            value = words, onValueChange = { words = it; model.backupEdited() }, label = { Text(stringResource(R.string.words_label)) },
+            keyboardOptions = secretKeyboard, modifier = Modifier.fillMaxWidth().testTag("backup-words"), minLines = 3,
+        )
+        ProblemCard(state.backupProblem, "backup-problem")
+        when (state.backupSame) {
+            true -> Lit(stringResource(R.string.backup_same), "backup-result")
+            false -> Text(stringResource(R.string.backup_other), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("backup-result"))
+            null -> Unit
+        }
+        OutlinedButton(onClick = { model.checkBackup(words) }, enabled = words.isNotBlank() && !state.backupBusy, modifier = Modifier.testTag("backup-go")) {
+            Text(stringResource(R.string.backup_go))
         }
     }
 }

@@ -126,6 +126,7 @@
     <string name="words_label">Slova pro obnovu</string>
     <string name="restore_go">Uložit peněženku</string>
     <string name="notice_wallet_ready">Peněženka je připravená.</string>
+    <string name="notice_wallet_made">Peněženka je připravená. Než na ni pošlete mince, zkontrolujte celý papír na stránce Více.</string>
     <string name="notice_wallet_removed">Peněženka byla z telefonu odebrána.</string>
     <string name="notice_saved">Uloženo.</string>
 
@@ -217,6 +218,7 @@
     <string name="public_intro">Nejrychlejší začátek. Peněženka se ptá veřejného uzlu TrueNorth, co je na vašich adresách, a předává mu vaše podepsané platby.</string>
     <string name="public_sees">Veřejný uzel vidí vaše adresy a vaši internetovou adresu a mohl by vám ukázat nepravdivý zůstatek nebo platbu zadržet. Vaše mince vzít nemůže: klíče tento telefon nikdy neopouštějí. Pro větší soukromí použijte vlastní uzel.</string>
     <string name="public_address">Adresa veřejného uzlu</string>
+    <string name="public_none">Tento projekt zatím vlastní veřejný uzel neprovozuje. Pokud nějaký veřejný uzel znáte, napište jeho adresu.</string>
     <string name="public_go">Připojit</string>
     <string name="offer_no_account">žádný (veřejný uzel)</string>
     <string name="problem_timeout">Uzel neodpověděl včas. Může být zaneprázdněný. Zkuste to za chvíli znovu.</string>
@@ -274,4 +276,12 @@
     <string name="problem_outcome_open">Zatím není známo, zda vaše poslední platba odešla. Dokud se to nevyjasní, další platba se nedělá: za minutu obnovte přehled. Platba se pak ukáže jako čekající na blok, nebo vám aplikace oznámí, že neproběhla.</string>
     <string name="dropped_no_coin">Uzel mezi adresami, na které se aplikace dívá, neukazuje žádnou minci této platby, takže teď nelze platit. Přejde to, až uzel dožene síť. Pokud to trvá, může peněženka, která použila mnoho adres, potřebovat volbu Prohlédnout dvakrát tolik na stránce Více. Zapomenout tuto platbu zvolte jen tehdy, když máte jistotu, že už dorazit nemůže.</string>
     <string name="wallet_remove_open">Tento telefon si také pamatuje platby, které čekají na blok nebo neproběhly. Tato paměť zmizí s peněženkou: některá z těch plateb by pak mohla dorazit vedle nové platby z týchž slov.</string>
+    <string name="problem_words_list">V seznamu slov pro obnovu není: %1$s. Číslo je pořadí slova v tom, co jste napsali. Zkontrolujte pravopis.</string>
+    <string name="problem_words_count">Počet napsaných slov: %1$s. Peněženka jich má 12 nebo 24.</string>
+    <string name="problem_words_fit">Všechna slova jsou v seznamu, ale dohromady netvoří platnou sadu slov pro obnovu. Některé je jiné než na papíře, nebo je jiné pořadí.</string>
+    <string name="backup_title">Kontrola celého papíru</string>
+    <string name="backup_text">Napište slova z papíru. Aplikace řekne, zda jsou to slova peněženky v tomto telefonu. Nic se neukládá a nic se nemění.</string>
+    <string name="backup_go">Zkontrolovat slova</string>
+    <string name="backup_same">Souhlasí: jsou to slova peněženky v tomto telefonu.</string>
+    <string name="backup_other">Jsou to platná slova pro obnovu, ale jiné peněženky, ne té v tomto telefonu.</string>
 </resources>

@@ -23,6 +23,31 @@ object Words {
     /** True if these are 12 or 24 words of the English BIP39 list with a correct checksum. */
     fun valid(words: List<String>): Boolean =
         (words.size == 12 || words.size == 24) && runCatching { MnemonicCode.validate(words) }.isSuccess
+
+    /** What is wrong with typed words, so that the person who typed them can be told. */
+    sealed interface Fault {
+        /** Words that are not on the English BIP39 list, by their place in what was typed; the first word is 1. */
+        data class NotOnList(val places: List<Int>) : Fault
+
+        /** Every word is on the list, but they are not 12 and not 24. */
+        data class Count(val words: Int) : Fault
+
+        /** Every word is on the list and their number is right, but they do not fit each other (the checksum). */
+        data object Mismatch : Fault
+    }
+
+    /** Null exactly when the words are [valid]; otherwise the first thing to put right. */
+    fun fault(words: List<String>): Fault? {
+        val strangers = words.indices.filter { words[it] !in onList }.map { it + 1 }
+        return when {
+            strangers.isNotEmpty() -> Fault.NotOnList(strangers)
+            words.size != 12 && words.size != 24 -> Fault.Count(words.size)
+            !valid(words) -> Fault.Mismatch
+            else -> null
+        }
+    }
+
+    private val onList: Set<String> by lazy { MnemonicCode.englishWordlist.toSet() }
 }
 
 /** One unspent output of the wallet: where it is on the chain and which key of the account it belongs to. */

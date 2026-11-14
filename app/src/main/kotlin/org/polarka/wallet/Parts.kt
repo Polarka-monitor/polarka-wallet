@@ -164,6 +164,7 @@ fun NoticeCard(model: WalletModel, state: WalletState) {
         Notice.FILE_UNREADABLE -> R.string.notice_file_unreadable
         Notice.CLIPBOARD_EMPTY -> R.string.notice_clipboard_empty
         Notice.WALLET_READY -> R.string.notice_wallet_ready
+        Notice.WALLET_MADE -> R.string.notice_wallet_made
         Notice.WALLET_REMOVED -> R.string.notice_wallet_removed
         Notice.SAVED -> R.string.notice_saved
         Notice.PAYMENT_GONE -> R.string.notice_payment_gone
@@ -205,7 +206,7 @@ fun problemText(problem: Problem): String = when (problem.kind) {
     Problem.Kind.FEE_RATE -> stringResource(R.string.problem_fee_rate)
     Problem.Kind.TOO_MANY_INPUTS -> stringResource(R.string.problem_too_many_inputs)
     Problem.Kind.WRONG_WORDS -> stringResource(R.string.problem_wrong_words)
-    Problem.Kind.BAD_WORDS -> stringResource(R.string.problem_bad_words)
+    Problem.Kind.BAD_WORDS -> wordsProblemText(problem.detail)
     Problem.Kind.REJECTED -> stringResource(R.string.problem_rejected, problem.detail)
     Problem.Kind.UNLOCK -> stringResource(R.string.problem_unlock, problem.detail)
     Problem.Kind.IN_WAITING_PAYMENT -> stringResource(R.string.problem_in_waiting)
@@ -217,6 +218,15 @@ fun problemText(problem: Problem): String = when (problem.kind) {
     Problem.Kind.TOO_MANY_WAITING -> stringResource(R.string.problem_too_many_waiting)
     Problem.Kind.EARLIER_PAYMENT -> stringResource(R.string.problem_earlier_payment)
     Problem.Kind.OUTCOME_OPEN -> stringResource(R.string.problem_outcome_open)
+}
+
+/** What is wrong with typed recovery words. The model passes it on in a short form (WalletModel.wordsDetail). */
+@Composable
+private fun wordsProblemText(detail: String): String = when {
+    detail.startsWith("list:") -> stringResource(R.string.problem_words_list, detail.substringAfter(':'))
+    detail.startsWith("count:") -> stringResource(R.string.problem_words_count, detail.substringAfter(':'))
+    detail == "fit" -> stringResource(R.string.problem_words_fit)
+    else -> stringResource(R.string.problem_bad_words)
 }
 
 @Composable

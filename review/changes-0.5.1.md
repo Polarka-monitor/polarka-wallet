@@ -1,0 +1,37 @@
+# What 0.5.1 changed
+
+0.5.0 was the first version of this app that was used on a real phone for more than a try (14 November 2026).
+Two things went wrong on that day that no test, emulator run or review had shown.
+
+1. A wallet was to be brought back from a paper on which the words had not been copied right. For every kind
+   of mistake the app had the same sentence ("These are not valid recovery words. Check the spelling and the
+   order."), and it emptied the field. Each try meant typing all the words again without knowing more.
+2. The first screen filled in the address of a public node that the project does not run yet. Pressing
+   "Connect" there could only end with "The node cannot be reached".
+
+The first of these is also a matter of the paper itself. When a wallet is made, the app asks back three of
+the 24 words. A single word copied wrongly is noticed in one case out of eight.
+
+| Change | Where | Tests |
+|---|---|---|
+| Typed words that are not valid are answered with what is wrong: the words that are not on the list, by their place and as they were typed (at most six, each cut to 16 characters), or the number of words, or that the words do not fit each other. What was typed stays in the field. | core: `Words.fault` in `Planner.kt`; app: `WalletModel.restoreWallet`, `paperLook`, `wordsDetail`, and `wordsProblemText` in `Parts.kt` | core `WalletEngineTest.whatIsWrongWithTypedWordsIsNamed`; app `WordsHelpTest.wordsThatAreNotValidAreAnsweredWithWhatIsWrongAndStayInTheField` |
+| "Check the whole paper" (More): typed words are compared with the wallet in the phone. The stored words are not opened and the fingerprint is not asked for: the account key derived from the typed words is compared with the one in the wallet's public file. Words that match are taken out of the field; others stay to be put right. | `WalletModel.checkBackup`, `backupEdited`; `BackupBlock` in `Tabs.kt` | `WordsHelpTest.aPaperIsCheckedInFullAgainstTheWalletInThePhone` |
+| A wallet that was just made is followed by the advice to check the paper in full before coins are sent to it. | `Notice.WALLET_MADE`, `keepWords(made)` | `WordsHelpTest.aWalletThatWasJustMadeIsFollowedByTheAdviceToCheckThePaperInFull` |
+| Typed words now stay in their field after a check that failed, so they are taken away at the other end: when the page is left, and when the app has been in the background for a minute, also where the wallet does not lock. A message that names a typed word goes with them. | `WalletState.typedEpoch`, `WalletModel.lock`, `typedWordsGone`; `remember(state.typedEpoch)` and the `DisposableEffect` in `Tabs.kt` | `WordsHelpTest.typedWordsAndWhatWasSaidAboutThemGoWhenTheAppWasAwayOrThePageIsLeft` |
+| The first screen names no public node while the project has none, says so, and puts the node of one's own first. | `PUBLIC_NODE` and `SetupScreen` in `MainActivity.kt` | `FirstScreenTest` |
+
+Nothing changed in how keys are derived, how the words are stored, how a payment is built and signed, or in
+what is said to a node.
+
+## What the check of the whole paper is not
+
+It does not show the words, and it cannot mend a paper: it says whether the typed words are those of the
+wallet in the phone, not which word is wrong. It needs the app to be open, and with it the Receive page shows
+an address of the wallet; somebody who knows most of the words learns no more from the check than from that
+address.
+
+## How it was checked
+
+- 122 tests, none failed, none skipped; lint without errors (14 November 2026, macOS, JDK 21).
+- The independent reviewer's look at the change and the runs of the signed package on emulators are recorded
+  below when they are done.
