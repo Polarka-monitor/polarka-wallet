@@ -4,12 +4,12 @@ import android.content.ClipboardManager
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -25,17 +26,16 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -65,7 +65,9 @@ class MainActivity : ComponentActivity() {
         // Android may build this screen anew while the app is in the background (the phone was turned, folded,
         // switched to dark mode). The time away is kept in the model, which survives that, and is looked at here too.
         model.returned()
-        enableEdgeToEdge()
+        // the app is dark whatever the phone is set to, so the signs in the system's bars are always the light ones
+        val clear = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+        enableEdgeToEdge(statusBarStyle = clear, navigationBarStyle = clear)
         runCatching { Notifier.schedule(this) }          // never a reason for the app not to start
         val owner = testOwner ?: PhoneOwner(this, getString(R.string.unlock_title), getString(R.string.unlock_subtitle))
         setContent { WalletApp(model, owner) }
@@ -101,30 +103,37 @@ enum class Section(val title: Int) {
 /** The public node offered on the first screen. The user may type another one. */
 const val PUBLIC_NODE = "https://node.polarka.org"
 
-val screenPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+val screenPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
 val gap = Arrangement.spacedBy(12.dp)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WalletApp(model: WalletModel, owner: Owner) {
-    val context = LocalContext.current
-    MaterialTheme(colorScheme = if (isSystemInDarkTheme()) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)) {
+    PolarkaTheme {
         val state = model.state
         var section by rememberSaveable { mutableStateOf(Section.OVERVIEW) }
         val inside = state.loaded && !state.locked && state.setup != null && state.newWords == null
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text(stringResource(R.string.app_name)) },
+                    title = { Brand() },
                     actions = {
                         if (inside) {
-                            TextButton(onClick = model::refresh, enabled = !state.busy, modifier = Modifier.testTag("refresh")) {
-                                Text(stringResource(R.string.refresh))
+                            IconButton(onClick = model::refresh, enabled = !state.busy, modifier = Modifier.testTag("refresh")) {
+                                Icon(Drawn.refresh, contentDescription = stringResource(R.string.refresh))
+                            }
+                            // locking by hand is offered where the app locks at all
+                            if (state.wallet?.lockOnOpen == true) {
+                                IconButton(onClick = model::lockNow, modifier = Modifier.testTag("lock-now")) {
+                                    Icon(Drawn.lock, contentDescription = stringResource(R.string.lock_now))
+                                }
                             }
                         }
                     },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Sky.night, scrolledContainerColor = Sky.night, actionIconContentColor = Sky.quiet),
                 )
             },
+            bottomBar = { if (inside) BottomBar(section) { section = it } },
         ) { inner ->
             Column(Modifier.padding(inner).fillMaxSize()) {
                 when {
@@ -132,21 +141,13 @@ fun WalletApp(model: WalletModel, owner: Owner) {
                     state.locked -> LockScreen(model, owner)
                     state.setup == null -> SetupScreen(model, state)
                     state.newWords != null -> NewWalletScreen(model, state, owner)
-                    else -> {
-                        PrimaryScrollableTabRow(selectedTabIndex = section.ordinal, edgePadding = 8.dp) {
-                            Section.entries.forEach { s ->
-                                Tab(selected = s == section, onClick = { section = s }, modifier = Modifier.testTag("tab-" + s.name),
-                                    text = { Text(stringResource(s.title)) })
-                            }
-                        }
-                        when (section) {
-                            Section.OVERVIEW -> OverviewTab(model, state, owner) { section = it }
-                            Section.RECEIVE -> ReceiveTab(model, state, owner)
-                            Section.SEND -> SendTab(model, state, owner)
-                            Section.HISTORY -> HistoryTab(state)
-                            Section.MINING -> MiningTab(model, state)
-                            Section.MORE -> MoreTab(model, state, owner)
-                        }
+                    else -> when (section) {
+                        Section.OVERVIEW -> OverviewTab(model, state, owner) { section = it }
+                        Section.RECEIVE -> ReceiveTab(model, state, owner)
+                        Section.SEND -> SendTab(model, state, owner)
+                        Section.HISTORY -> HistoryTab(state)
+                        Section.MINING -> MiningTab(model, state)
+                        Section.MORE -> MoreTab(model, state, owner) { section = it }
                     }
                 }
             }
@@ -156,9 +157,11 @@ fun WalletApp(model: WalletModel, owner: Owner) {
 
 @Composable
 private fun LockScreen(model: WalletModel, owner: Owner) {
-    LaunchedEffect(Unit) { model.unlockApp(owner) }
+    // the phone's dialog comes up by itself, except when the owner has just locked the app by hand
+    LaunchedEffect(Unit) { if (!model.state.byHand) model.unlockApp(owner) }
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(stringResource(R.string.lock_text), style = MaterialTheme.typography.bodyLarge)
+        Icon(Drawn.star, contentDescription = null, tint = Sky.star, modifier = Modifier.size(56.dp))
+        Text(stringResource(R.string.lock_text), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 20.dp))
         if (model.state.lockNote) {
             Text(stringResource(R.string.lock_hint), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp).testTag("lock-hint"))
         }

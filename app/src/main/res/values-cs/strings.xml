@@ -265,4 +265,10 @@
     <string name="dropped_forget_yes">Zapomenout</string>
     <string name="problem_earlier_payment">Dřívější platba neproběhla, ale ještě může dorazit, takže tato platba musí stát na jedné z jejích mincí. To v tuto chvíli nejde. Obnovte přehled a připravte platbu znovu; pokud to trvá, počkejte na další blok.</string>
     <string name="send_against_text">Tato platba utrácí minci dřívější platby, která neproběhla, aby mohla dorazit jen jedna z nich.</string>
+    <string name="lock_now">Zamknout</string>
+    <string name="node_answers">Uzel odpovídá, blok %1$d</string>
+    <string name="recent_title">Poslední pohyby</string>
+    <string name="recent_block">blok %1$d</string>
+    <string name="mining_more_text">Nalezené bloky, výkon sítě a váš vlastní podíl.</string>
+    <string name="mining_more_go">Otevřít stránku těžby</string>
 </resources>

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">Polarka Wallet</string>
+    <string name="brand" translatable="false">Polarka</string>
 
     <string name="banner_title">Test build %1$s</string>
     <string name="banner_text">This wallet has been checked twice, but not yet by an independent human expert. Use it with small amounts only.</string>
@@ -265,4 +266,10 @@
     <string name="dropped_forget_yes">Forget</string>
     <string name="problem_earlier_payment">An earlier payment did not go through but could still arrive, so this one has to be built on one of its coins. That cannot be done at this moment. Refresh and work the payment out again; if it stays so, wait for the next block.</string>
     <string name="send_against_text">This payment spends a coin of an earlier payment that did not go through, so that only one of the two can arrive.</string>
+    <string name="lock_now">Lock</string>
+    <string name="node_answers">The node answers, block %1$d</string>
+    <string name="recent_title">Latest movements</string>
+    <string name="recent_block">block %1$d</string>
+    <string name="mining_more_text">Blocks found, the hash rate of the network and your own share.</string>
+    <string name="mining_more_go">Open the mining page</string>
 </resources>

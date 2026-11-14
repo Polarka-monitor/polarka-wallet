@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,9 +21,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -120,15 +121,15 @@ fun OverviewTab(model: WalletModel, state: WalletState, owner: Owner, go: (Secti
             if (snapshot.info.syncing || snapshot.info.blocks < snapshot.info.headers) {
                 Warning(stringResource(R.string.node_syncing, snapshot.info.blocks, snapshot.info.headers))
             }
-            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(stringResource(R.string.total), style = MaterialTheme.typography.labelLarge)
-                    Text(Format.coins(snapshot.totalSat) + " NORTH", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.testTag("total"))
-                    Format.value(snapshot.totalSat, state.wallet?.price.orEmpty(), state.wallet?.currency.orEmpty())?.let {
-                        Text(stringResource(R.string.value_about, it), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("value"))
-                    }
+            // everything the app sees, in large figures on the night itself; then the two things done most often
+            Column(Modifier.fillMaxWidth().padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.total), style = MaterialTheme.typography.labelLarge, color = Sky.quiet)
+                BigAmount(Format.coins(snapshot.totalSat), "total")
+                Format.value(snapshot.totalSat, state.wallet?.price.orEmpty(), state.wallet?.currency.orEmpty())?.let {
+                    Text(stringResource(R.string.value_about, it), style = MaterialTheme.typography.bodyMedium, color = Sky.quiet, modifier = Modifier.testTag("value"))
                 }
             }
+            if (state.wallet != null) ReceiveAndSend({ go(Section.RECEIVE) }, { go(Section.SEND) })
         }
         state.pending.forEach { waiting ->
             Block(stringResource(if (waiting.unsure) R.string.pending_unsure_title else R.string.pending_title)) {
@@ -149,15 +150,13 @@ fun OverviewTab(model: WalletModel, state: WalletState, owner: Owner, go: (Secti
             NoWallet(model, state, owner)
         } else {
             if (snapshot != null && snapshot.wantsFurther) LookFurther(model, snapshot)
-            Block(stringResource(R.string.wallet_title)) {
-                if (snapshot != null) {
-                    Field(stringResource(R.string.spendable), Format.coins(snapshot.spendableSat), "wallet-spendable")
-                    if (snapshot.waitingSat > 0) Field(stringResource(R.string.in_waiting), Format.coins(snapshot.waitingSat), "wallet-waiting")
+            if (snapshot != null) {
+                Block(stringResource(R.string.wallet_title)) {
+                    // coins of a waiting payment that the node does not show as tied up are set aside all the same
+                    val aside = state.asideSat
+                    Field(stringResource(R.string.spendable), Format.coins(snapshot.spendableSat - aside), "wallet-spendable")
+                    if (snapshot.waitingSat + aside > 0) Field(stringResource(R.string.in_waiting), Format.coins(snapshot.waitingSat + aside), "wallet-waiting")
                     if (snapshot.immatureSat > 0) Field(stringResource(R.string.immature), Format.coins(snapshot.immatureSat))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { go(Section.RECEIVE) }) { Text(stringResource(R.string.tab_receive)) }
-                    OutlinedButton(onClick = { go(Section.SEND) }) { Text(stringResource(R.string.tab_send)) }
                 }
             }
         }
@@ -178,7 +177,9 @@ fun OverviewTab(model: WalletModel, state: WalletState, owner: Owner, go: (Secti
             }
         }
         if (snapshot != null) {
+            Recent(snapshot)
             Block(stringResource(R.string.node_title)) {
+                Lit(stringResource(R.string.node_answers, snapshot.tip), "node-answers")
                 Field(stringResource(R.string.node_address), setup.host)
                 Field(stringResource(R.string.node_network), snapshot.info.chain)
                 Field(stringResource(R.string.node_height), snapshot.tip.toString(), "height")
@@ -194,6 +195,29 @@ fun OverviewTab(model: WalletModel, state: WalletState, owner: Owner, go: (Secti
             confirmButton = { TextButton(onClick = { askForgetPayment = null; model.forgetDropped(txid, owner) }, modifier = Modifier.testTag("dropped-forget-yes")) { Text(stringResource(R.string.dropped_forget_yes)) } },
             dismissButton = { TextButton(onClick = { askForgetPayment = null }) { Text(stringResource(R.string.cancel)) } },
         )
+    }
+}
+
+/** The last few movements, right on the overview. The whole list is on the History page. */
+@Composable
+private fun Recent(snapshot: Snapshot) {
+    val last = remember(snapshot) {
+        snapshot.moves.ifEmpty { snapshot.watchedMoves }.sortedWith(compareByDescending<Movement> { it.height }.thenBy { it.txid }).take(3)
+    }
+    if (last.isEmpty()) return
+    Column(Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.recent_title), style = MaterialTheme.typography.labelLarge, color = Sky.quiet, modifier = Modifier.padding(bottom = 6.dp))
+        last.forEach { m ->
+            HorizontalDivider(color = Sky.line)
+            Row(Modifier.fillMaxWidth().heightIn(min = 52.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    val what = stringResource(if (m.coinbase) R.string.output_reward else if (m.netSat >= 0) R.string.history_received else R.string.history_paid)
+                    Text(what.replaceFirstChar { it.titlecase() }, style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.recent_block, m.height), style = MaterialTheme.typography.bodySmall, color = Sky.quiet)
+                }
+                Text(Format.signed(m.netSat), style = MaterialTheme.typography.bodyMedium.merge(figures), color = if (m.netSat >= 0) Sky.star else Sky.text, modifier = Modifier.testTag("recent-amount"))
+            }
+        }
     }
 }
 
@@ -274,7 +298,7 @@ fun SendTab(model: WalletModel, state: WalletState, owner: Owner) {
         val draft = state.draft
         if (draft == null) {
             Block(stringResource(R.string.send_title)) {
-                state.snapshot?.let { Field(stringResource(R.string.spendable), Format.coins(it.spendableSat)) }
+                state.snapshot?.let { Field(stringResource(R.string.spendable), Format.coins(it.spendableSat - state.asideSat)) }
                 OutlinedTextField(
                     value = to, onValueChange = { to = it.trim() }, label = { Text(stringResource(R.string.send_to)) },
                     modifier = Modifier.fillMaxWidth().testTag("send-to"), textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
@@ -347,7 +371,7 @@ fun HistoryTab(state: WalletState) {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(stringResource(if (m.coinbase) R.string.output_reward else if (m.netSat >= 0) R.string.history_received else R.string.history_paid), style = MaterialTheme.typography.labelLarge)
-                        Text(Format.signed(m.netSat), fontFamily = FontFamily.Monospace)
+                        Text(Format.signed(m.netSat), style = MaterialTheme.typography.bodyMedium.merge(figures), color = if (m.netSat >= 0) Sky.star else Sky.text)
                     }
                     Text(
                         Format.dateTime(m.time) + ", " + stringResource(R.string.output_where, m.height, snapshot.tip - m.height + 1) + ", " +
@@ -420,7 +444,7 @@ fun MiningTab(model: WalletModel, state: WalletState) {
 // ---------------------------------------------------------------------------------------------- more
 
 @Composable
-fun MoreTab(model: WalletModel, state: WalletState, owner: Owner) {
+fun MoreTab(model: WalletModel, state: WalletState, owner: Owner, go: (Section) -> Unit) {
     val context = LocalContext.current
     val wallet = state.wallet
     SecureWindow()                              // recovery words are typed on this page
@@ -484,6 +508,11 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner) {
                 ProblemCard(state.walletProblem?.takeIf { it.kind == Problem.Kind.BAD_PRICE }, "price-problem")
                 OutlinedButton(onClick = { model.savePrice(price, currency) }, modifier = Modifier.testTag("save-price")) { Text(stringResource(R.string.save)) }
             }
+        }
+        // the mining page has no place of its own in the bar at the bottom; it is opened from here
+        Block(stringResource(R.string.tab_mining)) {
+            Text(stringResource(R.string.mining_more_text), style = MaterialTheme.typography.bodySmall)
+            OutlinedButton(onClick = { go(Section.MINING) }, modifier = Modifier.testTag("tab-MINING")) { Text(stringResource(R.string.mining_more_go)) }
         }
         Block(stringResource(R.string.notify_title)) {
             Text(stringResource(R.string.notify_text), style = MaterialTheme.typography.bodySmall)

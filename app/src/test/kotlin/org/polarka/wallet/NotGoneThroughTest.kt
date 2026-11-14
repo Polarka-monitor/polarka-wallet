@@ -212,6 +212,8 @@ class NotGoneThroughTest {
         assertEquals(1, model.state.pending.size)
         assertTrue(model.state.pending[0].unsure)
         assertTrue(node.mempool().isEmpty(), "the node never got the transaction")
+        settled(model)
+        assertEquals(coins.max() * 100_000_000L, model.state.asideSat, "the coin of a payment whose outcome is not known is not shown as one that can be spent")
         // a minute later (the minute is switched off here) two looks in a row decide
         model.goneAfterMillis = 0
         model.refresh()
@@ -220,6 +222,7 @@ class NotGoneThroughTest {
         assertEquals("5.00000000", model.state.noticeDetail)
         assertTrue(model.state.pending.isEmpty())
         assertEquals(1, model.state.dropped.size, "the payment is kept as one that did not go through")
+        assertEquals(0L, model.state.asideSat, "its coin is free again")
         until("the wallet's file is written") { wallets.value!!.dropped.size == 1 && wallets.value!!.pending.isEmpty() }
         return model
     }

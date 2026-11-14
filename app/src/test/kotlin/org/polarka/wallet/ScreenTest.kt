@@ -107,7 +107,11 @@ class ScreenTest {
     private fun shown(tag: String) = screen.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
     private fun waitFor(tag: String, millis: Long = 30_000) = screen.waitUntil(millis) { shown(tag) }
     private fun textAnywhere(part: String) = screen.onAllNodes(hasText(part, substring = true)).fetchSemanticsNodes().isNotEmpty()
-    private fun open(section: Section) = screen.onNodeWithTag("tab-" + section.name).performClick()
+    private fun open(section: Section) {
+        // since 0.5.0 the mining page is opened from More; the other pages are in the bar at the bottom
+        if (section == Section.MINING) screen.onNodeWithTag("tab-MORE").performClick()
+        screen.onNodeWithTag("tab-" + section.name).performClick()
+    }
     private fun textOf(tag: String): String =
         screen.onNodeWithTag(tag).fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.joinToString("") { it.text }.orEmpty()
 

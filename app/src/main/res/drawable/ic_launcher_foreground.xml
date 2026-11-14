@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A four-pointed star: north. -->
+<!-- A four-pointed star with drawn-in sides: north. The same shape as the star in the app (Look.kt). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#F2E9D0" android:pathData="M54,24 L60,48 L84,54 L60,60 L54,84 L48,60 L24,54 L48,48 Z" />
+    <group android:scaleX="0.46" android:scaleY="0.46" android:translateX="31" android:translateY="31">
+        <path android:fillColor="#F2C14E" android:pathData="M50,4 C54,34 66,46 96,50 C66,54 54,66 50,96 C46,66 34,54 4,50 C34,46 46,34 50,4 Z" />
+    </group>
 </vector>

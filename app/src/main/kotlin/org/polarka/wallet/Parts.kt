@@ -14,6 +14,7 @@ import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -142,11 +144,13 @@ fun readClipboard(context: Context): String? =
 
 @Composable
 fun Banner() {
-    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(R.string.banner_title, appVersion(LocalContext.current)), style = MaterialTheme.typography.titleSmall)
-            Text(stringResource(R.string.banner_text), style = MaterialTheme.typography.bodySmall)
-        }
+    // a quiet frame, not a card: it is read once and should not compete with the balance
+    Column(
+        Modifier.fillMaxWidth().border(1.dp, Sky.edge, RoundedCornerShape(10.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(stringResource(R.string.banner_title, appVersion(LocalContext.current)), style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.banner_text), style = MaterialTheme.typography.bodySmall, color = Sky.quiet)
     }
 }
 
@@ -233,7 +237,7 @@ fun Warning(text: String) {
 fun Block(title: String, content: @Composable () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(title, style = MaterialTheme.typography.titleSmall, color = Sky.quiet)
             content()
         }
     }
@@ -242,8 +246,8 @@ fun Block(title: String, content: @Composable () -> Unit) {
 @Composable
 fun Field(label: String, value: String, tag: String? = null) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(end = 12.dp))
-        Text(value, style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace, modifier = if (tag == null) Modifier else Modifier.testTag(tag))
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = Sky.quiet, modifier = Modifier.padding(end = 12.dp))
+        Text(value, style = MaterialTheme.typography.bodyMedium.merge(figures), modifier = if (tag == null) Modifier else Modifier.testTag(tag))
     }
 }
 

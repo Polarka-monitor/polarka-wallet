@@ -15,8 +15,8 @@ android {
         applicationId = "org.polarka.wallet"
         minSdk = 31
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.4.2"
+        versionCode = 9
+        versionName = "0.5.0"
     }
     // The key that signs releases lives outside the project, on the owner's computer only (see make-signing-key.sh).
     // Without it a release cannot be built here, and that is intended. The file that names the key is opened only

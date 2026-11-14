@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The night of the app's look, for what the system draws before the app does (see Look.kt for the rest). -->
+    <color name="night">#0A1020</color>
+</resources>

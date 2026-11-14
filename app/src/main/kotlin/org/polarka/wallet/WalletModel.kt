@@ -64,6 +64,7 @@ data class WalletState(
     val loaded: Boolean = false,
     val locked: Boolean = false,
     val lockNote: Boolean = false,              // an attempt to unlock the app did not succeed
+    val byHand: Boolean = false,                // the owner locked the app by hand: the lock screen waits for a tap
     val setup: Setup? = null,
     val offered: Setup? = null,                 // read from a file or the clipboard, not saved yet
     val offerError: SetupError.Reason? = null,
@@ -95,6 +96,17 @@ data class WalletState(
 
     /** Payments that did not go through as far as the node showed, and that could still arrive. */
     val dropped: List<Dropped> get() = wallet?.dropped ?: emptyList()
+
+    /**
+     * Coins of waiting payments that the node does not show as tied up: it does not hold the payment, or the
+     * last look was before the payment. They are not offered for another payment, so the screens do not count
+     * them as coins that can be spent either.
+     */
+    val asideSat: Long get() {
+        val seen = snapshot ?: return 0
+        val own = pending.flatMap { it.inputs }.toSet()
+        return seen.coins.filter { it.spendableAt(seen.tip) && (it.txid + ":" + it.vout).let { coin -> coin in own && coin !in seen.inWaiting } }.sumOf { it.amountSat }
+    }
 }
 
 class WalletModel(app: Application) : AndroidViewModel(app) {
@@ -148,7 +160,7 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
     fun unlockApp(owner: Owner) {
         viewModelScope.launch {
             if (runCatching { owner.present() }.getOrDefault(false)) {
-                state = state.copy(locked = false, lockNote = false)
+                state = state.copy(locked = false, lockNote = false, byHand = false)
                 refresh()
             } else {
                 state = state.copy(lockNote = true)
@@ -191,6 +203,12 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
 
     private fun lockIfWanted() {
         if (lockWanted) lock()
+    }
+
+    /** The owner locks the app by hand. The lock screen then waits for a tap: the phone's dialog does not come up at once. */
+    fun lockNow() {
+        lock()
+        if (state.locked) state = state.copy(byHand = true)
     }
 
     // ------------------------------------------------------------------------------------------ node setup
