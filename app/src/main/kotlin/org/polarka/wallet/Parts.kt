@@ -216,6 +216,7 @@ fun problemText(problem: Problem): String = when (problem.kind) {
     Problem.Kind.BAD_PRICE -> stringResource(R.string.problem_bad_price)
     Problem.Kind.TOO_MANY_WAITING -> stringResource(R.string.problem_too_many_waiting)
     Problem.Kind.EARLIER_PAYMENT -> stringResource(R.string.problem_earlier_payment)
+    Problem.Kind.OUTCOME_OPEN -> stringResource(R.string.problem_outcome_open)
 }
 
 @Composable

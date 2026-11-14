@@ -103,7 +103,8 @@ class WalletScanTest {
             assertEquals(plan.changeSat, payment.receivedSat)
             assertEquals(seen.totalSat, moves.sumOf { it.netSat }, "the history adds up to the balance")
             // asking only for the newer part still finds the payment's block
-            assertTrue(node.relevantBlocks(descriptors, window, 100).hashes.size == 1)
+            // (a filter can, rarely, name a block that has nothing of the wallet in it; it never misses one that has)
+            assertTrue(node.relevantBlocks(descriptors, window, 100).hashes.size in 1..2)
 
             // a single watched address (as the cold address in the app) goes the same way, without key numbers
             // (the payment may or may not have spent that address's reward: the coins are chosen by amount, then by id)

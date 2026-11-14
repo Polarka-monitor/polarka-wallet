@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="banner_title">Zkušební verze %1$s</string>
-    <string name="banner_text">Peněženka prošla dvojí kontrolou, zatím ne kontrolou nezávislého lidského odborníka. Používejte ji jen s malými částkami.</string>
+    <string name="banner_text">Peněženka prošla trojí kontrolou, zatím ne kontrolou nezávislého lidského odborníka. Používejte ji jen s malými částkami.</string>
 
     <string name="refresh">Obnovit</string>
     <string name="cancel">Zrušit</string>
@@ -256,14 +256,14 @@
     <string name="offer_own_sees">Nastavení se jménem a heslem se bere jako váš vlastní uzel. Jakmile je v telefonu peněženka, dostane takový uzel klíč, který ukazuje všechny adresy peněženky, minulé i budoucí. Utrácet jím nelze. Uložte toto nastavení jen pro uzel, který provozujete sami nebo mu věříte jako vlastnímu.</string>
     <string name="notice_payment_beaten">Platba %1$s NORTH neproběhla a už ani dorazit nemůže: v bloku je jiná transakce, která utratila jednu z jejích mincí. Které platby jsou v bloku, ukazuje Historie.</string>
     <string name="notice_payment_arrived">Platba %1$s NORTH, která neproběhla, nakonec dorazila: je v bloku.</string>
-    <string name="notice_payment_back">Platbu %1$s NORTH, která neproběhla, uzel znovu drží a čeká na blok.</string>
+    <string name="notice_payment_back">Platbu %1$s NORTH, která neproběhla, uzel znovu drží; čeká na blok.</string>
     <string name="dropped_title">Neproběhla, ještě může dorazit</string>
     <string name="dropped_text">Uzel tuto platbu nedrží a není v žádném bloku. Její transakce ale platí, dokud nejsou utraceny její mince, takže ještě může dorazit z jiného uzlu. Vaše příští platba se proto postaví na jedné z jejích mincí: dorazit pak může jen jedna z těch dvou. Záznam zmizí, jakmile o něm rozhodne blok.</string>
     <string name="dropped_forget">Zapomenout tuto platbu</string>
     <string name="dropped_forget_title">Zapomenout tuto platbu?</string>
     <string name="dropped_forget_text">Jen pokud jste si jisti, že už dorazit nemůže. Kdyby později přece dorazila, mohla by přijít vedle nové platby za totéž.</string>
     <string name="dropped_forget_yes">Zapomenout</string>
-    <string name="problem_earlier_payment">Dřívější platba neproběhla, ale ještě může dorazit, takže tato platba musí stát na jedné z jejích mincí. To v tuto chvíli nejde. Obnovte přehled a připravte platbu znovu; pokud to trvá, počkejte na další blok.</string>
+    <string name="problem_earlier_payment">Dřívější platba neproběhla, ale ještě může dorazit, takže tato platba musí stát na jedné z jejích mincí. Tak, jak věci stojí, to nejde. Obnovte přehled a připravte platbu znovu. Pokud to trvá i po dalším bloku, podívejte se na tu platbu na stránce Přehled: je u ní napsáno, co lze dělat.</string>
     <string name="send_against_text">Tato platba utrácí minci dřívější platby, která neproběhla, aby mohla dorazit jen jedna z nich.</string>
     <string name="lock_now">Zamknout</string>
     <string name="node_answers">Uzel odpovídá, blok %1$d</string>
@@ -271,4 +271,7 @@
     <string name="recent_block">blok %1$d</string>
     <string name="mining_more_text">Nalezené bloky, výkon sítě a váš vlastní podíl.</string>
     <string name="mining_more_go">Otevřít stránku těžby</string>
+    <string name="problem_outcome_open">Zatím není známo, zda vaše poslední platba odešla. Dokud se to nevyjasní, další platba se nedělá: za minutu obnovte přehled. Platba se pak ukáže jako čekající na blok, nebo vám aplikace oznámí, že neproběhla.</string>
+    <string name="dropped_no_coin">Uzel mezi adresami, na které se aplikace dívá, neukazuje žádnou minci této platby, takže teď nelze platit. Přejde to, až uzel dožene síť. Pokud to trvá, může peněženka, která použila mnoho adres, potřebovat volbu Prohlédnout dvakrát tolik na stránce Více. Zapomenout tuto platbu zvolte jen tehdy, když máte jistotu, že už dorazit nemůže.</string>
+    <string name="wallet_remove_open">Tento telefon si také pamatuje platby, které čekají na blok nebo neproběhly. Tato paměť zmizí s peněženkou: některá z těch plateb by pak mohla dorazit vedle nové platby z týchž slov.</string>
 </resources>

@@ -283,6 +283,9 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
             }
             engine = Engine(setup)
             state = state.copy(setup = setup, offered = null, offeredFrom = null, offerError = null, snapshot = null, problem = null, notice = notice)
+            // The owner's yes to looking at more keys was given for the node that was asked then. Another node is
+            // not told more by itself; the keys in use are looked at in any case.
+            if ((state.wallet?.lookTo ?: 0) != 0) change({ it.copy(lookTo = 0) })
             refresh()
         }
     }
@@ -631,6 +634,12 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
             state = state.copy(sendProblem = Problem(Problem.Kind.BAD_AMOUNT), draft = null)
             return
         }
+        if (wallet.pending.any { it.unsure }) {
+            // While it is not known whether a payment went out, no other one is made: it could be a second one for
+            // the same thing. A look at the node settles the first one, about a minute after it was handed over.
+            state = state.copy(sendProblem = Problem(Problem.Kind.OUTCOME_OPEN), draft = null)
+            return
+        }
         state = state.copy(sending = true, sendProblem = null, draft = null, sentTxid = null)
         viewModelScope.launch {
             val used = state.pending.flatMap { it.inputs }.toSet()
@@ -668,6 +677,10 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         if (wallet.pending.size >= WalletInfo.MAX_PENDING) {
             // more waiting payments than the wallet's file can hold are not started; they clear with the next blocks
             state = state.copy(sendProblem = Problem(Problem.Kind.TOO_MANY_WAITING))
+            return
+        }
+        if (wallet.pending.any { it.unsure }) {
+            state = state.copy(sendProblem = Problem(Problem.Kind.OUTCOME_OPEN))
             return
         }
         val coins = draft.plan.inputs.map { it.txid + ":" + it.vout }.toSet()

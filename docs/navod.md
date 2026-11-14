@@ -1,6 +1,6 @@
 # Polarka Wallet: krátký návod
 
-Polarka Wallet je zkušební verze. Prošla dvojí kontrolou, zatím ne kontrolou nezávislého lidského odborníka.
+Polarka Wallet je zkušební verze. Prošla trojí kontrolou, zatím ne kontrolou nezávislého lidského odborníka.
 Mějte v ní jen malé částky. Větší úspory patří na papír (studená adresa).
 
 ## Před instalací

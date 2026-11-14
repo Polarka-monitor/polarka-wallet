@@ -28,7 +28,7 @@ data class Problem(val kind: Kind, val detail: String = "") {
     enum class Kind {
         UNREACHABLE, TIMEOUT, BUSY, LOGIN, NOT_ALLOWED, NODE, OTHER_CHAIN, FOREIGN_OUTPUTS, STORE, UNEXPECTED,
         BAD_ADDRESS, BAD_AMOUNT, NOTHING_TO_SPEND, NOT_ENOUGH, FEE_RATE, TOO_MANY_INPUTS, WRONG_WORDS, BAD_WORDS, REJECTED, UNLOCK,
-        IN_WAITING_PAYMENT, UNSURE, KEY_GONE, WORDS_EXIST, WALLET_FILE, BAD_PRICE, TOO_MANY_WAITING, EARLIER_PAYMENT,
+        IN_WAITING_PAYMENT, UNSURE, KEY_GONE, WORDS_EXIST, WALLET_FILE, BAD_PRICE, TOO_MANY_WAITING, EARLIER_PAYMENT, OUTCOME_OPEN,
     }
 
     companion object {
@@ -128,13 +128,22 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
     private var placesMap: Map<String, Pair<Int, Int>> = emptyMap()
 
     /** Every output script of the first [window] keys of both branches, with the key it belongs to. */
+    private fun scriptsOf(watch: WatchKey, window: Int): Map<String, Pair<Int, Int>> {
+        val map = HashMap<String, Pair<Int, Int>>()
+        for (branch in 0..1) for (index in 0 until window) map[Format.hex(watch.script(branch, index))] = branch to index
+        return map
+    }
+
+    /**
+     * The same for the wallet itself, kept from one look to the next: it is some hundred keys, and working
+     * them out again for every look would be felt. Only the wallet's own table is kept; a paper address that
+     * is looked at in between gets a table of its own that is thrown away (see [coinsOf]).
+     */
     @Synchronized
     private fun places(watch: WatchKey, window: Int): Map<String, Pair<Int, Int>> {
         val key = watch.xpub + "#" + window
         if (key != placesFor) {
-            val map = HashMap<String, Pair<Int, Int>>()
-            for (branch in 0..1) for (index in 0 until window) map[Format.hex(watch.script(branch, index))] = branch to index
-            placesMap = map
+            placesMap = scriptsOf(watch, window)
             placesFor = key
         }
         return placesMap
@@ -155,14 +164,15 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
         maxOf(if (setup.isPublic) AUTO_PUBLIC else AUTO_OWN, wallet.lookTo, maxOf(wallet.receiveIndex, wallet.changeIndex) + 1)
 
     /**
-     * The keys of each branch that are looked at when nothing new is found: what is in use and twenty beyond,
-     * and as far as the owner has asked for, within what is allowed.
+     * The keys of each branch that every look covers: all that the app may look at for this wallet. Looking at
+     * fewer (twenty past the keys in use, widened when needed) left a gap: a node could lead the app to an
+     * address that a wallet brought back from its words did not look at.
      */
-    fun windowOf(wallet: WalletInfo): Int = minOf(allowed(wallet), maxOf(wallet.window, wallet.lookTo))
+    fun windowOf(wallet: WalletInfo): Int = allowed(wallet)
 
     /** The coins of an account, each placed on its own key. The node is trusted for what exists, not for what is ours. */
-    private fun coinsOf(watch: WatchKey, window: Int): Pair<Int, List<Unspent>> {
-        val places = places(watch, window)
+    private fun coinsOf(watch: WatchKey, window: Int, kept: Boolean = true): Pair<Int, List<Unspent>> {
+        val places = if (kept) places(watch, window) else scriptsOf(watch, window)
         val scan = node.scanDescriptors(reach(watch, window), window)
         val coins = scan.utxos.map { u ->
             val place = places[u.script.lowercase()] ?: throw EngineError(Problem.Kind.FOREIGN_OUTPUTS)
@@ -182,10 +192,10 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
     /**
      * One look at the chain for the wallet and the watched addresses.
      *
-     * The history is read first, and with it the wallet's used keys are found: the look is widened until
-     * twenty unused keys follow the last used one on both branches, or until the limit of [allowed] is
-     * reached; the snapshot then says that more would have to be looked at. That is what lets a wallet brought
-     * back from its words find all of its coins, however long it had been in use.
+     * The history is read first, and with it the wallet's used keys are found. Every look covers all the keys
+     * the app may look at for this wallet ([allowed]); when fewer than twenty unused keys follow the last used
+     * one, the snapshot says that more would have to be looked at. A wallet brought back from its words looks
+     * at the same keys, so it finds every coin on an address the app could have shown without asking.
      *
      * The node's best block is read before and after. If it changed, the parts of this look do not belong to
      * one moment (a payment may be gone from the waiting ones and not yet in the history that was read), and
@@ -209,23 +219,21 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
         val anchor = blocks.values.filter { it.height <= scannedTo - REORG_DEPTH }.maxByOrNull { it.height }
         if (anchor != null && node.blockHash(anchor.height) != anchor.hash) forget(cacheKey)
 
-        val limit = if (wallet == null) 1 else allowed(wallet)
-        var window = if (wallet == null) 1 else minOf(limit, maxOf(wallet.window, wallet.lookTo, scannedWindow))
+        val window = if (wallet == null) 1 else windowOf(wallet)
         var nextReceive = 0
         var nextChange = 0
         if (watch != null || watchedDescriptors.isNotEmpty()) {
-            while (true) {
-                val descriptors = (if (watch == null) emptyList() else reach(watch, window)) + watchedDescriptors
-                // only the blocks that are new since the last look, and the last few again in case the chain
-                // reorganized; everything again when more keys are looked for than before
-                val tail = maxOf(0, scannedTo - REORG_DEPTH)
-                val from = if (window > scannedWindow) 0 else tail
-                blocks.values.removeAll { it.height >= tail }
-                val named = node.relevantBlocks(descriptors, window, from)
-                for (hash in named.hashes) if (hash !in blocks) blocks[hash] = node.block(hash)
-                scannedTo = named.toHeight
-                scannedWindow = window
-                if (watch == null) break
+            val descriptors = (if (watch == null) emptyList() else reach(watch, window)) + watchedDescriptors
+            // only the blocks that are new since the last look, and the last few again in case the chain
+            // reorganized; everything again when more keys are looked for than before
+            val tail = maxOf(0, scannedTo - REORG_DEPTH)
+            val from = if (window > scannedWindow) 0 else tail
+            blocks.values.removeAll { it.height >= tail }
+            val named = node.relevantBlocks(descriptors, window, from)
+            for (hash in named.hashes) if (hash !in blocks) blocks[hash] = node.block(hash)
+            scannedTo = named.toHeight
+            scannedWindow = window
+            if (watch != null) {
                 val paid = History.paidScripts(blocks.values)
                 var topReceive = -1
                 var topChange = -1
@@ -235,9 +243,6 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
                 }
                 nextReceive = topReceive + 1
                 nextChange = topChange + 1
-                val needed = maxOf(nextReceive, nextChange) + WalletInfo.GAP
-                if (needed <= window || window >= limit) break
-                window = minOf(limit, maxOf(needed, window * 2))
             }
         }
         val further = watch != null && maxOf(nextReceive, nextChange) + WalletInfo.GAP > window
@@ -383,9 +388,17 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
      * server in front of the node (which may have passed the transaction on before it failed), an answer in
      * an unknown form. The node is then asked whether it holds the transaction, and the same transaction is
      * handed over again; doing that twice cannot pay twice, because it is the same transaction.
+     *
+     * A no from the node counts as a refusal only when no try went before it. After a try whose outcome is not
+     * known the transaction may already be out (one address can stand for more than one node), and a later
+     * no does not take that back: the outcome stays "not known".
+     *
+     * There are at most three tries, and none is started later than forty seconds after the first. One try can
+     * itself wait for a busy node (see NodeClient), so the whole can last about a minute and a half.
      */
     fun deliver(signed: SignedSpend): Boolean {
         val deadline = System.nanoTime() + DELIVERY_MILLIS * 1_000_000
+        var open = false
         for (attempt in 1..DELIVERY_TRIES) {
             try {
                 if (node.broadcast(signed.hex) == signed.txid) return true
@@ -393,8 +406,9 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
             } catch (e: NodeError) {
                 when {
                     onItsWay(e) -> return true
-                    refusedByNode(e) -> throw e
+                    refusedByNode(e) -> if (open) return false else throw e
                     else -> {
+                        open = true
                         if (runCatching { node.waiting(signed.txid) }.getOrDefault(false)) return true
                         if (System.nanoTime() > deadline) return false
                         if (attempt < DELIVERY_TRIES) runCatching { Thread.sleep(DELIVERY_PAUSE_MILLIS) }
@@ -421,7 +435,7 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
      */
     fun paperLook(words: List<String>, spent: Set<String> = emptySet()): PaperFound {
         val account = try { Account.fromWords(words, setup.chain) } catch (e: Exception) { throw EngineError(Problem.Kind.BAD_WORDS) }
-        val (tip, coins) = coinsOf(account.watchKey(), WalletInfo.GAP)
+        val (tip, coins) = coinsOf(account.watchKey(), WalletInfo.GAP, kept = false)
         var free = coins.filter { key(it) !in spent }
         // coins that a waiting transaction already spends are left out, as far as it is reasonable to ask one by one
         if (free.size <= MAX_CHECKED) free = free.filter { !it.spendableAt(tip) || node.unspent(it.txid, it.vout) }

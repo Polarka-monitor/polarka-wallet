@@ -159,8 +159,8 @@ data class WalletInfo(
     val unanswered: List<Dropped> get() = dropped.filter { d -> pending.none { p -> p.inputs.any { it in d.inputs } } }
 
     /**
-     * How many keys of each branch the wallet wants the node to be asked about: everything used so far and
-     * twenty beyond. How many are really asked about is decided by Engine.windowOf, which also knows the limit.
+     * The keys of each branch in use so far and twenty beyond. How many keys the node is asked about is decided
+     * by Engine.windowOf, which knows how far the app may look without asking its owner.
      */
     val window: Int get() = maxOf(receiveIndex, changeIndex) + GAP
 

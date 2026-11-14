@@ -4,7 +4,7 @@
     <string name="brand" translatable="false">Polarka</string>
 
     <string name="banner_title">Test build %1$s</string>
-    <string name="banner_text">This wallet has been checked twice, but not yet by an independent human expert. Use it with small amounts only.</string>
+    <string name="banner_text">This wallet has been checked three times, but not yet by an independent human expert. Use it with small amounts only.</string>
 
     <string name="refresh">Refresh</string>
     <string name="cancel">Cancel</string>
@@ -264,7 +264,7 @@
     <string name="dropped_forget_title">Forget this payment?</string>
     <string name="dropped_forget_text">Only if you are sure that it can no longer arrive. If it arrived later after all, it could do so beside a new payment for the same thing.</string>
     <string name="dropped_forget_yes">Forget</string>
-    <string name="problem_earlier_payment">An earlier payment did not go through but could still arrive, so this one has to be built on one of its coins. That cannot be done at this moment. Refresh and work the payment out again; if it stays so, wait for the next block.</string>
+    <string name="problem_earlier_payment">An earlier payment did not go through but could still arrive, so this one has to be built on one of its coins. That cannot be done as things stand. Refresh and work the payment out again. If it stays so after the next block, look at that payment on the Overview page: it says what can be done.</string>
     <string name="send_against_text">This payment spends a coin of an earlier payment that did not go through, so that only one of the two can arrive.</string>
     <string name="lock_now">Lock</string>
     <string name="node_answers">The node answers, block %1$d</string>
@@ -272,4 +272,7 @@
     <string name="recent_block">block %1$d</string>
     <string name="mining_more_text">Blocks found, the hash rate of the network and your own share.</string>
     <string name="mining_more_go">Open the mining page</string>
+    <string name="problem_outcome_open">It is not yet known whether your last payment went out. Until that is settled no other payment is made: refresh in a minute. The payment then shows as waiting for a block, or the app tells you that it did not go through.</string>
+    <string name="dropped_no_coin">The node does not show a coin of this payment among the addresses the app looks at, so no payment can be made for now. That passes when the node catches up with the network. If it stays so, a wallet that has used many addresses may need Look at twice as many on the More page. Forget this payment only if you are sure that it can no longer arrive.</string>
+    <string name="wallet_remove_open">This phone also remembers payments that wait for a block or that did not go through. That memory goes with the wallet: one of those payments could then arrive beside a new one made with the same words.</string>
 </resources>

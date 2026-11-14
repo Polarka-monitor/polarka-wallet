@@ -64,9 +64,8 @@ Of the weak points the reviewer named in the gateway, two more were dealt with i
   back; with the safeguard switched off, the first of its tests fails). What remains is said in the Limits of
   the main README.
 - The reviewer checked nothing on a phone or an emulator. The emulator runs are described in `../emulator`.
-- The fixes in this table have not been reviewed. The reviewer began a third look at 0.4.1 on the same day:
-  it ran the whole suite in a clone of its own (93 tests, none failed, none skipped) and had started on a
-  test with a node that is stopped and started again when its work was cut short. It gave no report.
+- The fixes in this table were looked at in the reviewer's third look, which was cut short once and finished
+  later on the same day: see `../independent-review-0.4.2`.
 
 ## Files
 

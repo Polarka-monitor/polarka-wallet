@@ -45,9 +45,12 @@ class NotGoneThroughTest {
     /**
      * Stands between the app and the node. While [keeps] is set, a transaction handed over does not reach the
      * node, and the app gets the answer of a gateway whose node is away. Every transaction handed over is kept.
+     * While [forgets] is set, the node seems to have let go of everything that waited: it is said to hold no
+     * transaction, and every coin is said to be unspent.
      */
     private class Gate(private val target: Int) : AutoCloseable {
         @Volatile var keeps = false
+        @Volatile var forgets = false
         private val handed = ArrayList<String>()
         private val server = ServerSocket(0, 50, InetAddress.getLoopbackAddress())
         val port: Int get() = server.localPort
@@ -79,11 +82,16 @@ class NotGoneThroughTest {
             }
             val call = Json.parseToJsonElement(raw.decodeToString()).jsonObject
             val method = call["method"]!!.jsonPrimitive.content
-            var status = 502
-            var answer = "{\"result\":null,\"error\":{\"code\":-32603,\"message\":\"the node behind the gateway did not answer\"},\"id\":\"north\"}"
-            val kept = method == "sendrawtransaction" && keeps
             if (method == "sendrawtransaction") synchronized(handed) { handed.add(call["params"]!!.jsonArray[0].jsonPrimitive.content) }
-            if (!kept) {
+            val instead = when {
+                method == "sendrawtransaction" && keeps -> 502 to "{\"result\":null,\"error\":{\"code\":-32603,\"message\":\"the node behind the gateway did not answer\"},\"id\":\"north\"}"
+                method == "getmempoolentry" && forgets -> 500 to "{\"result\":null,\"error\":{\"code\":-5,\"message\":\"Transaction not in mempool\"},\"id\":\"north\"}"
+                method == "gettxout" && forgets -> 200 to "{\"result\":{\"confirmations\":101},\"error\":null,\"id\":\"north\"}"
+                else -> null
+            }
+            var status = instead?.first ?: 0
+            var answer = instead?.second.orEmpty()
+            if (instead == null) {
                 val c = URL("http://127.0.0.1:$target/").openConnection() as HttpURLConnection
                 c.requestMethod = "POST"
                 c.doOutput = true
@@ -103,6 +111,7 @@ class NotGoneThroughTest {
 
         /** The transaction handed over last, as the hexadecimal text the app sent. */
         fun last(): String = synchronized(handed) { handed.last() }
+        fun all(): List<String> = synchronized(handed) { handed.distinct() }
         fun count(): Int = synchronized(handed) { handed.size }
 
         override fun close() = server.close()
@@ -214,6 +223,9 @@ class NotGoneThroughTest {
         assertTrue(node.mempool().isEmpty(), "the node never got the transaction")
         settled(model)
         assertEquals(coins.max() * 100_000_000L, model.state.asideSat, "the coin of a payment whose outcome is not known is not shown as one that can be spent")
+        // while that is open, no other payment is made: it could be a second one for the same thing
+        assertEquals(Problem.Kind.OUTCOME_OPEN, pay(model, shop, "5")?.kind)
+        assertEquals(1, gate.all().size, "a second payment was handed over while the outcome of the first was not known")
         // a minute later (the minute is switched off here) two looks in a row decide
         model.goneAfterMillis = 0
         model.refresh()
@@ -328,10 +340,10 @@ class NotGoneThroughTest {
     }
 
     /**
-     * A second payment was worked out while the first was still thought to be on its way; it does not spend a
-     * coin of the first. When the first is then found not to have gone through, the second is not sent as it
-     * stands. Worked out again, it stands against the first. Only the owner can let the first one go. And a
-     * payment that did not go through and has no coin the app could spend keeps the wallet from paying beside it.
+     * A second payment was worked out while the first waited at the node; it does not spend a coin of the
+     * first. When the first is then found not to have gone through, the second is not sent as it stands.
+     * Worked out again, it stands against the first. Only the owner can let the first one go. And a payment
+     * that did not go through and has no coin the app could spend keeps the wallet from paying beside it.
      */
     @Test
     fun aPaymentWorkedOutEarlierIsNotSentAndOnlyTheOwnerLetsTheOldOneGo() {
@@ -350,15 +362,15 @@ class NotGoneThroughTest {
                 wallets.value = WalletInfo(Chain.REGTEST, wallet.watchKey().xpub, lockOnOpen = false)
                 vault().let { it.store(it.encryptor(), words) }
                 val model = opened()
-                gate.keeps = true
-                assertEquals(Problem.Kind.UNSURE, pay(model, shop, "5")?.kind)          // it takes the coin of fifty
-                gate.keeps = false
+                assertNull(pay(model, shop, "5"))                   // it takes the coin of fifty, and the node holds it
                 settled(model)
                 val first = model.state.pending.single()
 
                 val early = assertNotNull(workedOut(model, other, "3"), "problem: ${model.state.sendProblem}")
                 assertEquals(0, early.against)
                 assertTrue(coinsOf(early).none { it in first.inputs }, "a coin of a waiting payment is not offered")
+                // the node lets go of the first payment (the gate says so in its place), and the app finds that it did not go through
+                gate.forgets = true
                 model.goneAfterMillis = 0
                 model.refresh()
                 settled(model)
@@ -398,6 +410,57 @@ class NotGoneThroughTest {
                 settled(reopened)
                 assertEquals(listOf(ghost), reopened.state.dropped, "nothing shows that it cannot arrive, so it stays")
                 assertEquals(handed, gate.count(), "nothing was handed to the node")
+            }
+        }
+    }
+
+    /**
+     * Two payments in a row do not go through. The second already stood against the first, so they share a
+     * coin, and that one coin is enough for the next payment to stand against both. Sending everything spends
+     * it as well. After the block neither of the two kept transactions is taken by the node.
+     */
+    @Test
+    fun onePaymentStandsAgainstTwoThatDidNotGoThrough() {
+        val node = AuditNode.startOrNull() ?: return
+        node.use {
+            Gate(node.port).use { gate ->
+                val miner = fresh().address(0, 0)
+                val shop = fresh().address(0, 0)
+                val model = lostPayment(node, gate, Bank(node, miner), Words.generate(), shop, listOf(10, 50))
+                val first = model.state.dropped.single()             // it took the coin of fifty
+                gate.keeps = true
+                assertEquals(Problem.Kind.UNSURE, pay(model, shop, "5")?.kind)
+                gate.keeps = false
+                settled(model)
+                model.refresh()
+                settled(model)
+                assertEquals(2, model.state.dropped.size, "the second payment is kept as well")
+                val second = model.state.dropped.last()
+                assertTrue(second.txid != first.txid && second.inputs.any { it in first.inputs }, "the second payment stood against the first")
+                assertEquals(2, gate.all().size)
+
+                val draft = assertNotNull(workedOut(model, shop, "5"), "problem: ${model.state.sendProblem}")
+                assertEquals(2, draft.against)
+                assertEquals(first.inputs, coinsOf(draft), "the one coin that both of them spend is enough")
+                model.dropDraft()
+
+                until("no look at the node in progress") { !model.state.busy }
+                model.prepare(shop, "", true, 2)
+                until("the payment is worked out") { !model.state.sending }
+                val everything = assertNotNull(model.state.draft, "problem: ${model.state.sendProblem}")
+                assertEquals(2, everything.against)
+                assertEquals(2, everything.plan.inputs.size, "both coins of the wallet go")
+                model.confirmSend(owner)
+                settled(model)
+                assertNull(model.state.sendProblem)
+                assertEquals(1, node.mempool().size)
+                for (kept in gate.all().take(2)) assertTrue(refused(node, kept), "the node took a kept payment beside the new one")
+                node.mine(1, miner)
+                for (kept in gate.all().take(2)) assertTrue(refused(node, kept), "the node took a kept payment after the block")
+                model.refresh()
+                settled(model)
+                assertTrue(model.state.pending.isEmpty() && model.state.dropped.isEmpty(), "the block has settled all three")
+                assertTrue(node.held(shop) in 59_99000000L..60_00000000L, "the shop holds ${Format.coins(node.held(shop))}: everything once, less the fee")
             }
         }
     }

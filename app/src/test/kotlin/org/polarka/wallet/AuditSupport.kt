@@ -66,9 +66,21 @@ internal class AuditNode private constructor(private val bin: File) : AutoClosea
 
     fun mempool(): List<String> = Json.parseToJsonElement(cli("getrawmempool")).jsonArray.map { it.jsonPrimitive.content }
 
-    /** What an address holds in confirmed coins, in base units. */
+    /**
+     * What an address holds in confirmed coins, in base units.
+     *
+     * Adapted after the third look: the node scans for one caller at a time, and the app under test may be
+     * scanning at this very moment (it looks at the node by itself after a payment). The node then answers
+     * "Scan already in progress"; the question is asked again instead of failing the test.
+     */
     fun held(address: String): Long {
-        val r = Json.parseToJsonElement(cli("scantxoutset", "start", "[\"addr($address)\"]")).jsonObject
+        var answer: Result<String> = runCatching { cli("scantxoutset", "start", "[\"addr($address)\"]") }
+        var tries = 0
+        while (answer.isFailure && "Scan already in progress" in answer.exceptionOrNull()?.message.orEmpty() && tries++ < 40) {
+            Thread.sleep(150)
+            answer = runCatching { cli("scantxoutset", "start", "[\"addr($address)\"]") }
+        }
+        val r = Json.parseToJsonElement(answer.getOrThrow()).jsonObject
         return BigDecimal(r["total_amount"]!!.jsonPrimitive.content).movePointRight(8).longValueExact()
     }
 

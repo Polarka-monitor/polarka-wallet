@@ -138,11 +138,17 @@ fun OverviewTab(model: WalletModel, state: WalletState, owner: Owner, go: (Secti
                 Text(stringResource(if (waiting.unsure) R.string.pending_unsure_text else R.string.pending_text), style = MaterialTheme.typography.bodySmall)
             }
         }
+        // The coins the node shows for the wallet. A payment that did not go through and has none of its coins
+        // among them stops every payment for now, and its entry says so.
+        val shown = remember(snapshot) { snapshot?.coins?.map { it.txid + ":" + it.vout }?.toSet() }
         state.dropped.forEach { gone ->
             Block(stringResource(R.string.dropped_title)) {
                 Field(stringResource(R.string.send_amount), "-" + Format.coins(gone.sentSat + gone.feeSat), "dropped-amount")
                 Mono(gone.txid)
                 Text(stringResource(R.string.dropped_text), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("dropped-text"))
+                if (shown != null && gone.inputs.none { it in shown }) {
+                    Text(stringResource(R.string.dropped_no_coin), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("dropped-no-coin"))
+                }
                 TextButton(onClick = { askForgetPayment = gone.txid }, modifier = Modifier.testTag("dropped-forget")) { Text(stringResource(R.string.dropped_forget)) }
             }
         }
@@ -549,7 +555,14 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner, go: (Section) 
         AlertDialog(
             onDismissRequest = { askRemoveWallet = false },
             title = { Text(stringResource(R.string.wallet_remove_title)) },
-            text = { Text(stringResource(R.string.wallet_remove_text)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.wallet_remove_text))
+                    if (state.pending.isNotEmpty() || state.dropped.isNotEmpty()) {
+                        Text(stringResource(R.string.wallet_remove_open), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("wallet-remove-open"))
+                    }
+                }
+            },
             confirmButton = { TextButton(onClick = { askRemoveWallet = false; model.removeWallet(owner) }, modifier = Modifier.testTag("wallet-remove-yes")) { Text(stringResource(R.string.wallet_remove_yes)) } },
             dismissButton = { TextButton(onClick = { askRemoveWallet = false }) { Text(stringResource(R.string.cancel)) } },
         )

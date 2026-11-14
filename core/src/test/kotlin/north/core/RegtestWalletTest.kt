@@ -104,7 +104,11 @@ class RegtestWalletTest {
             // history: the node names the blocks that touch the wallet
             val blocks = node.json("scanblocks", "start",
                 (0..1).joinToString(",", "[", "]") { """{"desc":"${watch.descriptor(it)}","range":[0,${window - 1}]}""" }, "0").jsonObject
-            assertEquals(4, blocks["relevant_blocks"]!!.jsonArray.size)
+            // A block filter never misses a block that touches the wallet. It can, rarely, name one that does not
+            // (about once in a hundred runs of this test, with fresh keys each time), so the count is not exact.
+            val named = blocks["relevant_blocks"]!!.jsonArray.map { it.jsonPrimitive.content }.toSet()
+            val own = (1..4).map { node.cli("getblockhash", it.toString()) }
+            assertTrue(named.containsAll(own) && named.size <= 6, "the four blocks of the wallet are among the ${named.size} named")
 
             // a payment of 700 NORTH at 2 base units per virtual byte; the rest returns to change key 4
             val payTo = other.script(0, 0)

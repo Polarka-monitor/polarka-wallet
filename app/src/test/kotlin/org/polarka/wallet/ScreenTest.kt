@@ -310,6 +310,9 @@ class ScreenTest {
                 cli("generatetoaddress", "1", other.address(0, 9))                 // tip 207
                 open(Section.OVERVIEW)
                 refresh("207")
+                // A look that was under way when the block arrived shows the new height with the old balance of
+                // the watched address; the app sees that itself and looks again at once. The test waits for that look.
+                screen.waitUntil(30_000) { textOf("watched-total") == Format.coins(0) }
                 screen.onNodeWithTag("watched-total").assertTextContains(Format.coins(0))
                 val paperFee = 2L * Spend.vsize(3, listOf(wallet.script(0, 0)))
                 screen.onNodeWithTag("total").assertTextContains(Format.coins(5 * coin - 100_00000000L - fee - paperFee) + " NORTH")

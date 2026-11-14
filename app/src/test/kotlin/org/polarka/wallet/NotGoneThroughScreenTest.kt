@@ -5,6 +5,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import north.core.Account
 import north.core.Chain
@@ -22,7 +23,11 @@ import java.nio.file.Files
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** 0.4.2 on the screen: a payment that did not go through is shown on the overview, and only the owner lets it go. */
+/**
+ * 0.4.2 on the screen: a payment that did not go through is shown on the overview, and only the owner lets it go.
+ * With the third look: its entry says when no payment can be made beside it (R2-02), and the dialog for removing
+ * the wallet says that what the phone remembers about such payments goes with the wallet (N2-4).
+ */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w900dp-h4000dp")
 class NotGoneThroughScreenTest {
@@ -79,6 +84,17 @@ class NotGoneThroughScreenTest {
             assertTrue("could still arrive from another node" in textOf("dropped-text"), textOf("dropped-text"))
             assertEquals("-5.00000326", textOf("dropped-amount"))
             assertEquals(listOf(gone), model.state.dropped, "a look at a node that shows nothing about it leaves it where it is")
+            assertTrue("Forget this payment only if you are sure" in textOf("dropped-no-coin"), "the entry does not say what can be done when its coin is not shown")
+
+            screen.onNodeWithTag("tab-MORE").performClick()
+            waitFor("wallet-remove")
+            screen.onNodeWithTag("wallet-remove").performClick()
+            waitFor("wallet-remove-open")
+            assertTrue("could then arrive beside a new one" in textOf("wallet-remove-open"), textOf("wallet-remove-open"))
+            screen.onNodeWithText("Cancel").performClick()
+            screen.waitUntil(10_000) { !shown("wallet-remove-open") }
+            screen.onNodeWithTag("tab-OVERVIEW").performClick()
+            waitFor("dropped-forget")
 
             owner.there = false
             screen.onNodeWithTag("dropped-forget").performClick()

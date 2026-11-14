@@ -1,6 +1,6 @@
 # Polarka Wallet: a short guide
 
-Polarka Wallet is a test build. It has been checked twice, but not yet by an independent human expert.
+Polarka Wallet is a test build. It has been checked three times, but not yet by an independent human expert.
 Keep only small amounts in it. Larger savings belong on paper (a cold address).
 
 ## Before you install
