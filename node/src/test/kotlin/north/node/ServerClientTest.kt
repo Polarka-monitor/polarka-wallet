@@ -371,4 +371,85 @@ class ServerClientTest {
             assertEquals(2 to 2, fake.seen.size to fake.connections.get())
         }
     }
+
+    /**
+     * The sixth look of the reviewer, L3. A server that sends its answer a byte at a time is never late for the
+     * timeout of a read. The question as a whole has a limit of its own: when that is over, the question fails
+     * as one that was not answered in time, and the next question gets its own answer.
+     */
+    @Test
+    fun anAnswerThatComesALittleAtATimeIsNotWaitedForWithoutEnd() {
+        val server = ServerSocket(0, 50, InetAddress.getLoopbackAddress())
+        val slow = java.util.concurrent.atomic.AtomicBoolean(true)
+        val slowHead = java.util.concurrent.atomic.AtomicBoolean(false)
+        thread(isDaemon = true) {
+            while (!server.isClosed) {
+                val socket = try { server.accept() } catch (e: Exception) { break }
+                thread(isDaemon = true) {
+                    runCatching {
+                        socket.use { s ->
+                            val input = BufferedInputStream(s.getInputStream())
+                            val asked = StringBuilder()
+                            while (!asked.endsWith("\r\n\r\n")) {
+                                val b = input.read()
+                                if (b < 0) return@use
+                                asked.append(b.toChar())
+                            }
+                            val body = "{\"height\":7}".encodeToByteArray()
+                            val head = "HTTP/1.1 200 x\r\nContent-Type: application/json\r\nContent-Length: ${body.size}\r\nConnection: close\r\n\r\n".encodeToByteArray()
+                            val out = s.getOutputStream()
+                            for (b in head) {
+                                if (slowHead.get()) Thread.sleep(20)
+                                out.write(b.toInt())
+                                if (slowHead.get()) out.flush()
+                            }
+                            out.flush()
+                            for (b in body) {
+                                if (slow.get()) Thread.sleep(150)
+                                out.write(b.toInt())
+                                out.flush()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        server.use {
+            val url = "http://127.0.0.1:${server.localPort}"
+            fun timed(what: () -> Unit): Long {
+                val started = System.nanoTime()
+                val e = assertFailsWith<NodeError> { what() }
+                assertEquals(0 to NodeError.TIMEOUT, e.httpStatus to e.code, e.message)
+                return (System.nanoTime() - started) / 1_000_000
+            }
+            // every read gets a byte well within its second; the whole answer would take almost two seconds
+            val client = ServerClient(url, timeoutMs = 1000, deadlineMs = 600)
+            val body = timed { client.tipHeight() }
+            assertTrue(body in 500..1400, "the question took $body ms")
+            // one question may be given less time than the client gives by itself
+            val patient = ServerClient(url, timeoutMs = 1000)
+            val single = timed { patient.known(txid(5), 400) }
+            assertTrue(single in 300..1200, "the question took $single ms")
+            // the same while the beginning of the answer is still on its way (about 80 bytes, 20 ms each)
+            slow.set(false)
+            slowHead.set(true)
+            val head = timed { client.tipHeight() }
+            assertTrue(head in 500..1400, "the question took $head ms")
+            // without the delay the same server is read to its end
+            slowHead.set(false)
+            assertEquals(7, client.tipHeight())
+            // and no time at all is no question at all
+            timed { patient.known(txid(5), 0) }
+        }
+        // A busy server asks for a second. A question that has less than a second left is not asked again: "busy" is its answer.
+        Fake { _, _ -> Reply(429, "{\"message\":\"slow down\"}", mapOf("Retry-After" to "1")) }.use { fake ->
+            val waits = ArrayList<Long>()
+            val client = ServerClient(fake.url, pause = { waits.add(it) })
+            assertEquals(429, assertFailsWith<NodeError> { client.known(txid(5), 600) }.httpStatus)
+            assertEquals(1 to emptyList<Long>(), fake.seen.size to waits)
+            // with time enough it is waited for as before, until waiting has taken as long as the client allows
+            assertEquals(429, assertFailsWith<NodeError> { client.known(txid(5)) }.httpStatus)
+            assertTrue(waits.isNotEmpty() && fake.seen.size > 2)
+        }
+    }
 }

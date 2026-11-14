@@ -196,17 +196,33 @@ class ServerModelTest {
             val model = opened()
             assertNull(model.state.problem)
 
-            // the node behind the server says no: the owner is told why, and nothing is kept as waiting
+            // The node behind the server says no. The owner is told why. Nothing waits, and nothing is handed over
+            // for sending; but the server has seen the transaction, so the payment is kept as one that did not go
+            // through (the sixth look of the reviewer, H1) and the next payment is built on its coin.
             b.relay.instead = { path, _ ->
                 if (path == "/v1/transactions/validate") 200 to "{\"allowed\":false,\"rejection_reason\":\"min relay fee not met\"}" else null
             }
             val refusal = assertNotNull(pay(model, shop, "5"))
-            assertEquals(Problem.Kind.REJECTED to "min relay fee not met", refusal.kind to refusal.detail)
+            assertEquals(Problem.Kind.REFUSED_KEPT to "min relay fee not met", refusal.kind to refusal.detail)
             assertTrue(model.state.pending.isEmpty())
+            val refused = model.state.dropped.single()
+            assertNull(model.state.draft)
             assertTrue(b.node.mempool().isEmpty())
             assertTrue("/v1/transactions/broadcast" !in b.relay.paths, "a refused payment was handed over")
-            until("the wallet's file is written") { wallets.value!!.pending.isEmpty() }
+            until("the wallet's file is written") { wallets.value!!.pending.isEmpty() && wallets.value!!.dropped.size == 1 }
             settled(model)
+            b.relay.instead = { _, _ -> null }
+            val again = assertNotNull(workedOut(model, shop, "5"), "problem: ${model.state.sendProblem}")
+            assertEquals(1, again.against)
+            assertTrue(again.plan.inputs.any { it.txid + ":" + it.vout in refused.inputs })
+            model.confirmSend(owner)
+            settled(model)
+            assertNull(model.state.sendProblem)
+            b.node.mine(1, miner)                                               // tip 103
+            model.refresh()
+            settled(model)
+            assertTrue(model.state.pending.isEmpty() && model.state.dropped.isEmpty(), "the block has settled both")
+            assertEquals(5 * coin, b.held(shop), "the shop was paid once")
 
             // the hand-over reaches nobody: the outcome is not known, and no other payment is made meanwhile
             b.relay.instead = { path, _ ->
@@ -241,7 +257,7 @@ class ServerModelTest {
             model.refresh()
             settled(model)
             assertTrue(model.state.pending.isEmpty() && model.state.dropped.isEmpty(), "the block has settled both")
-            assertEquals(5 * coin, b.held(shop), "the shop was paid once")
+            assertEquals(10 * coin, b.held(shop), "the shop was paid once for each of the two purchases")
         }
     }
 

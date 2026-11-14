@@ -282,7 +282,7 @@
     <!-- 0.6: a wallet server, the number of words -->
     <string name="server_setup_title">Připojení přes veřejný server</string>
     <string name="server_intro">Nejrychlejší začátek, bez vlastního uzlu. Peněženka se ptá serveru pro peněženky TrueNorth, co je na vašich adresách, a předává mu vaše podepsané platby. Předvyplněný server provozuje projekt Northbound, ne autoři této aplikace.</string>
-    <string name="server_sees">Server vidí všechny adresy vaší peněženky pohromadě a internetovou adresu telefonu. Mohl by ukázat nepravdivý zůstatek, zatajit příchozí platbu nebo platbu zdržet. Vaše mince vzít nemůže: slova pro obnovu ani klíče tento telefon nikdy neopouštějí. Pro větší soukromí použijte vlastní uzel.</string>
+    <string name="server_sees">Server vidí všechny adresy vaší peněženky pohromadě, každou adresu, kterou přes tuto aplikaci sledujete nebo vybíráte, a internetovou adresu telefonu. Mohl by ukázat nepravdivý zůstatek, zatajit příchozí platbu, platbu zdržet nebo tvrdit, že platba proběhla, i když neproběhla. Vaše mince vzít nemůže: slova pro obnovu ani klíče tento telefon nikdy neopouštějí. Pro větší soukromí použijte vlastní uzel.</string>
     <string name="server_address">Adresa serveru</string>
     <string name="server_go">Pokračovat</string>
     <string name="offer_server">Server</string>
@@ -296,7 +296,7 @@
     <string name="problem_foreign_server">Server vrátil výstupy, které nepatří k vašim adresám. Nic se nezobrazí. Zvažte jiný server.</string>
     <string name="problem_timeout_server">Server neodpověděl včas. Může být zaneprázdněný. Zkuste to za chvíli znovu.</string>
     <string name="problem_busy_server">Server je zaneprázdněný. Zkuste to za chvíli znovu.</string>
-    <string name="problem_rejected_server">Uzel za serverem transakci odmítl (%1$s). Nic nebylo odesláno.</string>
+    <string name="problem_rejected_server">Server hlásí, že uzel za ním transakci nepřijme (%1$s). Poctivý server nic dál nepředal. Transakci ale viděl.</string>
     <string name="problem_unsure_server">Není známo, zda platba odešla: server nepotvrdil, že ji převzal (id %1$s). Teď neplaťte znovu. Za minutu obnovte přehled: platba se pak ukáže jako čekající na blok, nebo vám aplikace oznámí, že neproběhla.</string>
     <string name="problem_store_server">Něco uloženého v tomto telefonu nelze přečíst nebo zapsat (%1$s). Pokud chybí nastavení serveru, zadejte ho znovu.</string>
     <string name="sent_text_server">Server transakci převzal. Její označení:</string>
@@ -305,18 +305,23 @@
     <string name="pending_unsure_text_server">Server nepotvrdil, že platbu převzal. Její mince se zatím nechávají stranou. Za minutu obnovte přehled: platba se pak ukáže jako čekající na blok, nebo vám aplikace oznámí, že neproběhla.</string>
     <string name="notice_payment_gone_server">Platbu %1$s NORTH server nezná a není v žádném bloku: neproběhla. Ještě ale může dorazit odjinud, proto ji aplikace nechává na stránce Přehled a vaši příští platbu postaví na jedné z jejích mincí. Dorazit pak může jen jedna z těch dvou.</string>
     <string name="notice_payment_back_server">Platbu %1$s NORTH, která neproběhla, server znovu zná; čeká na blok.</string>
-    <string name="dropped_text_server">Server tuto platbu nezná a není v žádném bloku. Její transakce ale platí, dokud nejsou utraceny její mince, takže ještě může dorazit odjinud. Vaše příští platba se proto postaví na jedné z jejích mincí: dorazit pak může jen jedna z těch dvou. Záznam zmizí, jakmile o něm rozhodne blok.</string>
-    <string name="dropped_no_coin_server">Server mezi adresami, na které se aplikace dívá, neukazuje žádnou minci této platby, takže teď nelze platit. Přejde to, až server dožene síť. Pokud to trvá, může peněženka, která použila mnoho adres, potřebovat volbu Prohlédnout dvakrát tolik na stránce Více. Zapomenout tuto platbu zvolte jen tehdy, když máte jistotu, že už dorazit nemůže.</string>
+    <string name="dropped_text_server">Tato platba není v žádném bloku a server ji neukazuje ani mezi platbami, které na blok čekají. Její transakce ale platí, dokud nejsou utraceny její mince, takže ještě může dorazit odjinud. Vaše příští platba se proto postaví na jedné z jejích mincí: dorazit pak může jen jedna z těch dvou. Záznam zmizí, až server ukáže v bloku tuto platbu, nebo vaši pozdější platbu, která utrácí některou z jejích mincí. Co jiného minci utratilo, server neříká; v každém jiném případě tedy záznam zůstane, dokud ho nezapomenete sami.</string>
+    <string name="dropped_no_coin_server">Server nevypisuje žádnou z mincí této platby, takže nelze sestavit platbu, která by vedle ní byla bezpečná, a žádná se nesestaví. Přejde to, pokud server jen zaostal za svým uzlem. Pokud to trvá, utratilo některou minci této platby něco jiného (například jiný telefon se stejnými slovy), nebo server neukazuje pravdu. Než platbu zapomenete, podívejte se na peněženku přes jiný server nebo vlastní uzel. Zapomeňte ji, jen když máte jistotu, že už dorazit nemůže.</string>
     <string name="further_text_server">Server ukazuje platby blízko adresy číslo %1$s této peněženky a dál se aplikace sama nedívá. Pokud jste peněženku opravdu tolik používali, nechte ji hledat dál; jinak se mince na pozdějších adresách neukážou. Pokud ne, server možná ukazuje něco, co není pravda: dál nehledejte a zvažte jiný server.</string>
     <string name="further_more_text_server">Aplikace teď prohlíží prvních %1$s adres této peněženky. Pokud chybí mince, o kterých víte, například po obnově peněženky ze slov, nechte ji prohlédnout dvakrát tolik. Server se pak dozví dvakrát tolik adres.</string>
     <string name="renumber_text_server">Pokud čísla adres této peněženky utekla dopředu (může to způsobit server, který neukazoval pravdu), lze je znovu určit podle toho, co ukazuje současný server.</string>
     <string name="notify_text_server">Zhruba každých patnáct minut se telefon zeptá serveru, zda přišla odměna za blok nebo platba, i když je aplikace zavřená. Funguje to jen tehdy, když telefon na server dosáhne, a přesný okamžik určuje telefon.</string>
     <string name="arriving_label">Na cestě, čeká na blok</string>
-    <string name="history_not_whole">Některé pohyby v historii chybí. U peněženky s více než sto adresami je server neumí sečíst tak, aby je aplikace mohla ukázat správně. Zůstatek a mince úplné jsou.</string>
+    <string name="history_not_whole">Některé pohyby v historii chybí. Server sčítá každý pohyb vůči adresám jednoho dotazu a z toho nejde pohyb vždy správně určit: když má peněženka více než sto adres, když měla platba mezi svými mincemi i cizí, nebo když je historie delší, než aplikace čte. Zůstatek a mince jsou úplné tak, jak je server vypisuje.</string>
     <string name="mining_network_none_server">Výkon sítě a čas na blok server nesděluje, proto zde chybí váš podíl a čekané hodnoty.</string>
     <string name="mining_found_note_server">Přes server se jako odměna pozná jen ta, jejíž mince ještě nebyla utracena. Utracené odměny se zde nepočítají.</string>
     <string name="words_count_title">Počet slov</string>
     <string name="words_count_24">24 slov</string>
     <string name="words_count_12">12 slov</string>
     <string name="words_count_text">24 slov nese 256 bitů náhodnosti, 12 slov 128 bitů. Dvanáct slov se opisuje snáz a otevře je i peněženka Northbound pro počítač. Počet slov nelze u hotové peněženky změnit.</string>
+    <!-- 0.6: after the sixth look of the reviewer -->
+    <string name="problem_refused_kept">Uzel hlásí, že transakci nepřijme (%1$s). Není to váš vlastní uzel a celou transakci viděl, proto aplikace nechává platbu na stránce Přehled jako neprošlou. Vaše příští platba se postaví na jedné z jejích mincí: dorazit pak může jen jedna z těch dvou.</string>
+    <string name="problem_refused_kept_server">Server hlásí, že uzel za ním transakci nepřijme (%1$s). Celou transakci ale viděl, proto aplikace nechává platbu na stránce Přehled jako neprošlou. Vaše příští platba se postaví na jedné z jejích mincí: dorazit pak může jen jedna z těch dvou.</string>
+    <string name="problem_too_many_coins">Tolik mincí server v jedné odpovědi nevypíše (%1$s). Peněženku, která má na adresách více než 10 000 mincí, nelze přes server zobrazit. Připojte ji k vlastnímu uzlu a mince slučte do menšího počtu.</string>
+    <string name="paper_text_server">Napište slova papírové adresy a přesuňte její mince. Slova se použijí jednou a neukládají se. Papír potom už není bezpečný: přesuňte vše, do této peněženky nebo na novou papírovou adresu. Server se dozví prvních čtyřicet adres těchto slov, pozná tedy, že se na ně ptal tento telefon.</string>
 </resources>

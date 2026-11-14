@@ -786,9 +786,9 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
                 return
             }
             val delivery = withContext(io) { runCatching { engine.deliver(signed) } }
-            if (delivery.isFailure) {
-                // The node itself refused it: it is certain that it did not go out. The note about it is taken
-                // back, and so is the change key, which nothing has used.
+            if (delivery.isFailure && engine.ownersNode) {
+                // The owner's own node refused it: it is certain that it did not go out. The note about it is
+                // taken back, and so is the change key, which nothing has used.
                 change({
                     it.copy(
                         pending = it.pending.filter { p -> p.txid != record.txid },
@@ -796,6 +796,27 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
                     )
                 })
                 state = state.copy(sending = false, sendProblem = refusal(delivery.exceptionOrNull()!!))
+            } else if (delivery.isFailure) {
+                // Refused by a public node or a wallet server. They have seen the whole signed transaction, and
+                // their no is only their word: whoever was shown a transaction can send it later. The payment
+                // is therefore kept as one that did not go through, so that the next one is built on one of
+                // its coins, and its change key stays used. With no room left among those payments it stays
+                // "outcome not known", which lets no other payment be made until a look has settled it.
+                val why = refusal(delivery.exceptionOrNull()!!)
+                var kept = false
+                change({
+                    if (it.dropped.size >= WalletInfo.MAX_DROPPED) it else {
+                        kept = true
+                        it.copy(
+                            pending = it.pending.filter { p -> p.txid != record.txid },
+                            dropped = it.dropped + Dropped(record.txid, record.sentSat, record.feeSat, record.inputs, record.atMillis),
+                        )
+                    }
+                })
+                state = state.copy(
+                    sending = false, draft = null,
+                    sendProblem = if (kept) Problem(Problem.Kind.REFUSED_KEPT, why.detail) else Problem(Problem.Kind.UNSURE, record.txid),
+                )
             } else if (delivery.getOrThrow()) {
                 change({ it.copy(pending = it.pending.map { p -> if (p.txid == record.txid) p.copy(unsure = false) else p }) })
                 state = state.copy(sending = false, draft = null, sentTxid = record.txid)
@@ -806,7 +827,7 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Why a payment was refused. Only what the node itself decided is thrown as a refusal, so nothing was sent. */
+    /** Why a payment was refused. Only what the node itself decided is thrown as a refusal. */
     private fun refusal(t: Throwable): Problem = if (t is NodeError) Problem(Problem.Kind.REJECTED, t.message.orEmpty()) else Problem.of(t)
 
     fun clearSent() {

@@ -13,6 +13,15 @@ import north.node.ServerClient
  * [paperSign] are handed the words for the moment of signing and do not keep them.
  */
 interface Gateway {
+    /**
+     * True when what is asked is a node of the owner's own (a setup with an account). What such a node refuses
+     * it does not pass on, so its no to a transaction is the end of that transaction. Anybody else who was
+     * shown a signed transaction, a public node or a wallet server, may keep it and send it later, whatever
+     * they answered. A payment that such a party refused is therefore not forgotten: it is remembered as one
+     * that did not go through, and the next payment is built on one of its coins.
+     */
+    val ownersNode: Boolean
+
     /** How many keys of each branch the app may look at for this wallet without asking its owner again. */
     fun allowed(wallet: WalletInfo): Int
 
@@ -34,12 +43,16 @@ interface Gateway {
      */
     fun plan(wallet: WalletInfo, to: String, amountSat: Long?, feeRate: Long, used: Set<String> = emptySet()): Plan
 
-    /** Signs with the given words, which have to be those of the wallet with [expectedXpub]. Nothing is sent here. */
+    /**
+     * Signs with the given words, which have to be those of the wallet with [expectedXpub]. Nothing is sent
+     * here, and nobody but the owner's own node is shown the result ([ownersNode]).
+     */
     fun sign(expectedXpub: String, plan: Plan, words: List<String>): SignedSpend
 
     /**
      * Hands a signed transaction over. True: it is on its way. False: what became of it could not be found
-     * out. A refusal is thrown.
+     * out. A refusal is thrown. Unless [ownersNode] is true, whoever refused has seen the whole transaction
+     * by then, and the payment must not be forgotten because of the refusal.
      */
     fun deliver(signed: SignedSpend): Boolean
 

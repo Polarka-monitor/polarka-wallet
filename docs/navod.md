@@ -23,8 +23,9 @@ Peněženka nemá vlastní server. Na stav vašich adres se ptá jinde a je na v
 
 - **Veřejný server** je nejrychlejší cesta a nabízí se jako první. Předvyplněný je server projektu Northbound
   (`https://api.northboundwallet.org`); neprovozují ho autoři této aplikace. Server vidí všechny adresy vaší
-  peněženky pohromadě a vaši internetovou adresu. Mohl by vám ukázat nepravdivý zůstatek, zatajit příchozí
-  platbu nebo platbu zdržet. Mince vám vzít nemůže: slova ani klíče telefon neopouštějí. Když server neběží,
+  peněženky pohromadě, každou adresu, kterou přes aplikaci sledujete nebo vybíráte, a vaši internetovou
+  adresu. Mohl by vám ukázat nepravdivý zůstatek, zatajit příchozí platbu, platbu zdržet nebo tvrdit, že
+  platba proběhla, i když neproběhla. Mince vám vzít nemůže: slova ani klíče telefon neopouštějí. Když server neběží,
   peněženka nic neukáže; mince zůstávají vaše a připojíte se jinam. Místo předvyplněné adresy lze napsat
   adresu jiného serveru se stejným rozhraním.
 - **Vlastní uzel** nechá vaše adresy jen vám. Viz poslední kapitolu.
@@ -36,6 +37,13 @@ Co je přes server jinak než s vlastním uzlem:
 - U peněženky s více než sto adresami (zhruba po padesáti platbách) může v historii u některých plateb chybět
   poplatek a výjimečně celý řádek. Stránka Historie to řekne. Zůstatek a mince jsou úplné vždy.
 - Stránka těžby neukazuje výkon sítě a odměnu za blok pozná jen do chvíle, než je utracena.
+- Platba, kterou server odmítne, se nezapomíná. Server tou dobou celou platbu viděl a mohl by ji ještě
+  odeslat, proto ji aplikace nechá v Přehledu jako neprošlou a vaši příští platbu postaví na jedné z jejích
+  mincí.
+- Záznam "Neproběhla, ještě může dorazit" zmizí, až server ukáže v bloku tu platbu, nebo vaši pozdější
+  platbu postavenou na její minci. Co jiného minci utratilo, server neříká. Pokud minci utratilo něco jiného
+  (jiný telefon se stejnými slovy), nebo pokud server minci zatají, záznam zůstane a aplikace nezaplatí,
+  dokud záznam sami nezapomenete. Předtím se na peněženku podívejte přes jiný server nebo vlastní uzel.
 
 Jednou spusťte vlastní test (první obrazovka nebo Více). Ukáže, že kód pro klíče na vašem telefonu funguje.
 
@@ -72,8 +80,9 @@ Dokud nepřijde blok, je platba v Přehledu uvedena jako čekající a její min
 nebo server nepotvrdí, že platbu převzal, aplikace řekne, že výsledek není znám. Neplaťte pak znovu: za minutu obnovte
 přehled a aplikace ukáže, zda platba čeká na blok, nebo neproběhla.
 
-Platba, která neproběhla, zůstane v Přehledu jako "Neproběhla, ještě může dorazit": uzel, kterého se aplikace
-ptá, ji nedrží, ale jiný uzel ji držet může. Zaplatit znovu můžete hned. Aplikace postaví novou platbu na
+Platba, která neproběhla, zůstane v Přehledu jako "Neproběhla, ještě může dorazit": uzel nebo server, kterého
+se aplikace ptá, ji nedrží, ale jiný uzel ji držet může. Stejně aplikace naloží s platbou, kterou odmítl server
+nebo veřejný uzel, protože ji viděli. Zaplatit znovu můžete hned. Aplikace postaví novou platbu na
 minci té staré, takže dorazit může vždy jen jedna z nich, a záznam odstraní, jakmile o věci rozhodne blok.
 "Zapomenout tuto platbu" je pro vzácný případ, kdy záznam zůstává a vy máte jistotu, že stará platba už
 dorazit nemůže.

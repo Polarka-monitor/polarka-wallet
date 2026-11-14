@@ -35,9 +35,11 @@ import north.node.Utxo
  *   put in: such a transaction is left out, and the history says that it is not whole
  *   ([Snapshot.historyWhole]).
  * - Whether a transaction in the history was a block reward is known only while its coin is unspent.
- * - The server does not say which transaction spent a coin. When a coin of one of the wallet's payments is
- *   gone from the list, the payment is known nowhere and nothing else of the wallet waits, a transaction in
- *   a block has spent it; which one is not known, and it is marked [ANOTHER].
+ * - The server does not say which transaction spent a coin, and a coin that is missing from its list proves
+ *   nothing: the server may be behind its node, or may not show the truth. Nothing is concluded from a
+ *   missing coin. A payment of the wallet's counts as beaten only when the server shows, in a block, another
+ *   payment of this wallet that spends one of its coins. When a coin went another way (from another phone
+ *   with the same words), the payment stays among those that did not go through until its owner forgets it.
  * - The server says whether it knows a transaction, not whether that is in a block. A payment of the
  *   wallet's that the server knows and the history does not list is taken to wait: the index behind the
  *   history may not have caught up with its node. A payment in a block would show the same if it were older
@@ -47,7 +49,9 @@ import north.node.Utxo
  *   wallet's addresses, and by that it is known ([Problem.Kind.OTHER_CHAIN]).
  * - A payment is signed on the phone and handed over afterwards ([deliver]); the node behind the server checks
  *   it at the hand-over, not at the signing. The server answers every failed hand-over alike, so after one
- *   the outcome is asked for and, if nobody knows, stays "not known" until a look settles it.
+ *   the outcome is asked for and, if nobody knows, stays "not known" until a look settles it. From the first
+ *   question of the hand-over on the server has the whole signed transaction, and it could keep it whatever
+ *   it answers. A payment is therefore never forgotten on the server's word ([ownersNode]).
  *
  * Everything in one look has to come from the same block. If a block arrives in between, the look is made again.
  */
@@ -57,6 +61,9 @@ class ServerEngine(
     private val most: Int = MAX_LINES,
     private val pause: (Long) -> Unit = { Thread.sleep(it) },
     private val clock: () -> Long = { System.nanoTime() },
+    /** The longest the check before a hand-over may take, and the shortest time any question of the hand-over is given. */
+    private val checkMillis: Long = CHECK_MILLIS,
+    private val leastMillis: Long = MIN_QUESTION_MILLIS,
 ) : Gateway {
     private class Keys(
         val xpub: String, val window: Int, val addresses: List<String>,
@@ -77,6 +84,9 @@ class ServerEngine(
     )
 
     private var keys: Keys? = null
+
+    /** A wallet server is somebody else's: what it was shown it may keep, whatever it answered. */
+    override val ownersNode: Boolean get() = false
 
     /** The addresses of both branches of an account: some hundred keys. The wallet's own are worked out once and kept from look to look. */
     @Synchronized
@@ -114,14 +124,18 @@ class ServerEngine(
     private fun key(coin: Unspent): String = coin.txid + ":" + coin.vout
 
     /**
-     * A server that will not take what the wallet asks (HTTP 400) is not told apart further: it works for
-     * another network than the setup names, which is what it says of addresses it does not know, or it is
-     * not a server of this kind. That is said as one thing, with the server's own words.
+     * A server that will not take what the wallet asks (HTTP 400). One refusal is told apart by the server's
+     * own words: more coins on the addresses than it lists in one answer. Every other one is about the
+     * addresses themselves: the server works for another network than the setup names, which is what it says
+     * of addresses it does not know, or it is not a server of this kind. That is said as one thing, with the
+     * server's words.
      */
     private inline fun <T> asked(what: () -> T): T = try {
         what()
     } catch (e: NodeError) {
-        if (e.httpStatus == 400) throw EngineError(Problem.Kind.OTHER_CHAIN, e.message.orEmpty()) else throw e
+        if (e.httpStatus != 400) throw e
+        val said = e.message.orEmpty()
+        throw EngineError(if ("output limit" in said.lowercase()) Problem.Kind.TOO_MANY_COINS else Problem.Kind.OTHER_CHAIN, said)
     }
 
     private fun scriptFor(address: String): ByteArray =
@@ -211,8 +225,15 @@ class ServerEngine(
 
     /**
      * What became of the wallet's waiting payments and of those that did not go through, as the server shows it.
-     * [held] and [back] get the ones that wait for a block, [tied] the coins that something unknown has tied
-     * up, [spentBy] the coins that a transaction in a block has spent.
+     * [held] and [back] get the ones that wait for a block, [tied] the coins that something waiting may be
+     * spending, [spentBy] the coins that a payment of this wallet has spent in a block.
+     *
+     * Nothing is concluded from a coin that the server does not list. It does not say what spent a coin, and
+     * a coin that is left out is no proof that a block spent it: the server may be behind its node, or it may
+     * not show the truth, and it is the one who was handed the payment. A payment is therefore beaten only by
+     * another payment of this wallet that the server shows in a block, which is something the server has to
+     * say and cannot merely leave out. A payment that the server neither knows nor shows in a block becomes,
+     * and stays, one that did not go through, and the next payment is built on one of its coins.
      */
     private fun judge(
         wallet: WalletInfo, coins: List<Unspent>, inBlocks: Set<String>, waiting: Map<String, List<ServerMove>>,
@@ -224,20 +245,26 @@ class ServerEngine(
         val own = (wallet.pending.map { it.txid } + wallet.dropped.map { it.txid }).toSet()
         // a waiting transaction that spends from the wallet and is none of its payments: made elsewhere with the same words
         val stranger = waiting.any { (txid, lines) -> txid !in own && lines.any { it.receivedAt == null } }
+        val busy = HashSet<String>()                // the coins of the wallet's own payments that wait for a block
+        val unknown = ArrayList<Set<String>>()      // the coins of the payments that are in no block and that the server does not know
         fun check(txid: String, inputs: Set<String>, waits: MutableSet<String>) {
             when {
                 // in a block: the history lists it there, or one of the wallet's coins is of its making
                 txid in inBlocks || txid in made -> inputs.forEach { spentBy[it] = txid }
                 // waiting: the index shows it, or the node behind the server has it and the index has not caught up
-                txid in waiting || server.known(txid) -> waits.add(txid)
-                else -> for (coin in inputs) {
-                    if (coin in present) continue           // still there, and nothing spends it
-                    if (stranger) tied.add(coin) else spentBy[coin] = ANOTHER
+                txid in waiting || server.known(txid) -> {
+                    waits.add(txid)
+                    busy.addAll(inputs)
                 }
+                else -> unknown.add(inputs)
             }
         }
         for (payment in wallet.pending.take(Engine.MAX_CHECKED)) check(payment.txid, payment.inputs, held)
         for (payment in wallet.dropped) check(payment.txid, payment.inputs, back)
+        // A coin of such a payment that is not listed while something waits that may be spending it (another
+        // payment of this wallet, or a transaction made elsewhere with the same words) is tied up: the next
+        // blocks will tell. A missing coin with nothing waiting says nothing at all.
+        for (inputs in unknown) for (coin in inputs) if (coin !in present && coin !in spentBy && (stranger || coin in busy)) tied.add(coin)
     }
 
     /** The transactions in blocks as the wallet's kind of lines, newest first; null for one that cannot be told. */
@@ -419,31 +446,34 @@ class ServerEngine(
      * Hands a signed transaction to the server. True: the node behind it has the transaction. False: that
      * could not be found out.
      *
-     * The node is first asked whether it would take the transaction. Its no at this point is a refusal and is
-     * thrown, and so is a server that could not be asked. In both cases nothing was handed over for sending.
+     * The node is first asked whether it would take the transaction. With that question the server has the
+     * whole signed transaction, and it could keep it whatever it answers. A no is thrown as a refusal; the one
+     * who called must not forget the payment because of it ([ownersNode] is false here, and the model keeps
+     * the payment as one that did not go through). A check that could not be made decides nothing: the
+     * hand-over is tried all the same.
      *
-     * After that nothing is thrown any more. The server answers every failed hand-over in the same way, a node
-     * that said no like a node that was away, so a failed hand-over says nothing by itself. The server is then
-     * asked whether it knows the transaction, and the same transaction is handed over again; doing that twice
-     * cannot pay twice. An answer that names another transaction is not believed either. There are at most
-     * three tries, and none is started later than forty seconds after the first.
+     * After the check nothing is thrown any more. The server answers every failed hand-over in the same way, a
+     * node that said no like a node that was away, so a failed hand-over says nothing by itself. The server is
+     * then asked whether it knows the transaction, and the same transaction is handed over again; doing that
+     * twice cannot pay twice. An answer that names another transaction is not believed either.
+     *
+     * There are at most three tries, and none is started later than forty seconds after the beginning. Every
+     * question has a time limit of its own, so that a server that answers very slowly cannot hold the
+     * hand-over: the whole lasts about a minute at most.
      */
     override fun deliver(signed: SignedSpend): Boolean {
-        val verdict = try {
-            server.validate(signed.hex)
-        } catch (e: NodeError) {
-            val problem = Problem.of(e)
-            throw EngineError(problem.kind, problem.detail)
-        }
-        if (!verdict.allowed) {
+        val until = clock() + Engine.DELIVERY_MILLIS * 1_000_000
+        // what one question may take: the time that is left, but long enough for an honest answer over a slow line
+        fun left(): Long = maxOf(leastMillis, (until - clock()) / 1_000_000)
+        val verdict = runCatching { server.validate(signed.hex, checkMillis) }.getOrNull()
+        if (verdict != null && !verdict.allowed) {
             if (onItsWay(verdict.reason)) return true
             throw EngineError(Problem.Kind.REJECTED, verdict.reason.orEmpty())
         }
-        val deadline = clock() + Engine.DELIVERY_MILLIS * 1_000_000
         for (attempt in 1..Engine.DELIVERY_TRIES) {
-            if (runCatching { server.broadcast(signed.hex) }.getOrNull() == signed.txid) return true
-            if (runCatching { server.known(signed.txid) }.getOrDefault(false)) return true
-            if (clock() > deadline) return false
+            if (runCatching { server.broadcast(signed.hex, left()) }.getOrNull() == signed.txid) return true
+            if (runCatching { server.known(signed.txid, left()) }.getOrDefault(false)) return true
+            if (clock() > until) return false
             if (attempt < Engine.DELIVERY_TRIES) runCatching { pause(Engine.DELIVERY_PAUSE_MILLIS) }
         }
         return false
@@ -500,7 +530,9 @@ class ServerEngine(
         /** The most lines of history read for one part of the addresses in one look. */
         const val MAX_LINES = 2000
         const val TRIES = 3
-        /** In [Snapshot.spentBy]: a transaction in a block has spent the coin, and the server does not say which. */
-        const val ANOTHER = "another transaction"
+        /** The longest the check before a hand-over may take. */
+        const val CHECK_MILLIS = 20_000L
+        /** The shortest time a question of the hand-over is given, however little of the forty seconds is left. */
+        const val MIN_QUESTION_MILLIS = 10_000L
     }
 }

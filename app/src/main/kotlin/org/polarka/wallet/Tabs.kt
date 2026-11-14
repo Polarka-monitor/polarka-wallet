@@ -151,12 +151,15 @@ fun OverviewTab(model: WalletModel, state: WalletState, owner: Owner, go: (Secti
         // The coins the node shows for the wallet. A payment that did not go through and has none of its coins
         // among them stops every payment for now, and its entry says so.
         val shown = remember(snapshot) { snapshot?.coins?.map { it.txid + ":" + it.vout }?.toSet() }
+        // Only a payment that nothing stands against yet needs a free coin. One whose coin a waiting payment of
+        // the wallet's is spending does not, and a wallet server does not list a coin that something waiting spends.
+        val open = remember(state.wallet) { state.wallet?.unanswered?.map { it.txid }?.toSet().orEmpty() }
         state.dropped.forEach { gone ->
             Block(stringResource(R.string.dropped_title)) {
                 Field(stringResource(R.string.send_amount), "-" + Format.coins(gone.sentSat + gone.feeSat), "dropped-amount")
                 Mono(gone.txid)
                 Text(stringResource(pick(R.string.dropped_text, R.string.dropped_text_server)), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("dropped-text"))
-                if (shown != null && gone.inputs.none { it in shown }) {
+                if (shown != null && gone.txid in open && gone.inputs.none { it in shown }) {
                     Text(stringResource(pick(R.string.dropped_no_coin, R.string.dropped_no_coin_server)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("dropped-no-coin"))
                 }
                 TextButton(onClick = { askForgetPayment = gone.txid }, modifier = Modifier.testTag("dropped-forget")) { Text(stringResource(R.string.dropped_forget)) }
@@ -620,7 +623,7 @@ private fun PaperBlock(model: WalletModel, state: WalletState) {
     var rate by rememberSaveable { mutableStateOf(Planner.DEFAULT_FEE_RATE) }
     val mine = remember(wallet?.xpub, wallet?.receiveIndex) { wallet?.let { it.watchKey().address(0, it.receiveIndex) } }
     Block(stringResource(R.string.paper_title)) {
-        Text(stringResource(R.string.paper_text), style = MaterialTheme.typography.bodySmall)
+        Text(stringResource(pick(R.string.paper_text, R.string.paper_text_server)), style = MaterialTheme.typography.bodySmall)
         state.paperTxid?.let { txid ->
             Text(stringResource(pick(R.string.sent_text, R.string.sent_text_server)))
             Mono(txid, "paper-txid")

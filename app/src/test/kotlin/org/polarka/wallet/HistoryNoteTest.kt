@@ -45,7 +45,9 @@ class HistoryNoteTest {
         history(whole = false)
         assertTrue(shown("history-not-whole"))
         val note = screen.onNodeWithTag("history-not-whole").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.joinToString("") { it.text }.orEmpty()
-        assertTrue("Some movements are missing from the history" in note && "The balance and the coins are complete" in note, note)
+        assertTrue("Some movements are missing from the history" in note && "The balance and the coins are shown in full" in note, note)
+        // every reason for it is named (the sixth look of the reviewer, L4): the note comes up for more than a wallet of many addresses
+        assertTrue("more than a hundred addresses" in note && "coins of somebody else among its own" in note && "longer than the app reads" in note, note)
     }
 
     @Test

@@ -231,6 +231,8 @@ fun problemText(problem: Problem): String = when (problem.kind) {
     Problem.Kind.TOO_MANY_WAITING -> stringResource(R.string.problem_too_many_waiting)
     Problem.Kind.EARLIER_PAYMENT -> stringResource(R.string.problem_earlier_payment)
     Problem.Kind.OUTCOME_OPEN -> stringResource(R.string.problem_outcome_open)
+    Problem.Kind.REFUSED_KEPT -> stringResource(pick(R.string.problem_refused_kept, R.string.problem_refused_kept_server), problem.detail)
+    Problem.Kind.TOO_MANY_COINS -> stringResource(R.string.problem_too_many_coins, problem.detail)
 }
 
 /** What is wrong with typed recovery words. The model passes it on in a short form (WalletModel.wordsDetail). */

@@ -24,8 +24,10 @@ not built or run. Five read-only requests to the public server on 14 November 20
 Amounts are whole numbers of base units. An error has the body `{"message"}`.
 
 Commit a531965 adds `GET /v2/fees/estimate`, which gives the rate for 1,000 virtual bytes
-(`atomic_units_per_kvbyte`) and so does not round it up to a whole unit per byte. The client does not use it
-yet. On 14 November 2026 the public server did not have it.
+(`atomic_units_per_kvbyte`) and so does not round it up to a whole unit per byte. The client does not use it:
+the wallet takes no fee estimate from a server and offers its three fixed rates. When this note was first
+written, in the afternoon of 14 November 2026, the public server did not have that call; in the evening of
+the same day it answered 1,002 for 1,000 virtual bytes, where `/v1/fees/estimate` answered 2 for one byte.
 
 ## What the answers mean
 
@@ -54,7 +56,8 @@ yet. On 14 November 2026 the public server did not have it.
 
 ## Limits
 
-- At most 100 addresses in one request (400 otherwise), 10,000 coins in one answer, a body of 1 MB.
+- At most 100 addresses in one request (400 otherwise), a body of 1 MB, and 10,000 coins in one answer: a
+  request that would list more is refused with 400 and the words "request exceeds the 10,000 output limit".
 - Since commit 846e444, 100 requests a second for all clients of one server together; above that 429 with
   `Retry-After: 1`. Requests that were refused do not reach the index or the node.
 - 503 when the index is busy, still catching up, or older than its allowed age.
@@ -72,3 +75,12 @@ yet. On 14 November 2026 the public server did not have it.
   balance or history, hold a payment back, or say that it is in a block. It cannot spend.
 - Nothing in the API says which network a server is on. A server of another network refuses the wallet's
   addresses.
+- With **validate** as with **broadcast** the server has the whole signed transaction, and it could keep it
+  whatever it answers. A wallet must not forget a payment because the server said no to it. This wallet
+  keeps such a payment as one that did not go through and builds its next payment on one of its coins.
+- The server does not say what spent a coin. A coin that it does not list may have been spent in a block, may
+  be spent by a waiting transaction, or may simply have been left out. This wallet concludes nothing from a
+  coin that is missing: a payment of its own counts as overtaken only when the server shows, in a block,
+  another payment of the same wallet that spends one of its coins.
+- No answer is waited for without end. Every question has a time limit as a whole (`ServerClient.DEADLINE_MS`),
+  beside the limits for a connection and for a single read.

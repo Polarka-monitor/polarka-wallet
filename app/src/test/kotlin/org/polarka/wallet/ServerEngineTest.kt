@@ -129,7 +129,7 @@ class ServerEngineTest {
     }
 
     @Test
-    fun aPaymentThatDidNotGoThroughOneThatWasBeatenAndOneThatCameBack() {
+    fun aPaymentThatDidNotGoThroughOneWhoseCoinWentElsewhereAndOneThatCameBack() {
         bench().use { b ->
             val wallet = fresh()
             val other = fresh()
@@ -155,11 +155,13 @@ class ServerEngineTest {
             assertEquals(setOf(key(a)), seen.inWaiting)
             assertTrue(seen.held.isEmpty() && seen.spentBy.isEmpty())
             assertEquals(listOf(key(c)), seen.coins.map { key(it) })
-            // ... and once it is in a block, the payment can never arrive. Which transaction took the coin, the server does not say.
+            // ... and once it is in a block, the coin is gone from the server's list and nothing waits any more. The
+            // server does not say what took the coin, and a coin that is not listed proves nothing (a server could
+            // simply leave it out): nothing is concluded. The model keeps such a payment as one that did not go through.
             b.node.mine(1, miner)
             seen = engine.fetch(waiting)
-            assertEquals(mapOf(key(a) to ServerEngine.ANOTHER), seen.spentBy)
-            assertTrue(seen.inWaiting.isEmpty() && seen.held.isEmpty())
+            assertTrue(key(a) !in seen.coins.map { key(it) })
+            assertTrue(seen.spentBy.isEmpty() && seen.inWaiting.isEmpty() && seen.held.isEmpty())
 
             // a payment kept as "did not go through" reaches the network after all, and then a block
             val late = Planner.pay(listOf(c), script(other.address(0, 2)), 30 * coin, 2, wallet.script(1, 2))
@@ -170,14 +172,67 @@ class ServerEngineTest {
             assertEquals(lateSigned.txid, b.client.broadcast(lateSigned.hex))
             seen = engine.fetch(kept)
             assertEquals(setOf(lateSigned.txid), seen.back)
-            // The wallet's own payment that waits is no stranger. The coin of the first payment went in a block, and that still shows.
+            // The wallet's own payment that waits is no stranger, and it spends another coin than the first payment did:
+            // of the first payment's coin there is still nothing to say.
             seen = engine.fetch(kept.copy(pending = waiting.pending))
-            assertEquals(mapOf(key(a) to ServerEngine.ANOTHER), seen.spentBy)
-            assertTrue(seen.inWaiting.isEmpty())
+            assertEquals(setOf(lateSigned.txid), seen.back)
+            assertTrue(seen.spentBy.isEmpty() && seen.inWaiting.isEmpty())
             b.node.mine(1, miner)
             seen = engine.fetch(kept)
             assertEquals(mapOf(key(c) to lateSigned.txid), seen.spentBy)
             assertTrue(seen.back.isEmpty())
+        }
+    }
+
+    /**
+     * The sixth look of the reviewer, M1 and L1. A payment D did not go through; the next payment P is built on
+     * D's coin and waits for a block. A server no longer lists a coin that a waiting transaction spends, and it
+     * does not know D. That does not make D beaten: the coin is tied up by P. Only P in a block decides, and
+     * the coin then carries P's own id.
+     */
+    @Test
+    fun aPaymentThatWaitsOnTheCoinOfOneThatDidNotGoThrough() {
+        bench().use { b ->
+            val wallet = fresh()
+            val other = fresh()
+            val miner = fresh().address(0, 0)
+            val info = WalletInfo(Chain.REGTEST, wallet.watchKey().xpub, lockOnOpen = false)
+            b.node.mine(1, wallet.address(0, 0))
+            b.node.mine(100, miner)
+            val engine = ServerEngine(Chain.REGTEST, emptyList(), b.client)
+            val a = engine.fetch(info).coins.single()
+            val d = Planner.pay(listOf(a), script(other.address(0, 0)), 10 * coin, 2, wallet.script(1, 0))
+            val dId = d.sign(wallet).txid                                       // never handed over
+            val p = Planner.pay(listOf(a), script(other.address(0, 0)), 10 * coin, 5, wallet.script(1, 1))
+            val pSigned = p.sign(wallet)
+            assertEquals(pSigned.txid, b.client.broadcast(pSigned.hex))
+            val now = info.copy(
+                changeIndex = 2,
+                pending = listOf(Pending(pSigned.txid, p.sentSat, p.feeSat, setOf(key(a)))),
+                dropped = listOf(Dropped(dId, d.sentSat, d.feeSat, setOf(key(a)))),
+            )
+            var seen = engine.fetch(now)
+            assertTrue(seen.coins.none { key(it) == key(a) }, "a coin that a waiting transaction spends is not listed")
+            assertEquals(setOf(pSigned.txid), seen.held)
+            assertTrue(seen.back.isEmpty())
+            assertTrue(seen.spentBy.isEmpty(), "nothing in a block has spent the coin: ${seen.spentBy}")
+            assertEquals(setOf(key(a)), seen.inWaiting)
+
+            // P in a block: that is something the server says, and it says it with P's id. D is beaten by P.
+            b.node.mine(1, miner)
+            seen = engine.fetch(now)
+            assertEquals(mapOf(key(a) to pSigned.txid), seen.spentBy)
+            assertTrue(seen.held.isEmpty() && seen.inWaiting.isEmpty() && seen.back.isEmpty())
+
+            // A transaction made elsewhere with the same words now waits, and it spends what P brought back. That ties
+            // up coins of which nothing else is known. The coin that P has spent in a block is not one of those.
+            val broughtBack = seen.coins.single()
+            val elsewhere = Planner.pay(listOf(broughtBack), script(other.address(0, 3)), coin, 2, wallet.script(1, 5)).sign(wallet)
+            assertEquals(elsewhere.txid, b.client.broadcast(elsewhere.hex))
+            seen = engine.fetch(now)
+            assertTrue(seen.coins.isEmpty())
+            assertEquals(mapOf(key(a) to pSigned.txid), seen.spentBy)
+            assertTrue(seen.inWaiting.isEmpty(), "a coin that a block has spent is called tied up: ${seen.inWaiting}")
         }
     }
 

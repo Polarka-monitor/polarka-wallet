@@ -29,6 +29,10 @@ data class Problem(val kind: Kind, val detail: String = "") {
         UNREACHABLE, TIMEOUT, BUSY, LOGIN, NOT_ALLOWED, NODE, OTHER_CHAIN, FOREIGN_OUTPUTS, STORE, UNEXPECTED,
         BAD_ADDRESS, BAD_AMOUNT, NOTHING_TO_SPEND, NOT_ENOUGH, FEE_RATE, TOO_MANY_INPUTS, WRONG_WORDS, BAD_WORDS, REJECTED, UNLOCK,
         IN_WAITING_PAYMENT, UNSURE, KEY_GONE, WORDS_EXIST, WALLET_FILE, BAD_PRICE, TOO_MANY_WAITING, EARLIER_PAYMENT, OUTCOME_OPEN,
+        /** Somebody who is not the owner's node refused a payment after seeing it; the payment is kept as one that did not go through. */
+        REFUSED_KEPT,
+        /** More coins on the wallet's addresses than a wallet server lists in one answer. */
+        TOO_MANY_COINS,
     }
 
     companion object {
@@ -355,21 +359,36 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
         throw EngineError(Problem.Kind.IN_WAITING_PAYMENT)
     }
 
-    /** Signs with the given words and lets the node check the result. Nothing is sent here. */
+    /** A node with an account is the owner's own; one without is a public node, which is somebody else's. */
+    override val ownersNode: Boolean get() = !setup.isPublic
+
+    /**
+     * Signs with the given words. The owner's own node is then asked to check the result, before anything is
+     * written down: what it refuses it does not pass on, and its no leaves no trace. A public node is not
+     * shown the transaction here. It sees it in [deliver], after the app has written the payment down,
+     * because whoever is shown a signed transaction could keep it. Nothing is sent here.
+     */
     override fun sign(expectedXpub: String, plan: Plan, words: List<String>): SignedSpend {
         val account = try { Account.fromWords(words, setup.chain) } catch (e: Exception) { throw EngineError(Problem.Kind.BAD_WORDS) }
         if (account.watchKey().xpub != expectedXpub) throw EngineError(Problem.Kind.WRONG_WORDS)
         val signed = plan.sign(account)
-        val verdict = node.testAccept(signed.hex)
-        if (!verdict.allowed) throw EngineError(Problem.Kind.REJECTED, verdict.rejectReason.orEmpty())
-        if (verdict.feeSat != plan.feeSat) throw EngineError(Problem.Kind.REJECTED, "fee")
+        if (ownersNode) checked(signed, node.testAccept(signed.hex))
         return signed
     }
 
-    private fun onItsWay(e: NodeError): Boolean {
-        val said = e.message.orEmpty().lowercase()
-        return e.code == -27 || "already in" in said || "already known" in said || "txn-already" in said || "same-nonwitness-data" in said
+    /** The node's word on whether it would take the transaction. A no is thrown, and so is a fee that is not the one that was shown. */
+    private fun checked(signed: SignedSpend, verdict: north.node.Verdict) {
+        if (!verdict.allowed) throw EngineError(Problem.Kind.REJECTED, verdict.rejectReason.orEmpty())
+        if (verdict.feeSat != signed.feeSat) throw EngineError(Problem.Kind.REJECTED, "fee")
     }
+
+    /** What a node says of a transaction that it already has, waiting or in a block. */
+    private fun alreadyThere(reason: String?): Boolean {
+        val said = reason.orEmpty().lowercase()
+        return "already in" in said || "already known" in said || "txn-already" in said || "same-nonwitness-data" in said
+    }
+
+    private fun onItsWay(e: NodeError): Boolean = e.code == -27 || alreadyThere(e.message)
 
     /** The node itself looked at the transaction and said no. Nothing else is a refusal. */
     private fun refusedByNode(e: NodeError): Boolean = e.code in REFUSALS
@@ -390,8 +409,16 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
      *
      * There are at most three tries, and none is started later than forty seconds after the first. One try can
      * itself wait for a busy node (see NodeClient), so the whole can last about a minute and a half.
+     *
+     * A public node is asked here, and only here, whether it would take the transaction: the payment is
+     * written down by now. Its no is thrown like any refusal, and whoever called must not forget the payment
+     * because of it ([ownersNode] is false). A check that could not be made decides nothing.
      */
     override fun deliver(signed: SignedSpend): Boolean {
+        if (!ownersNode) {
+            val verdict = runCatching { node.testAccept(signed.hex) }.getOrNull()
+            if (verdict != null && !(!verdict.allowed && alreadyThere(verdict.rejectReason))) checked(signed, verdict)
+        }
         val deadline = System.nanoTime() + DELIVERY_MILLIS * 1_000_000
         var open = false
         for (attempt in 1..DELIVERY_TRIES) {

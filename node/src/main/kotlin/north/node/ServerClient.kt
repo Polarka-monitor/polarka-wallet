@@ -12,6 +12,10 @@ import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ScheduledThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /** The coins on some addresses, as the server's index shows them at block [tip]. */
 data class ServerCoins(val tip: Int, val tipHash: String, val utxos: List<Utxo>)
@@ -58,10 +62,15 @@ data class ServerVerdict(val allowed: Boolean, val reason: String?)
  * own request), so [history] takes at most a hundred addresses.
  *
  * A server that asks to slow down (429) or is busy (503) is waited for and asked again, for [maxWaitMs] at most.
+ *
+ * One question, from its beginning to the last byte of its answer and with the waiting for a busy server, takes
+ * [deadlineMs] at most. The timeouts of a connection do not see to that: a server that keeps sending a
+ * little is never late for them. When the time is over the connection is closed and the question fails as
+ * one that was not answered in time.
  */
 class ServerClient(
     url: String, private val timeoutMs: Int = 30_000, private val maxWaitMs: Long = MAX_WAIT_MS,
-    private val pause: (Long) -> Unit = { Thread.sleep(it) },
+    private val pause: (Long) -> Unit = { Thread.sleep(it) }, private val deadlineMs: Long = DEADLINE_MS,
 ) {
     private val base: String
     private val lock: Any
@@ -84,7 +93,10 @@ class ServerClient(
 
     private class TooLong : RuntimeException()
 
-    private fun read(stream: InputStream?): String {
+    private class Late : RuntimeException()
+
+    /** Reads an answer to its end, as long as it is not too long and the time for the whole question ([until]) is not over. */
+    private fun read(stream: InputStream?, until: Long): String {
         if (stream == null) return ""
         stream.use { input ->
             val out = java.io.ByteArrayOutputStream()
@@ -94,16 +106,28 @@ class ServerClient(
                 if (n < 0) break
                 if (out.size() + n > MAX_ANSWER_BYTES) throw TooLong()
                 out.write(buffer, 0, n)
+                if (now() > until) throw Late()
             }
             return out.toByteArray().decodeToString()
         }
     }
 
-    private fun once(path: String, body: String?): Answer {
+    private fun late() = NodeError(0, NodeError.TIMEOUT, "the server did not answer in time")
+
+    private fun once(path: String, body: String?, withinMs: Long): Answer {
+        if (withinMs <= 0) throw late()
         var asked = false
-        var c: HttpURLConnection? = null
+        val open = AtomicReference<HttpURLConnection?>()
+        val over = AtomicBoolean(false)
+        val until = now() + withinMs
+        // When the time for the whole question is over, the connection is closed under whatever waits on it. An
+        // answer that is being read is given up by its reader as well, between two reads: closing a connection
+        // from outside does not end every read at once.
+        val watch = WATCH.schedule({ over.set(true); runCatching { open.get()?.disconnect() } }, withinMs, TimeUnit.MILLISECONDS)
         try {
-            c = URI(base + path).toURL().openConnection() as HttpURLConnection
+            val c = URI(base + path).toURL().openConnection() as HttpURLConnection
+            open.set(c)
+            if (over.get()) throw java.io.IOException("the time was over before the question was asked")
             c.requestMethod = if (body == null) "GET" else "POST"
             c.connectTimeout = timeoutMs
             c.readTimeout = timeoutMs
@@ -118,35 +142,56 @@ class ServerClient(
             }
             asked = true
             val status = c.responseCode
-            val text = read(if (status in 200..299) c.inputStream else c.errorStream)
+            val text = read(if (status in 200..299) c.inputStream else c.errorStream, until)
             val retry = c.getHeaderField("Retry-After")?.trim()?.toIntOrNull()
             // The answer was read to its end, so the connection is left open for the next question. A look asks
             // several, and with a server far away a new connection costs twice what a question costs.
             return Answer(status, text, retry)
         } catch (e: TooLong) {
-            c?.disconnect()
+            open.get()?.disconnect()
             throw NodeError(200, null, "the server sent an answer that is too long")
+        } catch (e: Late) {
+            open.get()?.disconnect()
+            throw late()
         } catch (e: SocketTimeoutException) {
-            c?.disconnect()
-            if (asked) throw NodeError(0, NodeError.TIMEOUT, "the server did not answer in time")
+            open.get()?.disconnect()
+            if (asked || over.get()) throw late()
             throw NodeError(0, null, "the server cannot be reached (${e.javaClass.simpleName})")
         } catch (e: java.io.IOException) {
-            c?.disconnect()
+            open.get()?.disconnect()
+            if (over.get()) throw late()
             throw NodeError(0, null, "the server cannot be reached (${e.javaClass.simpleName})")
+        } catch (e: RuntimeException) {
+            // a connection that is closed under its reader can fail in ways of its own
+            if (!over.get()) throw e
+            open.get()?.disconnect()
+            throw late()
+        } finally {
+            watch.cancel(false)
         }
     }
 
-    /** One question at a time to one server: the requests of all its users share one budget. */
-    private fun call(path: String, body: String? = null): JsonObject = synchronized(lock) { asked(path, body) }
+    private fun now(): Long = System.nanoTime() / 1_000_000
 
-    private fun asked(path: String, body: String?): JsonObject {
+    /**
+     * One question at a time to one server: the requests of all its users share one budget. [withinMs] is the
+     * time the question may take as a whole, the wait for its turn included.
+     */
+    private fun call(path: String, body: String? = null, withinMs: Long = deadlineMs): JsonObject {
+        val until = now() + withinMs
+        return synchronized(lock) { asked(path, body, until) }
+    }
+
+    private fun asked(path: String, body: String?, until: Long): JsonObject {
         var waited = 0L
         while (true) {
-            val answer = once(path, body)
+            val answer = once(path, body, until - now())
             val busy = answer.status == 429 || answer.status == 503
             if (!busy || waited >= maxWaitMs) return parsed(answer)
             // what the server asks for, and a little longer each time
             val ms = (answer.retryAfter ?: if (answer.status == 429) 1 else 2).coerceIn(1, 5) * 1000L + waited / 4
+            // no time left to wait and ask once more: "busy" is the answer
+            if (now() + ms >= until) return parsed(answer)
             try {
                 pause(ms)
             } catch (e: InterruptedException) {
@@ -386,8 +431,8 @@ class ServerClient(
     }
 
     /** Asks whether the node behind the server would take this transaction. The server sees the whole signed transaction. */
-    fun validate(hex: String): ServerVerdict {
-        val answer = call("/v1/transactions/validate", carrying(hex))
+    fun validate(hex: String, withinMs: Long = deadlineMs): ServerVerdict {
+        val answer = call("/v1/transactions/validate", carrying(hex), withinMs)
         return ServerVerdict(answer.flag("allowed"), answer.textOrNull("rejection_reason", 2000)?.let { NodeClient.clean(it) })
     }
 
@@ -396,12 +441,13 @@ class ServerClient(
      * node behind the server comes back as 502, a refusal as well as a node that is down: an error here says
      * nothing about what became of the transaction, and [known] has to be asked.
      */
-    fun broadcast(hex: String): String = id(call("/v1/transactions/broadcast", carrying(hex)).text("transaction_id", 64))
+    fun broadcast(hex: String, withinMs: Long = deadlineMs): String =
+        id(call("/v1/transactions/broadcast", carrying(hex), withinMs).text("transaction_id", 64))
 
     /** True if the server or its node knows this transaction, in a block or waiting for one. */
-    fun known(txid: String): Boolean {
+    fun known(txid: String, withinMs: Long = deadlineMs): Boolean {
         require(NodeClient.isId(txid)) { "this is not a transaction id" }
-        return call("/v1/transactions/status", buildJsonObject { put("transaction_id", JsonPrimitive(txid)) }.toString()).flag("known")
+        return call("/v1/transactions/status", buildJsonObject { put("transaction_id", JsonPrimitive(txid)) }.toString(), withinMs).flag("known")
     }
 
     companion object {
@@ -421,9 +467,14 @@ class ServerClient(
         const val MAX_TIME = 32_503_680_000L
         const val MAX_RESTARTS = 2
         const val MAX_WAIT_MS = 20_000L
+        /** The longest one question may take as a whole. An answer of the largest size still fits over a slow line. */
+        const val DEADLINE_MS = 90_000L
         const val MAX_ANSWER_BYTES = 8 * 1024 * 1024
         /** [NodeError.code] when the parts of one answer were read at different blocks. Asking again helps. */
         const val MOVED = -2
         private val LOCKS = ConcurrentHashMap<String, Any>()
+        /** Closes connections whose time is over. One thread for all clients, and it does not keep a program alive. */
+        private val WATCH = ScheduledThreadPoolExecutor(1) { work -> Thread(work, "server-deadline").apply { isDaemon = true } }
+            .apply { removeOnCancelPolicy = true }
     }
 }

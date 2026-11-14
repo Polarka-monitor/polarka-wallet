@@ -133,23 +133,26 @@ class ServerPayTest {
             assertEquals(rival.txid, b.direct.broadcast(rival.hex))
             b.node.mine(1, miner)
 
-            // the node says no before anything is handed over for sending: that is a refusal, with the node's reason
+            // the node says no before anything is handed over for sending: that is a refusal, with the node's reason.
+            // (The server has seen the transaction by then; what the model makes of that is shown in SixthLookTest.)
             b.relay.paths.clear()
             val refusal = assertFailsWith<EngineError> { b.engine.deliver(signed) }
             assertEquals(Problem.Kind.REJECTED to "missing-inputs", refusal.kind to refusal.detail)
             assertEquals(ask, b.relay.paths)
             assertTrue(b.node.mempool().isEmpty())
 
-            // a server that is too busy to be asked: thrown as what it is, and nothing was handed over either
+            // A server that is too busy to make the check. That decides nothing, and nothing is thrown: the server
+            // has been shown the transaction, so the hand-over is tried all the same, and what cannot be found out
+            // stays "not known" (the sixth look of the reviewer, H1).
             b.relay.paths.clear()
             b.relay.instead = { path, _ -> if (path == "/v1/transactions/validate") 503 to "{\"message\":\"index is not ready\"}" else null }
-            assertEquals(Problem.Kind.BUSY, assertFailsWith<EngineError> { b.engine.deliver(signed) }.kind)
-            assertEquals(ask, b.relay.paths)
+            assertFalse(b.engine.deliver(signed))
+            assertEquals(ask + hand + hand + hand, b.relay.paths)
 
-            // and a server that is not there
+            // and a server that is not there: not known either
             val nobody = ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { it.localPort }
-            val away = ServerEngine(Chain.REGTEST, emptyList(), ServerClient("http://127.0.0.1:$nobody", timeoutMs = 3000, maxWaitMs = 0))
-            assertEquals(Problem.Kind.UNREACHABLE, assertFailsWith<EngineError> { away.deliver(signed) }.kind)
+            val away = ServerEngine(Chain.REGTEST, emptyList(), ServerClient("http://127.0.0.1:$nobody", timeoutMs = 3000, maxWaitMs = 0), pause = {})
+            assertFalse(away.deliver(signed))
         }
     }
 
@@ -206,6 +209,42 @@ class ServerPayTest {
             assertTrue(b.engine.deliver(third))
             assertEquals(ask + hand, b.relay.paths)
             assertEquals(setOf(second.txid, third.txid), b.node.mempool().toSet())
+        }
+    }
+
+    /**
+     * The sixth look of the reviewer, L3. A server that answers very slowly cannot hold a hand-over. Every
+     * question of it has a time limit of its own, and what cannot be found out in that time is "not known".
+     */
+    @Test
+    fun aServerThatAnswersVerySlowlyDoesNotHoldTheHandOver() {
+        bench().use { b ->
+            val (wallet, words) = fresh()
+            val other = fresh().first
+            val miner = fresh().first.address(0, 0)
+            val info = WalletInfo(Chain.REGTEST, wallet.watchKey().xpub, lockOnOpen = false)
+            b.node.mine(1, wallet.address(0, 0))
+            b.node.mine(100, miner)
+            val signed = b.engine.sign(info.xpub, b.engine.plan(info, other.address(0, 0), 10 * coin, 2), words)
+            // every answer about a transaction comes three seconds late; the check is given 400 ms, and after it
+            // the forty seconds are over (the clock of this engine jumps), so every further question gets 400 ms too
+            b.relay.after = { path, _ -> if (path.startsWith("/v1/transactions/")) Thread.sleep(3000) }
+            var asked = 0
+            val hasty = ServerEngine(
+                Chain.REGTEST, emptyList(), ServerClient(b.relay.url, maxWaitMs = 0), pause = {},
+                clock = { if (asked++ == 0) 0L else 41_000_000_000L }, checkMillis = 400, leastMillis = 400,
+            )
+            b.relay.paths.clear()
+            val started = System.nanoTime()
+            assertFalse(hasty.deliver(signed))
+            val took = (System.nanoTime() - started) / 1_000_000
+            assertEquals(ask + hand, b.relay.paths)
+            assertTrue(took in 1100..2800, "the hand-over took $took ms")
+            // The server did pass the transaction on; the wallet could not hear it in time. That is why the outcome
+            // is "not known" and not "refused": a look settles it.
+            b.relay.after = { _, _ -> }
+            Thread.sleep(3300)
+            assertEquals(listOf(signed.txid), b.node.mempool())
         }
     }
 

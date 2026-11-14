@@ -24,9 +24,10 @@ The wallet has no server of its own. It asks elsewhere what your addresses hold,
 
 - **A public server** is the quickest way and is offered first. The one filled in is the server of the
   Northbound project (`https://api.northboundwallet.org`); it is not run by the authors of this app. The
-  server sees all the addresses of your wallet together and your internet address. It could show a false
-  balance, keep an incoming payment from you, or hold a payment back. It cannot take your coins: the words
-  and the keys never leave the phone. While the server is down the wallet shows nothing; the coins stay
+  server sees all the addresses of your wallet together, every address you watch or empty through the app,
+  and your internet address. It could show a false balance, keep an incoming payment from you, hold a
+  payment back, or call a payment done that is not. It cannot take your coins: the words and the keys never
+  leave the phone. While the server is down the wallet shows nothing; the coins stay
   yours and you connect elsewhere. The address of another server with the same interface can be typed in
   place of the one filled in.
 - **A node of your own** keeps your addresses to yourself. See the last chapter.
@@ -40,6 +41,14 @@ What is different through a server:
   always complete.
 - The mining page does not show the hash rate of the network, and a block reward is known as one only
   until it is spent.
+- A payment that the server refuses is not forgotten. The server has seen the whole payment by then and
+  could still send it, so the app keeps it on the Overview as one that did not go through and builds your
+  next payment on one of its coins.
+- An entry "Did not go through, could still arrive" goes when the server shows that payment in a block, or
+  a later payment of yours that was built on one of its coins. A server does not tell what else has spent a
+  coin. If the coin went another way (from another phone with the same words), or if the server leaves the
+  coin out, the entry stays and the app makes no payment until you forget the entry yourself. Before you do,
+  look at the wallet through another server or a node of your own.
 
 Run the self-test once (first screen, or More). It shows that the key code works on your phone.
 
@@ -79,10 +88,11 @@ again then: refresh after a minute, and the app shows whether the payment waits 
 through.
 
 A payment that did not go through stays on the Overview as "Did not go through, could still arrive": the node
-that the app asks does not hold it, but another node might. You can pay again at once. The app builds the new
-payment on a coin of the old one, so that only one of the two can ever arrive, and it removes the entry when
-a block has settled the matter. "Forget this payment" is for the rare case that the entry stays and you are
-sure the old payment can no longer arrive.
+or the server that the app asks does not hold it, but another node might. The same is done with a payment
+that a server or a public node refused, because they have seen it. You can pay again at once. The app builds
+the new payment on a coin of the old one, so that only one of the two can ever arrive, and it removes the
+entry when a block has settled the matter. "Forget this payment" is for the rare case that the entry stays
+and you are sure the old payment can no longer arrive.
 
 ## Bringing a wallet back
 
