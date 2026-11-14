@@ -1,0 +1,262 @@
+package org.polarka.wallet
+
+import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.pm.ApplicationInfo
+import android.hardware.biometrics.BiometricManager
+import android.hardware.biometrics.BiometricPrompt
+import android.os.Build
+import android.os.CancellationSignal
+import android.view.View
+import android.view.WindowManager
+import androidx.activity.compose.LocalActivity
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
+import kotlinx.coroutines.suspendCancellableCoroutine
+import javax.crypto.Cipher
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+
+/** The owner asked through the phone's own unlock dialog: a fingerprint, or the screen lock as a fallback. */
+class PhoneOwner(private val activity: Activity, private val title: String, private val subtitle: String) : Owner {
+    private val allowed = BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+
+    override suspend fun unlock(cipher: Cipher): Cipher = ask(BiometricPrompt.CryptoObject(cipher))?.cipher ?: cipher
+
+    override suspend fun present(): Boolean = try {
+        ask(null)
+        true
+    } catch (e: OwnerRefused) {
+        false
+    }
+
+    private suspend fun ask(crypto: BiometricPrompt.CryptoObject?): BiometricPrompt.CryptoObject? = suspendCancellableCoroutine { waiting ->
+        val cancel = CancellationSignal()
+        waiting.invokeOnCancellation { cancel.cancel() }
+        val prompt = BiometricPrompt.Builder(activity).setTitle(title).setSubtitle(subtitle).setAllowedAuthenticators(allowed).build()
+        val callback = object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                if (waiting.isActive) waiting.resume(result.cryptoObject)
+            }
+
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                if (waiting.isActive) waiting.resumeWithException(OwnerRefused(errString.toString()))
+            }
+        }
+        try {
+            if (crypto != null) prompt.authenticate(crypto, cancel, activity.mainExecutor, callback)
+            else prompt.authenticate(cancel, activity.mainExecutor, callback)
+        } catch (e: Exception) {
+            if (waiting.isActive) waiting.resumeWithException(OwnerRefused(e.javaClass.simpleName))
+        }
+    }
+}
+
+/** The version of the app as the phone knows it. */
+fun appVersion(context: Context): String =
+    runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "?"
+
+fun isDebugBuild(context: Context): Boolean = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+
+/** While this is on the screen, the screen cannot be captured and is hidden in the list of recent apps. */
+@Composable
+fun SecureWindow() {
+    val activity = LocalActivity.current
+    DisposableEffect(activity) {
+        activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        onDispose {
+            // a released build keeps the whole app secure (see MainActivity); a test build frees the other screens again
+            if (activity != null && isDebugBuild(activity)) activity.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
+}
+
+/**
+ * While this is on the screen, recovery words are shown or typed there. From Android 14 on, apps with
+ * accessibility rights that are not screen readers are then not given what the screen holds.
+ */
+@Composable
+fun WordsOnScreen() {
+    val view = LocalView.current
+    DisposableEffect(view) {
+        if (Build.VERSION.SDK_INT >= 34) view.setAccessibilityDataSensitive(View.ACCESSIBILITY_DATA_SENSITIVE_YES)
+        onDispose {
+            if (Build.VERSION.SDK_INT >= 34) view.setAccessibilityDataSensitive(View.ACCESSIBILITY_DATA_SENSITIVE_AUTO)
+        }
+    }
+}
+
+/** A box to tick with its text; a tap anywhere on the line counts. */
+@Composable
+fun Tick(checked: Boolean, onChange: (Boolean) -> Unit, text: String, tag: String? = null) {
+    Row(
+        (if (tag == null) Modifier else Modifier.testTag(tag)).fillMaxWidth().toggleable(value = checked, role = Role.Checkbox, onValueChange = onChange),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null)
+        Text(text, modifier = Modifier.padding(start = 12.dp, top = 10.dp, bottom = 10.dp))
+    }
+}
+
+fun copyToClipboard(context: Context, label: String, text: String) {
+    context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(label, text))
+}
+
+fun readClipboard(context: Context): String? =
+    context.getSystemService(ClipboardManager::class.java)?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
+
+@Composable
+fun Banner() {
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(R.string.banner_title, appVersion(LocalContext.current)), style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.banner_text), style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+fun NoticeCard(model: WalletModel, state: WalletState) {
+    val notice = state.notice ?: return
+    val text = when (notice) {
+        Notice.FILE_DELETED -> R.string.notice_file_deleted
+        Notice.FILE_NOT_DELETED -> R.string.notice_file_not_deleted
+        Notice.CLIPBOARD_CLEARED -> R.string.notice_clipboard_cleared
+        Notice.FILE_UNREADABLE -> R.string.notice_file_unreadable
+        Notice.CLIPBOARD_EMPTY -> R.string.notice_clipboard_empty
+        Notice.WALLET_READY -> R.string.notice_wallet_ready
+        Notice.WALLET_REMOVED -> R.string.notice_wallet_removed
+        Notice.SAVED -> R.string.notice_saved
+        Notice.PAYMENT_GONE -> R.string.notice_payment_gone
+        Notice.ADDRESS_LIMIT -> R.string.notice_address_limit
+        Notice.WORDS_REMOVED -> R.string.notice_words_removed
+    }
+    Card(Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (notice == Notice.PAYMENT_GONE) stringResource(text, state.noticeDetail) else stringResource(text),
+                modifier = Modifier.weight(1f).testTag("notice"), style = MaterialTheme.typography.bodyMedium,
+            )
+            TextButton(onClick = { model.note(null) }) { Text(stringResource(R.string.ok)) }
+        }
+    }
+}
+
+@Composable
+fun problemText(problem: Problem): String = when (problem.kind) {
+    Problem.Kind.UNREACHABLE -> stringResource(R.string.problem_unreachable)
+    Problem.Kind.TIMEOUT -> stringResource(R.string.problem_timeout)
+    Problem.Kind.BUSY -> stringResource(R.string.problem_busy)
+    Problem.Kind.LOGIN -> stringResource(R.string.problem_login)
+    Problem.Kind.NOT_ALLOWED -> stringResource(R.string.problem_not_allowed)
+    Problem.Kind.NODE -> stringResource(R.string.problem_node, problem.detail)
+    Problem.Kind.OTHER_CHAIN -> stringResource(R.string.problem_other_chain, problem.detail)
+    Problem.Kind.FOREIGN_OUTPUTS -> stringResource(R.string.problem_foreign)
+    Problem.Kind.STORE -> stringResource(R.string.problem_store, problem.detail)
+    Problem.Kind.UNEXPECTED -> stringResource(R.string.problem_unexpected, problem.detail)
+    Problem.Kind.BAD_ADDRESS -> stringResource(R.string.problem_bad_address)
+    Problem.Kind.BAD_AMOUNT -> stringResource(R.string.problem_bad_amount)
+    Problem.Kind.NOTHING_TO_SPEND -> stringResource(R.string.problem_nothing_to_spend)
+    Problem.Kind.NOT_ENOUGH -> stringResource(R.string.problem_not_enough, problem.detail)
+    Problem.Kind.FEE_RATE -> stringResource(R.string.problem_fee_rate)
+    Problem.Kind.TOO_MANY_INPUTS -> stringResource(R.string.problem_too_many_inputs)
+    Problem.Kind.WRONG_WORDS -> stringResource(R.string.problem_wrong_words)
+    Problem.Kind.BAD_WORDS -> stringResource(R.string.problem_bad_words)
+    Problem.Kind.REJECTED -> stringResource(R.string.problem_rejected, problem.detail)
+    Problem.Kind.UNLOCK -> stringResource(R.string.problem_unlock, problem.detail)
+    Problem.Kind.IN_WAITING_PAYMENT -> stringResource(R.string.problem_in_waiting)
+    Problem.Kind.UNSURE -> stringResource(R.string.problem_unsure, problem.detail)
+    Problem.Kind.KEY_GONE -> stringResource(R.string.problem_key_gone)
+    Problem.Kind.WORDS_EXIST -> stringResource(R.string.problem_words_exist)
+    Problem.Kind.WALLET_FILE -> stringResource(R.string.problem_wallet_file, problem.detail)
+    Problem.Kind.BAD_PRICE -> stringResource(R.string.problem_bad_price)
+}
+
+@Composable
+fun ProblemCard(problem: Problem?, tag: String = "problem") {
+    if (problem == null) return
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+        Text(problemText(problem), Modifier.padding(16.dp).testTag(tag), color = MaterialTheme.colorScheme.onErrorContainer)
+    }
+}
+
+@Composable
+fun Warning(text: String) {
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+        Text(text, Modifier.padding(16.dp).testTag("warning"), color = MaterialTheme.colorScheme.onErrorContainer)
+    }
+}
+
+@Composable
+fun Block(title: String, content: @Composable () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            content()
+        }
+    }
+}
+
+@Composable
+fun Field(label: String, value: String, tag: String? = null) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(end = 12.dp))
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontFamily = FontFamily.Monospace, modifier = if (tag == null) Modifier else Modifier.testTag(tag))
+    }
+}
+
+@Composable
+fun Mono(text: String, tag: String? = null) {
+    Text(text, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall, modifier = if (tag == null) Modifier else Modifier.testTag(tag))
+}
+
+/** A QR code drawn as black squares on white, with the quiet border the standard asks for. */
+@Composable
+fun QrCode(text: String, modifier: Modifier = Modifier) {
+    val matrix = remember(text) {
+        QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, 0, 0, mapOf(EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M, EncodeHintType.MARGIN to 4))
+    }
+    Box(modifier.aspectRatio(1f).background(Color.White)) {
+        Canvas(Modifier.fillMaxWidth().aspectRatio(1f)) {
+            val cell = size.width / matrix.width
+            for (y in 0 until matrix.height) for (x in 0 until matrix.width) {
+                if (matrix.get(x, y)) drawRect(Color.Black, Offset(x * cell, y * cell), Size(cell + 0.5f, cell + 0.5f))
+            }
+        }
+    }
+}

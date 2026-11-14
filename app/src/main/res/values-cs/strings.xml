@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="banner_title">Zkušební verze 0.4</string>
+    <string name="banner_title">Zkušební verze %1$s</string>
     <string name="banner_text">Peněženka prošla dvojí kontrolou, zatím ne kontrolou nezávislého lidského odborníka. Používejte ji jen s malými částkami.</string>
 
     <string name="refresh">Obnovit</string>
@@ -86,7 +86,7 @@
     <string name="problem_store">Něco uloženého v tomto telefonu nelze přečíst nebo zapsat (%1$s). Pokud chybí nastavení uzlu, načtěte ho znovu.</string>
     <string name="problem_unexpected">Stalo se něco nečekaného (%1$s).</string>
 
-    <string name="unlock_title">North Wallet</string>
+    <string name="unlock_title">Polarka Wallet</string>
     <string name="unlock_subtitle">Potvrďte, že jste to vy</string>
     <string name="tab_overview">Přehled</string>
     <string name="tab_receive">Přijmout</string>
@@ -240,4 +240,7 @@
     <string name="partial_note">Do jedné transakce se vejde nejvýš %1$s mincí a tato je plná. Zbývá mincí pro další krok: %2$d.</string>
     <string name="paper_warning_part">Do jedné transakce se vejde nejvýš %1$s mincí a tato je plná. Na papírové adrese zbývá mincí: %2$d. Další část se nabídne hned po této.</string>
     <string name="paper_warning_rest">%1$s NORTH v odměnách za bloky ještě nedozrálo a zůstává na papírové adrese. Papír si nechte. Adresu vyprázdněte ještě jednou, až dozraje poslední odměna. Zbývá bloků: asi %2$d.</string>
+    <string name="about_title">O aplikaci</string>
+    <string name="about_text">Polarka Wallet %1$s pro TrueNorth (NORTH). Svobodný software pod licencí MIT, bez záruky. Nezávislý komunitní projekt, ne produkt vývojářů TrueNorth.</string>
+    <string name="about_libraries">Využívá libsecp256k1 (MIT), bitcoin-kmp a secp256k1-kmp od ACINQ, Kotlin a kotlinx od JetBrains, AndroidX s Jetpack Compose a CameraX a ZXing (vše pod licencí Apache 2.0).</string>
 </resources>

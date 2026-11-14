@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">North Wallet</string>
+    <string name="app_name" translatable="false">Polarka Wallet</string>
 
-    <string name="banner_title">Test build 0.4</string>
+    <string name="banner_title">Test build %1$s</string>
     <string name="banner_text">This wallet has been checked twice, but not yet by an independent human expert. Use it with small amounts only.</string>
 
     <string name="refresh">Refresh</string>
@@ -86,7 +86,7 @@
     <string name="problem_store">Something stored in this phone cannot be read or written (%1$s). If the node setup is missing, import it again.</string>
     <string name="problem_unexpected">Something unexpected happened (%1$s).</string>
 
-    <string name="unlock_title">North Wallet</string>
+    <string name="unlock_title">Polarka Wallet</string>
     <string name="unlock_subtitle">Confirm that it is you</string>
     <string name="tab_overview">Overview</string>
     <string name="tab_receive">Receive</string>
@@ -240,4 +240,7 @@
     <string name="partial_note">One transaction takes at most %1$s coins, and this one is full. Coins left for the next step: %2$d.</string>
     <string name="paper_warning_part">One transaction takes at most %1$s coins, and this one is full. Coins left on the paper address: %2$d. The next part is offered right after this one.</string>
     <string name="paper_warning_rest">%1$s NORTH in block rewards are not ripe yet and stay on the paper address. Keep the paper. Empty the address once more when the last reward has ripened. Blocks until then: about %2$d.</string>
+    <string name="about_title">About</string>
+    <string name="about_text">Polarka Wallet %1$s for TrueNorth (NORTH). Free software under the MIT licence, with no warranty. An independent community project, not a product of the TrueNorth developers.</string>
+    <string name="about_libraries">Built with libsecp256k1 (MIT), bitcoin-kmp and secp256k1-kmp by ACINQ, Kotlin and kotlinx by JetBrains, AndroidX with Jetpack Compose and CameraX, and ZXing (all under the Apache licence 2.0).</string>
 </resources>

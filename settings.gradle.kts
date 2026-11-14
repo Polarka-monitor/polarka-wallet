@@ -12,7 +12,7 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "north-wallet"
+rootProject.name = "polarka-wallet"
 include(":core")
 include(":node")
 include(":app")

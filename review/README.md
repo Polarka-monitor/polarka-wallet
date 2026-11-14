@@ -1,8 +1,8 @@
-# Review of North Wallet
+# Review of Polarka Wallet
 
-This folder holds what is needed to repeat the checks made on a release, and the results of the last run
-(`evidence-0.3.1/`). It is the author's own review: the same hand wrote the code and the checks.
-It does not replace a review by somebody who did not write the code.
+This folder holds what is needed to repeat the checks made on a release, the results of the author's own review
+of 0.3.1 (`evidence-0.3.1/`, made when the app was still called North Wallet), and the report of the independent
+review of the same version (`independent-review-0.3.1/`). Neither replaces a review by an independent human expert.
 
 ## How to repeat the checks
 
@@ -12,7 +12,9 @@ build tools 36.0.0) on the path. `TN_BIN` must point to a folder with the offici
 
 | Check | Command | Passes when |
 |---|---|---|
-| All tests (40) | `gradle :core:test :node:test :app:testDebugUnitTest` | exit 0 |
+| All tests (80) | `gradle :core:test :node:test :app:testDebugUnitTest`, then `sh review/tests-summary.sh` | exit 0; 80 tests, 0 failures, 0 skipped |
+| The findings of the independent review stay fixed | the `Audit*Test` classes in the three modules | all pass |
+| A public node never gets the account key | app test `PublicNodeTest` (needs python3 and `gateway.py` of polarka-node) | prints `PUBLIC NODE OK: ...` |
 | Nothing secret leaves the phone | app test `ReviewTest.nothingSecretLeavesThePhone` | prints `REVIEW OK: ... no word, seed, extended private key or private key in any of them` |
 | A lying node cannot make the wallet lose coins | app test `ReviewTest.aLyingNodeCannotMakeTheWalletLoseCoins` | prints `REVIEW OK: foreign coin refused, ...` |
 | Coin selection and fee | core test `PlannerPropertyTest` (20,000 random wallets) | prints `PLANNER OK` |

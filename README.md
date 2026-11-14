@@ -1,65 +1,94 @@
-# north-wallet (work in progress, nothing here is released)
+# Polarka Wallet
 
-A TrueNorth (NORTH) wallet for Android, built in stages. What exists on 13 November 2026:
+A wallet for TrueNorth (NORTH) on Android. It keeps its keys in the phone, signs there, and asks a TrueNorth
+Core node what the addresses hold. There is no server of the wallet's own, no account and no analytics.
 
-| Module | What it is | State |
-|---|---|---|
-| `core` | keys, addresses and transactions (no Android code, no network code) | tested against the published vectors and a regtest node |
-| `node` | a small JSON-RPC client for a TrueNorth Core node of one's own | tested against a regtest node set up like the real one |
-| `app`  | **North Watch 0.1**: a watch-only Android app | builds; screens tested on the desktop; **not yet run on a phone** |
+**State: test build 0.4.0, not released.** The wallet has been checked twice: by its author and by an
+independent reviewer that had not seen the code being written (`review/independent-review-0.3.1`). Both were
+AI-assisted; a review by an independent human expert is still recommended. Until then it is for small amounts.
+It is an independent community project and not a product of the TrueNorth developers.
 
-## North Watch 0.1 (watch only)
+## What it does
 
-It shows what the watched addresses hold, as the user's own node sees it: total, what can be spent, block
-rewards that are still maturing, and every unspent output. It has no keys and cannot send coins.
+- Makes a wallet from 24 recovery words (BIP39), or brings one back from its words. However long the wallet
+  was in use, its coins are found again: used keys are searched until twenty unused ones follow.
+- Receives to P2QRH addresses (`north1z...`), a fresh one whenever the last one has been used; shows a QR code.
+- Sends: the payment is worked out, shown, and signed only after the owner's fingerprint or screen lock.
+  The fee is exact before signing. Addresses can be pasted or read from a QR code.
+- Shows the history, block rewards that are still maturing, and payments that wait for a block.
+- Watches addresses without their keys (for example a paper address that is being mined to).
+- Empties a paper address whose words are typed in for that one use.
+- A mining page (network hash rate, own share, expected blocks) and optional notifications about a new
+  reward or payment.
+- A self-test that checks the key code and the native library on the phone against published vectors.
 
-- It talks to one node only, over https, with a node account that may read the chain and pass on finished
-  transactions and nothing else (`rpcauth` plus `rpcwhitelist`; see `node/src/test` for the exact list).
-- The setup (node address, user, password, addresses) comes as one small JSON file, `north-watch-setup/1`.
-  The password is never shown on the screen. It is stored encrypted with a key from the Android Keystore,
-  in the app's private storage, and the app is excluded from backups.
-- The node is trusted for what exists, not for what is ours: an answer with an output that does not pay to
-  a watched address is refused as a whole, and so is a node that works on another network.
-- One permission: INTERNET. No analytics, no other server, no code downloaded at run time.
-- A self-test button derives the address of the public BIP39 test phrase and compares it with the published
-  one. It shows whether the key code and the native libsecp256k1 work on that phone. It uses no key of the user.
+## The node
 
-What it is not: reviewed, signed with a release key, or minified. The file `app-debug.apk` is a debug build
-(larger, slower, and readable by anyone who can attach a debugger to the unlocked phone). That is acceptable
-for a password that can only read; it would not be for keys that can spend.
+The wallet talks to one node, over https only.
+
+- **A public node.** Nothing to set up: the address of the node is enough. The wallet names its addresses to
+  the node one by one and never sends the key that shows the whole wallet. A public node sees those addresses
+  and the phone's internet address, and it could show a false balance or hold a payment back. It cannot take
+  coins: a transaction built on false figures is not valid, and keys never leave the phone. The gateway that
+  makes a node public is in the `polarka-node` repository.
+- **A node of one's own.** The node gets a user that may only read the chain and pass on finished transactions
+  (`rpcauth` with `rpcwhitelist`; the list is in `node/src/test`). The setup comes as a small JSON file
+  (`north-watch-setup/1` or `polarka-setup/2`). The password is never shown, is stored encrypted, and the
+  file can be deleted after import. Nobody else learns the addresses.
+
+What the node says is trusted for what exists, never for what is ours: an answer with an output that does not
+pay to the wallet's own scripts is refused as a whole, and so are amounts that cannot exist, malformed ids,
+a node on another network, and answers that are too long.
+
+## Keys and what is stored
+
+- The recovery words are sealed with a key that lives in the Android Keystore (the phone's security chip
+  where there is one) and is released only after the owner unlocks it, once per use. The app cannot read the
+  words on its own. They are never shown again after the wallet is made, never logged, never sent.
+- The node setup and the wallet's public information are sealed with a second Keystore key. The app is excluded
+  from backups; nothing travels to a cloud or to another phone.
+- Screens cannot be captured; no other app may draw over the wallet; from Android 14 on, the screens with words
+  are hidden from accessibility services that are not screen readers.
+- Permissions: INTERNET, USE_BIOMETRIC, CAMERA (asked when a code is scanned), POST_NOTIFICATIONS (asked when
+  switched on), RECEIVE_BOOT_COMPLETED and ACCESS_NETWORK_STATE (for the periodic look at the node),
+  HIDE_OVERLAY_WINDOWS. No storage, contacts, location or microphone.
+
+## Limits
+
+- A payment that has not reached a block yet is not shown to its receiver; it appears with the first block.
+- One account, P2QRH addresses only, no fee estimate from the node (three fixed fee rates).
+- The price of a coin is typed in by hand; nothing is looked up.
+- Tried on one real phone (Android 16) and on emulators with Android 12, 14 and 16.
 
 ## Code
 
-- `core/src/main/kotlin/north/core/`: `Chain.kt` (network parameters, v30.5.4), `Qrh.kt` (P2QRH commitment,
-  script, address; strict decoding of addresses), `Account.kt` (BIP39 words to the keys of m/88h/COINh/0h),
-  `Spend.kt` (builds and signs a transaction; exact size before signing).
-- `node/src/main/kotlin/north/node/NodeClient.kt`: balance by `scantxoutset`, `testmempoolaccept`,
-  `sendrawtransaction`, confirmations. https, or plain http only to a private or Tailscale address.
-- `app/src/main/kotlin/io/github/severka_monitor/northwatch/`: `Setup.kt` (the setup file, every field
-  checked), `Store.kt` (the sealed file and the Keystore key), `WatchModel.kt` (state and the checks on the
-  node's answer), `MainActivity.kt` (the screens), `Format.kt` (amounts as text).
+| Module | What it is |
+|---|---|
+| `core` | keys, addresses, coin selection and signing; no Android code and no network code |
+| `node` | a small JSON-RPC client for TrueNorth Core, with limits on everything a node may send |
+| `app` | the Android app: `Setup.kt`, `Store.kt`, `Engine.kt`, `WalletModel.kt`, the screens |
 
-The elliptic-curve code is libsecp256k1 (fr.acinq.secp256k1:secp256k1-kmp 0.24.0, JNI). BIP32, BIP39, bech32,
-transaction serialization and the BIP-341 signature hash come from fr.acinq.bitcoin:bitcoin-kmp 0.32.0. The
-screens use Jetpack Compose (BOM 2026.06.01, the last one made for Android Gradle plugin 8.x and API 36).
+The elliptic-curve code is libsecp256k1 (`fr.acinq.secp256k1:secp256k1-kmp` 0.24.0, JNI). BIP32, BIP39, bech32,
+transaction serialization and the BIP-341 signature hash come from `fr.acinq.bitcoin:bitcoin-kmp` 0.32.0. The
+screens use Jetpack Compose; QR codes are read and drawn with zxing. `THIRD-PARTY.md` lists the libraries and
+their licences.
 
-## Tests
+## Building and testing
 
-`TN_BIN=/path/to/official/bin gradle :core:test :node:test :app:testDebugUnitTest :app:lintDebug`
+JDK 21, Gradle 8.14.3 and the Android SDK (platform 36). `TN_BIN` names a folder with the official `truenorthd`
+and `truenorth-cli` of TrueNorth Core v30.5.4; the tests start their own regtest node from it and never touch
+a real network.
 
-- `core` `VectorsTest`: byte for byte against `p2qrh-test-vectors.json` of the cold address repository.
-- `core` `RegtestAcceptanceTest`: a transaction built here is accepted, mined and found on a regtest chain.
-- `node` `NodeClientTest`: balance, test, send and confirmations through a restricted user; other calls refused.
-- `app` `SetupTest`, `StoreTest`, `FormatTest`: the setup file (https only, every address checked against the
-  network), the sealed file (a changed byte or another key is refused), amounts.
-- `app` `ScreenTest`: the real activity run on the desktop by Robolectric: setup from the clipboard (the
-  password is not on the screen, the clipboard is emptied), an unreachable node, removing the setup, the
-  self-test, and the balance of a real regtest node with a refresh, a wrong network and a wrong password.
+    TN_BIN=/path/to/bin gradle :core:test :node:test :app:testDebugUnitTest :app:lintDebug
+    sh review/tests-summary.sh
 
-Not covered by any test here, because it needs a phone: how the screens look, the Android Keystore, the file
-picker, deleting the setup file after import, the native library for phones, TLS to a real node.
+80 tests; none may be skipped. Every library is pinned by its SHA-256 in `gradle/verification-metadata.xml`:
+the build stops if one differs from the day it was first downloaded. The pins were made by Gradle on that day
+(trust on first download); signatures of the libraries are not verified.
 
-## Not done yet
+A release is signed with a key that lives outside this repository and is opened only when a release is built.
+`review/README.md` describes the checks made before a release and how to repeat them.
 
-Making new words on the device, coin selection and fees, sending, legacy base58 recipients, a release build
-with its own signing key, dependency verification, and the two reviews that every release will go through.
+## Licence
+
+MIT, see `LICENSE`. There is no warranty: see the licence, and the state described at the top.
