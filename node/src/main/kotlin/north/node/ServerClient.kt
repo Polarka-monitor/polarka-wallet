@@ -101,8 +101,9 @@ class ServerClient(
 
     private fun once(path: String, body: String?): Answer {
         var asked = false
+        var c: HttpURLConnection? = null
         try {
-            val c = URI(base + path).toURL().openConnection() as HttpURLConnection
+            c = URI(base + path).toURL().openConnection() as HttpURLConnection
             c.requestMethod = if (body == null) "GET" else "POST"
             c.connectTimeout = timeoutMs
             c.readTimeout = timeoutMs
@@ -119,14 +120,18 @@ class ServerClient(
             val status = c.responseCode
             val text = read(if (status in 200..299) c.inputStream else c.errorStream)
             val retry = c.getHeaderField("Retry-After")?.trim()?.toIntOrNull()
-            c.disconnect()
+            // The answer was read to its end, so the connection is left open for the next question. A look asks
+            // several, and with a server far away a new connection costs twice what a question costs.
             return Answer(status, text, retry)
         } catch (e: TooLong) {
+            c?.disconnect()
             throw NodeError(200, null, "the server sent an answer that is too long")
         } catch (e: SocketTimeoutException) {
+            c?.disconnect()
             if (asked) throw NodeError(0, NodeError.TIMEOUT, "the server did not answer in time")
             throw NodeError(0, null, "the server cannot be reached (${e.javaClass.simpleName})")
         } catch (e: java.io.IOException) {
+            c?.disconnect()
             throw NodeError(0, null, "the server cannot be reached (${e.javaClass.simpleName})")
         }
     }

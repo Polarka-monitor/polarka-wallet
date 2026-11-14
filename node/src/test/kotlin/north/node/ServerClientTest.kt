@@ -27,8 +27,12 @@ class ServerClientTest {
 
     private class Asked(val method: String, val path: String, val body: String)
 
-    private class Fake(private val answer: (count: Int, asked: Asked) -> Reply) : AutoCloseable {
+    /** What a server does with the connection behind an answer: says that it closes it, keeps it open, or drops it without a word. */
+    private enum class Line { SAYS_CLOSE, KEPT, DROPPED }
+
+    private class Fake(private val line: Line = Line.SAYS_CLOSE, private val answer: (count: Int, asked: Asked) -> Reply) : AutoCloseable {
         val seen = ArrayList<Asked>()
+        val connections = java.util.concurrent.atomic.AtomicInteger()
         private val server = ServerSocket(0, 50, InetAddress.getLoopbackAddress())
         val url: String get() = "http://127.0.0.1:${server.localPort}"
 
@@ -36,6 +40,7 @@ class ServerClientTest {
             thread(isDaemon = true) {
                 while (!server.isClosed) {
                     val socket = try { server.accept() } catch (e: Exception) { break }
+                    connections.incrementAndGet()
                     thread(isDaemon = true) { runCatching { handle(socket) } }
                 }
             }
@@ -43,31 +48,37 @@ class ServerClientTest {
 
         private fun handle(socket: Socket) = socket.use { s ->
             val input = BufferedInputStream(s.getInputStream())
-            val head = StringBuilder()
-            while (!head.endsWith("\r\n\r\n")) {
-                val b = input.read()
-                if (b < 0) return@use
-                head.append(b.toChar())
-            }
-            val first = head.lines().first().split(' ')
-            val headers = head.lines().drop(1).filter { ':' in it }.associate { it.substringBefore(':').trim().lowercase() to it.substringAfter(':').trim() }
-            val raw = ByteArray(headers["content-length"]?.toInt() ?: 0)
-            var n = 0
-            while (n < raw.size) {
-                val got = input.read(raw, n, raw.size - n)
-                if (got < 0) break
-                n += got
-            }
-            val asked = Asked(first[0], first[1], raw.decodeToString())
-            val count = synchronized(seen) { seen.add(asked); seen.size }
-            val reply = answer(count, asked)
-            val out = reply.body.encodeToByteArray()
-            s.getOutputStream().apply {
-                write(("HTTP/1.1 ${reply.status} x\r\nContent-Type: application/json\r\nContent-Length: ${out.size}\r\nConnection: close\r\n" +
-                    reply.headers.entries.joinToString("") { "${it.key}: ${it.value}\r\n" } + "\r\n").encodeToByteArray())
-                write(out)
-                flush()
-            }
+            var open: Boolean
+            do {
+                val head = StringBuilder()
+                while (!head.endsWith("\r\n\r\n")) {
+                    val b = input.read()
+                    if (b < 0) return@use
+                    head.append(b.toChar())
+                }
+                val first = head.lines().first().split(' ')
+                val headers = head.lines().drop(1).filter { ':' in it }.associate { it.substringBefore(':').trim().lowercase() to it.substringAfter(':').trim() }
+                val raw = ByteArray(headers["content-length"]?.toInt() ?: 0)
+                var n = 0
+                while (n < raw.size) {
+                    val got = input.read(raw, n, raw.size - n)
+                    if (got < 0) break
+                    n += got
+                }
+                val asked = Asked(first[0], first[1], raw.decodeToString())
+                val count = synchronized(seen) { seen.add(asked); seen.size }
+                val reply = answer(count, asked)
+                val out = reply.body.encodeToByteArray()
+                // a client that asks for the connection to be closed gets that, as from a real server
+                open = line == Line.KEPT && headers["connection"]?.lowercase() != "close"
+                s.getOutputStream().apply {
+                    write(("HTTP/1.1 ${reply.status} x\r\nContent-Type: application/json\r\nContent-Length: ${out.size}\r\n" +
+                        (if (line == Line.SAYS_CLOSE || (line == Line.KEPT && !open)) "Connection: close\r\n" else "") +
+                        reply.headers.entries.joinToString("") { "${it.key}: ${it.value}\r\n" } + "\r\n").encodeToByteArray())
+                    write(out)
+                    flush()
+                }
+            } while (open)
         }
 
         override fun close() = server.close()
@@ -332,5 +343,32 @@ class ServerClientTest {
         // nothing listens: the server cannot be reached, which is not an answer
         val nobody = ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { it.localPort }
         assertEquals(0, refused { ServerClient("http://127.0.0.1:$nobody", timeoutMs = 3000).tipHeight() }.httpStatus)
+    }
+
+    @Test
+    fun theConnectionIsLeftOpenForTheNextQuestion() {
+        val answers = { _: Int, asked: Asked -> if (asked.method == "POST") Reply(200, "{\"known\":true}") else Reply(200, "{\"height\":7}") }
+        Fake(Line.KEPT, answers).use { fake ->
+            val client = ServerClient(fake.url)
+            assertEquals(7, client.tipHeight())
+            assertTrue(client.known(txid(5)))
+            assertEquals(7, client.tipHeight())
+            assertEquals(3 to 1, fake.seen.size to fake.connections.get())
+        }
+        // a server that drops the connection behind every answer without saying so is asked again on a new one, each question once
+        Fake(Line.DROPPED, answers).use { fake ->
+            val client = ServerClient(fake.url)
+            assertEquals(7, client.tipHeight())
+            assertTrue(client.known(txid(5)))
+            assertEquals(7, client.tipHeight())
+            assertEquals(listOf("GET", "POST", "GET"), fake.seen.map { it.method })
+        }
+        // an answer that is given up half read ends the connection: the next question goes out on a new one and gets its own answer
+        Fake(Line.KEPT) { count, _ -> if (count == 1) Reply(200, "x".repeat(2 * ServerClient.MAX_ANSWER_BYTES)) else Reply(200, "{\"height\":7}") }.use { fake ->
+            val client = ServerClient(fake.url)
+            refused { client.tipHeight() }
+            assertEquals(7, client.tipHeight())
+            assertEquals(2 to 2, fake.seen.size to fake.connections.get())
+        }
     }
 }
