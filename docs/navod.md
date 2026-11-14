@@ -53,6 +53,12 @@ Dokud nepřijde blok, je platba v Přehledu uvedena jako čekající a její min
 nepotvrdí, že platbu převzal, aplikace řekne, že výsledek není znám. Neplaťte pak znovu: za minutu obnovte
 přehled a aplikace ukáže, zda platba čeká na blok, nebo neproběhla.
 
+Platba, která neproběhla, zůstane v Přehledu jako "Neproběhla, ještě může dorazit": uzel, kterého se aplikace
+ptá, ji nedrží, ale jiný uzel ji držet může. Zaplatit znovu můžete hned. Aplikace postaví novou platbu na
+minci té staré, takže dorazit může vždy jen jedna z nich, a záznam odstraní, jakmile o věci rozhodne blok.
+"Zapomenout tuto platbu" je pro vzácný případ, kdy záznam zůstává a vy máte jistotu, že stará platba už
+dorazit nemůže.
+
 ## Obnova peněženky
 
 Více, "Obnova peněženky": napište 12 nebo 24 slov oddělených mezerami. Mince se najdou v řetězci, ať byla

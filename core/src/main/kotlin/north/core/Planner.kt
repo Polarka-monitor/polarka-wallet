@@ -77,17 +77,33 @@ object Planner {
         if (feeRate < MIN_FEE_RATE || feeRate > MAX_FEE_RATE) throw PlanError(PlanError.Reason.FEE_RATE)
     }
 
-    private fun ordered(coins: List<Unspent>): List<Unspent> =
-        coins.distinctBy { it.txid + ":" + it.vout }.sortedWith(compareByDescending<Unspent> { it.amountSat }.thenBy { it.txid }.thenBy { it.vout })
+    private fun key(coin: Unspent): String = coin.txid + ":" + coin.vout
 
-    /** Pays [amountSat] to the script [to]; the rest returns to the script [change]. */
-    fun pay(spendable: List<Unspent>, to: ByteArray, amountSat: Long, feeRate: Long, change: ByteArray): Plan {
+    private fun ordered(coins: List<Unspent>): List<Unspent> =
+        coins.distinctBy { key(it) }.sortedWith(compareByDescending<Unspent> { it.amountSat }.thenBy { it.txid }.thenBy { it.vout })
+
+    /** The coins in the order they are taken: first the ones that must be spent in any case, then the others, the largest first. */
+    private fun arranged(spendable: List<Unspent>, must: List<Unspent>): List<Unspent> {
+        val first = must.distinctBy { key(it) }
+        if (first.size > MAX_INPUTS) throw PlanError(PlanError.Reason.TOO_MANY_INPUTS, first.sumOf { it.amountSat })
+        val keys = first.map { key(it) }.toSet()
+        return first + ordered(spendable.filter { key(it) !in keys })
+    }
+
+    /**
+     * Pays [amountSat] to the script [to]; the rest returns to the script [change].
+     *
+     * The coins in [must] are spent in any case, however small the amount. That is how a payment is made to
+     * stand against an earlier one that spends the same coin: only one of the two can ever be in a block.
+     */
+    fun pay(spendable: List<Unspent>, to: ByteArray, amountSat: Long, feeRate: Long, change: ByteArray, must: List<Unspent> = emptyList()): Plan {
         checkRate(feeRate)
         if (amountSat < MIN_OUTPUT_SAT) throw PlanError(PlanError.Reason.AMOUNT_TOO_SMALL)
-        val coins = ordered(spendable)
+        val coins = arranged(spendable, must)
         if (coins.isEmpty()) throw PlanError(PlanError.Reason.NOTHING_TO_SPEND)
-        var sum = 0L
-        for (n in 1..minOf(coins.size, MAX_INPUTS)) {
+        val least = maxOf(1, must.distinctBy { key(it) }.size)
+        var sum = coins.take(least - 1).sumOf { it.amountSat }
+        for (n in least..minOf(coins.size, MAX_INPUTS)) {
             sum += coins[n - 1].amountSat
             val sizeWithChange = Spend.vsize(n, listOf(to, change))
             val left = sum - amountSat - sizeWithChange * feeRate
@@ -124,11 +140,12 @@ object Planner {
     /**
      * Sends everything in [spendable] to the script [to], less the fee. Used to empty a wallet or a paper address.
      * One transaction takes at most [MAX_INPUTS] coins; if there are more, the largest ones go now and the
-     * caller repeats with what is left (compare the plan's inputs with what was offered).
+     * caller repeats with what is left (compare the plan's inputs with what was offered). The coins in [must]
+     * are always among those that go now.
      */
-    fun sweep(spendable: List<Unspent>, to: ByteArray, feeRate: Long): Plan {
+    fun sweep(spendable: List<Unspent>, to: ByteArray, feeRate: Long, must: List<Unspent> = emptyList()): Plan {
         checkRate(feeRate)
-        val every = ordered(spendable)
+        val every = arranged(spendable, must)
         val coins = every.take(MAX_INPUTS)
         if (coins.isEmpty()) throw PlanError(PlanError.Reason.NOTHING_TO_SPEND)
         val size = Spend.vsize(coins.size, listOf(to))

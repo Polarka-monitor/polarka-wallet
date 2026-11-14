@@ -57,6 +57,12 @@ If the node does not confirm that it took the payment, the app says that the out
 again then: refresh after a minute, and the app shows whether the payment waits for a block or did not go
 through.
 
+A payment that did not go through stays on the Overview as "Did not go through, could still arrive": the node
+that the app asks does not hold it, but another node might. You can pay again at once. The app builds the new
+payment on a coin of the old one, so that only one of the two can ever arrive, and it removes the entry when
+a block has settled the matter. "Forget this payment" is for the rare case that the entry stays and you are
+sure the old payment can no longer arrive.
+
 ## Bringing a wallet back
 
 More, "Bring back a wallet": type the 12 or 24 words, separated by spaces. The coins are found from the chain,

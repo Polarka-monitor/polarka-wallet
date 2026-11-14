@@ -129,6 +129,15 @@ class SealedFileStore(file: File, keys: KeyHolder) : SetupStore {
 data class Pending(val txid: String, val sentSat: Long, val feeSat: Long, val inputs: Set<String>, val unsure: Boolean = false, val atMillis: Long = 0)
 
 /**
+ * A payment that left this phone, that the node then stopped holding (or never took) and that is in no
+ * block: as far as this node shows, it did not go through. Its transaction stays valid for as long as its
+ * coins are unspent, so somebody who still has it could bring it into a block later. It is therefore kept
+ * here, and the next payment of the wallet spends one of its coins ([inputs], "txid:n"): then only one of
+ * the two can ever be in a block. It leaves this list when a block spends one of its coins.
+ */
+data class Dropped(val txid: String, val sentSat: Long, val feeSat: Long, val inputs: Set<String>, val atMillis: Long = 0)
+
+/**
  * What the app keeps about its own wallet without any secret: enough to show it, not enough to spend.
  * The account key shows every address of the wallet, so it is stored sealed like the node password.
  */
@@ -138,8 +147,16 @@ data class WalletInfo(
     val pending: List<Pending> = emptyList(),
     /** How many keys of each branch the owner has allowed the app to look at, beyond what it looks at by itself. 0: nothing said. */
     val lookTo: Int = 0,
+    /** Payments that did not go through as far as the node showed, and that could still arrive. */
+    val dropped: List<Dropped> = emptyList(),
 ) {
     fun watchKey(): WatchKey = WatchKey.parse(xpub, chain)
+
+    /**
+     * The payments that did not go through and that no waiting payment stands against yet (none of the
+     * waiting ones spends a coin of theirs). A payment made now has to spend a coin of each of them.
+     */
+    val unanswered: List<Dropped> get() = dropped.filter { d -> pending.none { p -> p.inputs.any { it in d.inputs } } }
 
     /**
      * How many keys of each branch the wallet wants the node to be asked about: everything used so far and
@@ -170,12 +187,25 @@ data class WalletInfo(
                 })
             }
         })
+        put("dropped", buildJsonArray {
+            dropped.forEach { d ->
+                add(buildJsonObject {
+                    put("txid", JsonPrimitive(d.txid))
+                    put("sent", JsonPrimitive(d.sentSat))
+                    put("fee", JsonPrimitive(d.feeSat))
+                    put("inputs", buildJsonArray { d.inputs.forEach { add(JsonPrimitive(it)) } })
+                    put("at", JsonPrimitive(d.atMillis))
+                })
+            }
+        })
     }.toString()
 
     companion object {
         const val FORMAT = "north-wallet-info/1"
         const val GAP = 20
         const val MAX_PENDING = 200
+        /** The most payments that did not go through which are remembered. When the list is full, no further one is called gone. */
+        const val MAX_DROPPED = 50
         /** The most keys of one branch that are ever looked at. */
         const val MAX_LOOK = 5000
 
@@ -192,7 +222,7 @@ data class WalletInfo(
             require(info.receiveIndex in 0..100_000 && info.changeIndex in 0..100_000) { "a key number is out of bounds" }
             require(info.lookTo in 0..MAX_LOOK) { "the number of keys to look at is out of bounds" }
             info.watchKey()                                 // refuses a key of another network or a damaged one
-            val waiting = (o["pending"] as? JsonArray).orEmpty().map { it as JsonObject }.map { w ->
+            fun payments(list: String): List<Pending> = (o[list] as? JsonArray).orEmpty().map { it as JsonObject }.map { w ->
                 fun text(name: String) = (w[name] as JsonPrimitive).content
                 val inputs = (w["inputs"] as JsonArray).map { (it as JsonPrimitive).content }.toSet()
                 val p = Pending(
@@ -203,8 +233,12 @@ data class WalletInfo(
                 require(inputs.isNotEmpty() && inputs.all { NodeClient.isId(it.substringBefore(':')) && it.substringAfter(':', "").toLongOrNull() in 0..NodeClient.MAX_VOUT }) { "a waiting payment is damaged" }
                 p
             }
+            val waiting = payments("pending")
             require(waiting.size <= MAX_PENDING) { "too many waiting payments" }
-            return info.copy(pending = waiting)
+            // a file written by an earlier version has no such list
+            val gone = payments("dropped").map { Dropped(it.txid, it.sentSat, it.feeSat, it.inputs, it.atMillis) }
+            require(gone.size <= MAX_DROPPED) { "too many payments that did not go through" }
+            return info.copy(pending = waiting, dropped = gone)
         }
     }
 }

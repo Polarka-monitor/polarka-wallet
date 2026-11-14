@@ -57,9 +57,12 @@ Of the weak points the reviewer named in the gateway, two more were dealt with i
   false balance or history, and it can lead its user to say yes to looking further.
 - N-1, N-2 and N-6 in the table.
 - "It did not go through" rests on one node. A payment that this node has let go of can still be held by other
-  nodes and arrive later; a new payment made with other coins would then be a second one. The notice sends
-  the owner to the History before paying again. The lasting answer, building the new payment on a coin of the
-  old one, is not in 0.4.1.
+  nodes and arrive later; a new payment made with other coins would then be a second one. In 0.4.1 the notice
+  only sent the owner to the History before paying again. Since 0.4.2 the payment is kept in the wallet's file
+  and the next payment is built on one of its coins, so that only one of the two can be in a block
+  (`NotGoneThroughTest`: the transaction is kept from the node, found not to have gone through, and brought
+  back; with the safeguard switched off, the first of its tests fails). What remains is said in the Limits of
+  the main README.
 - The reviewer checked nothing on a phone or an emulator. The emulator runs are described in `../emulator`.
 - The fixes in this table have not been reviewed. The reviewer began a third look at 0.4.1 on the same day:
   it ran the whole suite in a clone of its own (93 tests, none failed, none skipped) and had started on a

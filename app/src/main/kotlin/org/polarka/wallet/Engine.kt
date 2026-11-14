@@ -28,7 +28,7 @@ data class Problem(val kind: Kind, val detail: String = "") {
     enum class Kind {
         UNREACHABLE, TIMEOUT, BUSY, LOGIN, NOT_ALLOWED, NODE, OTHER_CHAIN, FOREIGN_OUTPUTS, STORE, UNEXPECTED,
         BAD_ADDRESS, BAD_AMOUNT, NOTHING_TO_SPEND, NOT_ENOUGH, FEE_RATE, TOO_MANY_INPUTS, WRONG_WORDS, BAD_WORDS, REJECTED, UNLOCK,
-        IN_WAITING_PAYMENT, UNSURE, KEY_GONE, WORDS_EXIST, WALLET_FILE, BAD_PRICE, TOO_MANY_WAITING,
+        IN_WAITING_PAYMENT, UNSURE, KEY_GONE, WORDS_EXIST, WALLET_FILE, BAD_PRICE, TOO_MANY_WAITING, EARLIER_PAYMENT,
     }
 
     companion object {
@@ -81,6 +81,13 @@ data class Snapshot(
     val wantsFurther: Boolean = false,
     /** False when a block arrived while the look was under way: its parts belong to different moments, and nothing is judged from it. */
     val steady: Boolean = true,
+    /** Ids of the wallet's payments that did not go through which the node holds among the waiting transactions again. */
+    val back: Set<String> = emptySet(),
+    /**
+     * Coins ("txid:n") of the wallet's waiting payments and of those that did not go through which a
+     * transaction in a block has spent, each with the id of that transaction.
+     */
+    val spentBy: Map<String, String> = emptyMap(),
 ) {
     private fun free(coin: Unspent): Boolean = (coin.txid + ":" + coin.vout) !in inWaiting
     val spendableSat: Long get() = NodeClient.total(coins.filter { it.spendableAt(tip) && free(it) }.map { it.amountSat })
@@ -252,6 +259,12 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
             }
         }
 
+        // the payments that did not go through: does the node hold one again, and has a block spent a coin of one
+        val back = HashSet<String>()
+        for (payment in wallet?.dropped.orEmpty()) if (node.waiting(payment.txid)) back.add(payment.txid)
+        val doubtful = wallet?.let { w -> (w.pending.flatMap { it.inputs } + w.dropped.flatMap { it.inputs }).toSet() }.orEmpty()
+        val spentBy = History.spenders(blocks.values, doubtful)
+
         val hashps = runCatching { node.networkHashps(SPAN) }.getOrNull()
         val seconds = runCatching {
             if (info.blocks > SPAN) (node.blockTime(info.blocks) - node.blockTime(info.blocks - SPAN)) / SPAN.toDouble() else null
@@ -259,7 +272,7 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
         val steady = runCatching { node.chainInfo().bestBlockHash == info.bestBlockHash }.getOrDefault(false)
         return Snapshot(
             info, tip, coins, watched, History.movements(ordered, walletScripts), History.movements(ordered, watchedScripts),
-            hashps, seconds, System.currentTimeMillis(), busy, held, nextReceive, nextChange, window, further, steady,
+            hashps, seconds, System.currentTimeMillis(), busy, held, nextReceive, nextChange, window, further, steady, back, spentBy,
         )
     }
 
@@ -297,21 +310,49 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
      * place of the earlier one, which would then never arrive. [used] are the coins the app knows to be tied
      * up; the node is asked about the chosen ones as well, so that a payment made on another phone with the
      * same words, or one this phone has forgotten, is respected too.
+     *
+     * The opposite holds for a payment that did not go through ([WalletInfo.dropped]). Its transaction is
+     * signed and stays valid while its coins are unspent; a node that does not hold it now says nothing about
+     * other nodes. The new payment therefore spends one coin of every such payment that nothing stands
+     * against yet: whatever happens later, only one of the two can be in a block.
      */
     fun plan(wallet: WalletInfo, to: String, amountSat: Long?, feeRate: Long, used: Set<String> = emptySet()): Plan {
         val script = scriptFor(to)
         val watch = wallet.watchKey()
         val (tip, coins) = coinsOf(watch, windowOf(wallet))
         val taken = HashSet(used)
+        val unanswered = wallet.unanswered
         repeat(PLAN_ROUNDS) {
             val spendable = coins.filter { it.spendableAt(tip) && key(it) !in taken }
-            val plan = if (amountSat == null) Planner.sweep(spendable, script, feeRate)
-            else Planner.pay(spendable, script, amountSat, feeRate, watch.script(1, wallet.changeIndex))
+            val must = against(unanswered, spendable)
+            val plan = if (amountSat == null) Planner.sweep(spendable, script, feeRate, must)
+            else Planner.pay(spendable, script, amountSat, feeRate, watch.script(1, wallet.changeIndex), must)
             val tied = plan.inputs.take(MAX_CHECKED).filter { !node.unspent(it.txid, it.vout) }.map { key(it) }
             if (tied.isEmpty()) return plan
             taken.addAll(tied)
         }
         throw EngineError(Problem.Kind.IN_WAITING_PAYMENT)
+    }
+
+    /**
+     * The coins a new payment must spend to stand against every payment in [unanswered]: one free coin of
+     * each. A coin that several of them share is taken first, so that few coins are enough. If one of them
+     * has no free coin at this moment, no payment can be made that is safe beside it, and none is made.
+     */
+    private fun against(unanswered: List<Dropped>, spendable: List<Unspent>): List<Unspent> {
+        if (unanswered.isEmpty()) return emptyList()
+        val free = spendable.associateBy { key(it) }
+        if (unanswered.any { payment -> payment.inputs.none { it in free } }) throw EngineError(Problem.Kind.EARLIER_PAYMENT)
+        val left = ArrayList(unanswered)
+        val must = ArrayList<Unspent>()
+        while (left.isNotEmpty()) {
+            val shared = HashMap<String, Int>()
+            for (payment in left) for (coin in payment.inputs) if (coin in free) shared[coin] = (shared[coin] ?: 0) + 1
+            val best = shared.entries.sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key }).first().key
+            must.add(free.getValue(best))
+            left.removeAll { best in it.inputs }
+        }
+        return must
     }
 
     /** Signs with the given words and lets the node check the result. Nothing is sent here. */

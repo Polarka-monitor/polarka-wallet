@@ -175,7 +175,10 @@ private fun SetupScreen(model: WalletModel, state: WalletState) {
     var publicUrl by rememberSaveable { mutableStateOf(PUBLIC_NODE) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) model.offerFile(uri) }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(screenPadding), verticalArrangement = gap) {
+    val scroll = rememberScrollState()
+    // what was read from a file or typed in is shown from its top: "Check before saving" must not begin above the visible part
+    LaunchedEffect(state.offered) { if (state.offered != null) scroll.scrollTo(0) }
+    Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(screenPadding), verticalArrangement = gap) {
         Banner()
         NoticeCard(model, state)
         ProblemCard(state.problem)

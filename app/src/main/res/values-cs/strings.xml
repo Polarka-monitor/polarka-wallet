@@ -231,7 +231,7 @@
     <string name="stored_words_text">V tomto telefonu jsou uložena slova peněženky, ale soubor s jejím popisem chybí nebo ho nelze přečíst. Peněženku lze z uložených slov znovu sestavit po přiložení otisku. Její mince se pak znovu najdou v řetězci.</string>
     <string name="stored_words_rebuild">Sestavit peněženku znovu otiskem</string>
     <string name="stored_words_discard">Odstranit uložená slova</string>
-    <string name="notice_payment_gone">Platbu %1$s NORTH, která čekala na blok, už uzel nedrží a není v žádném bloku. Neproběhla. Než zaplatíte znovu, podívejte se do Historie.</string>
+    <string name="notice_payment_gone">Platbu %1$s NORTH uzel už nedrží a není v žádném bloku: neproběhla. Ještě ale může dorazit z jiného uzlu, proto ji aplikace nechává na stránce Přehled a vaši příští platbu postaví na jedné z jejích mincí. Dorazit pak může jen jedna z těch dvou.</string>
     <string name="notice_address_limit">Dvacet adres po sobě zatím nebylo použito. Peněženka obnovená ze slov hledá dvacet adres dopředu, proto se další adresa neotevře, dokud některá z těchto nebude použita.</string>
     <string name="notice_words_removed">Uložená slova byla odstraněna.</string>
     <string name="pending_unsure_title">Předáno uzlu, výsledek není znám</string>
@@ -254,4 +254,15 @@
     <string name="notice_look_limit">Další adresa by už byla za hranicí, kam se aplikace dívá. Nejdřív na stránce Více zvolte Prohlédnout dvakrát tolik.</string>
     <string name="problem_too_many_waiting">Na blok čeká příliš mnoho plateb této peněženky. Zkuste to po dalším bloku.</string>
     <string name="offer_own_sees">Nastavení se jménem a heslem se bere jako váš vlastní uzel. Jakmile je v telefonu peněženka, dostane takový uzel klíč, který ukazuje všechny adresy peněženky, minulé i budoucí. Utrácet jím nelze. Uložte toto nastavení jen pro uzel, který provozujete sami nebo mu věříte jako vlastnímu.</string>
+    <string name="notice_payment_beaten">Platba %1$s NORTH neproběhla a už ani dorazit nemůže: v bloku je jiná transakce, která utratila jednu z jejích mincí. Které platby jsou v bloku, ukazuje Historie.</string>
+    <string name="notice_payment_arrived">Platba %1$s NORTH, která neproběhla, nakonec dorazila: je v bloku.</string>
+    <string name="notice_payment_back">Platbu %1$s NORTH, která neproběhla, uzel znovu drží a čeká na blok.</string>
+    <string name="dropped_title">Neproběhla, ještě může dorazit</string>
+    <string name="dropped_text">Uzel tuto platbu nedrží a není v žádném bloku. Její transakce ale platí, dokud nejsou utraceny její mince, takže ještě může dorazit z jiného uzlu. Vaše příští platba se proto postaví na jedné z jejích mincí: dorazit pak může jen jedna z těch dvou. Záznam zmizí, jakmile o něm rozhodne blok.</string>
+    <string name="dropped_forget">Zapomenout tuto platbu</string>
+    <string name="dropped_forget_title">Zapomenout tuto platbu?</string>
+    <string name="dropped_forget_text">Jen pokud jste si jisti, že už dorazit nemůže. Kdyby později přece dorazila, mohla by přijít vedle nové platby za totéž.</string>
+    <string name="dropped_forget_yes">Zapomenout</string>
+    <string name="problem_earlier_payment">Dřívější platba neproběhla, ale ještě může dorazit, takže tato platba musí stát na jedné z jejích mincí. To v tuto chvíli nejde. Obnovte přehled a připravte platbu znovu; pokud to trvá, počkejte na další blok.</string>
+    <string name="send_against_text">Tato platba utrácí minci dřívější platby, která neproběhla, aby mohla dorazit jen jedna z nich.</string>
 </resources>

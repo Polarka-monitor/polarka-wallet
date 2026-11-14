@@ -3,7 +3,7 @@
 A wallet for TrueNorth (NORTH) on Android. It keeps its keys in the phone, signs there, and asks a TrueNorth
 Core node what the addresses hold. There is no server of the wallet's own, no account and no analytics.
 
-**State: test build 0.4.1, not released.** The wallet has been checked by its author and, twice, by an
+**State: test build 0.4.2, not released.** The wallet has been checked by its author and, twice, by an
 independent reviewer that had not seen the code being written (`review/independent-review-0.3.1` and
 `review/independent-review-0.4.0`). All of that was AI-assisted; a review by an independent human expert is
 still recommended. Until then it is for small amounts.
@@ -50,7 +50,9 @@ looks further, and can work the numbers out again with another node (More). A pa
 when the node itself says no to the transaction; a lost answer, or an error of a gateway or web server in
 front of the node, leaves it written down as "outcome not known" with its coins set aside. And a waiting
 payment is reported as gone only when it is in no block, the node does not hold it, nothing else is spending
-its coins, it is at least a minute old, and two looks in a row agree.
+its coins, it is at least a minute old, and two looks in a row agree. Even then it is not forgotten: its
+transaction could still reach a block from another node, so the next payment is built on one of its coins,
+and only one of the two can ever be in a block.
 
 ## Keys and what is stored
 
@@ -77,9 +79,11 @@ its coins, it is at least a minute old, and two looks in a row agree.
   blocks are far smaller.
 - "It did not go through" is said from what one node shows. A payment that this node no longer holds can still
   be held by other nodes, for example after the node was restarted without its waiting transactions, and it
-  can then still arrive. Whoever pays again after that notice should look at the History first and, if in
-  doubt, wait for a few blocks. A later version will build the new payment on a coin of the old one, so that
-  the two can never both arrive.
+  can then still arrive. The wallet keeps such a payment on the Overview and builds the next payment on one
+  of its coins, so that the two can never both arrive; the entry goes when a block shows the old payment
+  after all, or shows one of its coins spent by something else. Two things remain. This memory lives in the
+  phone: a wallet brought back from its words elsewhere does not have it. And the owner can tell the app to
+  forget such a payment; after that nothing stands against it.
 - Tried on one real phone (Android 16) and on emulators with Android 12, 14 and 16.
 
 ## Code
@@ -104,7 +108,7 @@ a real network.
     TN_BIN=/path/to/bin gradle :core:test :node:test :app:testDebugUnitTest :app:lintDebug
     sh review/tests-summary.sh
 
-93 tests. A test that cannot run (no node programs, or no `gateway.py` of polarka-node next to this
+108 tests. A test that cannot run (no node programs, or no `gateway.py` of polarka-node next to this
 repository or named by `POLARKA_GATEWAY`) is reported as skipped; for a release none may be skipped. Every library is pinned by its SHA-256 in `gradle/verification-metadata.xml`:
 the build stops if one differs from the day it was first downloaded. The pins were made by Gradle on that day
 (trust on first download); signatures of the libraries are not verified.

@@ -172,6 +172,20 @@ object History {
         return result
     }
 
+    /**
+     * Which transaction in these blocks spends each of [coins] ("txid:n"): the coin and the id of that
+     * transaction. A coin that no transaction in these blocks spends is not in the answer.
+     */
+    fun spenders(blocks: Collection<ChainBlock>, coins: Set<String>): Map<String, String> {
+        val found = HashMap<String, String>()
+        if (coins.isEmpty()) return found
+        for (block in blocks) for (tx in block.transactions) for (input in tx.inputs) {
+            val coin = input.txid + ":" + input.vout
+            if (coin in coins) found[coin] = tx.txid
+        }
+        return found
+    }
+
     /** Every output script that appears in these blocks: what the search for used keys of a wallet looks through. */
     fun paidScripts(blocks: Collection<ChainBlock>): Set<String> {
         val scripts = HashSet<String>()

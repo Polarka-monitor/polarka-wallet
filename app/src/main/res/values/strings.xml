@@ -231,7 +231,7 @@
     <string name="stored_words_text">This phone holds the recovery words of a wallet, but the file that describes the wallet is missing or cannot be read. The wallet can be rebuilt from the stored words with your fingerprint. Its coins are then found again from the chain.</string>
     <string name="stored_words_rebuild">Rebuild the wallet with my fingerprint</string>
     <string name="stored_words_discard">Remove the stored words</string>
-    <string name="notice_payment_gone">A payment of %1$s NORTH that waited for a block is no longer held by the node and is in no block. It did not go through. Look at History before paying again.</string>
+    <string name="notice_payment_gone">A payment of %1$s NORTH is no longer held by the node and is in no block: it did not go through. It could still arrive from another node, so the app keeps it on the Overview page and builds your next payment on one of its coins. Only one of the two can then arrive.</string>
     <string name="notice_address_limit">Twenty addresses in a row have not been used yet. A wallet brought back from its words looks twenty addresses ahead, so no further one is opened until one of these has been used.</string>
     <string name="notice_words_removed">The stored recovery words were removed.</string>
     <string name="pending_unsure_title">Handed to the node, outcome not known</string>
@@ -254,4 +254,15 @@
     <string name="notice_look_limit">The next address would be one that the app does not look at. Choose Look at twice as many on the More page first.</string>
     <string name="problem_too_many_waiting">Too many payments of this wallet wait for a block. Try again after the next block.</string>
     <string name="offer_own_sees">A setup with a user name and a password is treated as a node of your own. Once the phone has a wallet, such a node is given the key that shows every address of the wallet, past and future. It cannot spend with it. Save this setup only for a node that you run yourself or trust like your own.</string>
+    <string name="notice_payment_beaten">A payment of %1$s NORTH did not go through and cannot arrive any more: a block holds another transaction that spends one of its coins. History shows which payments are in a block.</string>
+    <string name="notice_payment_arrived">A payment of %1$s NORTH that had not gone through arrived after all: it is in a block now.</string>
+    <string name="notice_payment_back">A payment of %1$s NORTH that had not gone through is held by the node again and waits for a block.</string>
+    <string name="dropped_title">Did not go through, could still arrive</string>
+    <string name="dropped_text">The node does not hold this payment and it is in no block. Its transaction stays valid while its coins are unspent, so it could still arrive from another node. Your next payment is therefore built on one of its coins: only one of the two can then arrive. The entry disappears when a block settles it.</string>
+    <string name="dropped_forget">Forget this payment</string>
+    <string name="dropped_forget_title">Forget this payment?</string>
+    <string name="dropped_forget_text">Only if you are sure that it can no longer arrive. If it arrived later after all, it could do so beside a new payment for the same thing.</string>
+    <string name="dropped_forget_yes">Forget</string>
+    <string name="problem_earlier_payment">An earlier payment did not go through but could still arrive, so this one has to be built on one of its coins. That cannot be done at this moment. Refresh and work the payment out again; if it stays so, wait for the next block.</string>
+    <string name="send_against_text">This payment spends a coin of an earlier payment that did not go through, so that only one of the two can arrive.</string>
 </resources>

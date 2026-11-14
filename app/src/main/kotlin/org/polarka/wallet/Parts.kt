@@ -166,11 +166,15 @@ fun NoticeCard(model: WalletModel, state: WalletState) {
         Notice.ADDRESS_LIMIT -> R.string.notice_address_limit
         Notice.WORDS_REMOVED -> R.string.notice_words_removed
         Notice.LOOK_LIMIT -> R.string.notice_look_limit
+        Notice.PAYMENT_BEATEN -> R.string.notice_payment_beaten
+        Notice.PAYMENT_ARRIVED -> R.string.notice_payment_arrived
+        Notice.PAYMENT_BACK -> R.string.notice_payment_back
     }
+    val withAmount = notice == Notice.PAYMENT_GONE || notice == Notice.PAYMENT_BEATEN || notice == Notice.PAYMENT_ARRIVED || notice == Notice.PAYMENT_BACK
     Card(Modifier.fillMaxWidth()) {
         Row(Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                if (notice == Notice.PAYMENT_GONE) stringResource(text, state.noticeDetail) else stringResource(text),
+                if (withAmount) stringResource(text, state.noticeDetail) else stringResource(text),
                 modifier = Modifier.weight(1f).testTag("notice"), style = MaterialTheme.typography.bodyMedium,
             )
             TextButton(onClick = { model.note(null) }) { Text(stringResource(R.string.ok)) }
@@ -207,6 +211,7 @@ fun problemText(problem: Problem): String = when (problem.kind) {
     Problem.Kind.WALLET_FILE -> stringResource(R.string.problem_wallet_file, problem.detail)
     Problem.Kind.BAD_PRICE -> stringResource(R.string.problem_bad_price)
     Problem.Kind.TOO_MANY_WAITING -> stringResource(R.string.problem_too_many_waiting)
+    Problem.Kind.EARLIER_PAYMENT -> stringResource(R.string.problem_earlier_payment)
 }
 
 @Composable

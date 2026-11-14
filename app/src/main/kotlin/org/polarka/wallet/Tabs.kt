@@ -110,6 +110,7 @@ private fun LookFurther(model: WalletModel, snapshot: Snapshot) {
 fun OverviewTab(model: WalletModel, state: WalletState, owner: Owner, go: (Section) -> Unit) {
     val setup = state.setup ?: return
     val snapshot = state.snapshot
+    var askForgetPayment by rememberSaveable { mutableStateOf<String?>(null) }
     Page {
         Banner()
         NoticeCard(model, state)
@@ -134,6 +135,14 @@ fun OverviewTab(model: WalletModel, state: WalletState, owner: Owner, go: (Secti
                 Field(stringResource(R.string.send_amount), "-" + Format.coins(waiting.sentSat + waiting.feeSat), "pending-amount")
                 Mono(waiting.txid)
                 Text(stringResource(if (waiting.unsure) R.string.pending_unsure_text else R.string.pending_text), style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        state.dropped.forEach { gone ->
+            Block(stringResource(R.string.dropped_title)) {
+                Field(stringResource(R.string.send_amount), "-" + Format.coins(gone.sentSat + gone.feeSat), "dropped-amount")
+                Mono(gone.txid)
+                Text(stringResource(R.string.dropped_text), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("dropped-text"))
+                TextButton(onClick = { askForgetPayment = gone.txid }, modifier = Modifier.testTag("dropped-forget")) { Text(stringResource(R.string.dropped_forget)) }
             }
         }
         if (state.wallet == null) {
@@ -176,6 +185,15 @@ fun OverviewTab(model: WalletModel, state: WalletState, owner: Owner, go: (Secti
                 Field(stringResource(R.string.node_updated), Format.clock(snapshot.atMillis))
             }
         }
+    }
+    askForgetPayment?.let { txid ->
+        AlertDialog(
+            onDismissRequest = { askForgetPayment = null },
+            title = { Text(stringResource(R.string.dropped_forget_title)) },
+            text = { Text(stringResource(R.string.dropped_forget_text)) },
+            confirmButton = { TextButton(onClick = { askForgetPayment = null; model.forgetDropped(txid, owner) }, modifier = Modifier.testTag("dropped-forget-yes")) { Text(stringResource(R.string.dropped_forget_yes)) } },
+            dismissButton = { TextButton(onClick = { askForgetPayment = null }) { Text(stringResource(R.string.cancel)) } },
+        )
     }
 }
 
@@ -295,6 +313,7 @@ fun SendTab(model: WalletModel, state: WalletState, owner: Owner) {
         } else {
             Block(stringResource(R.string.send_confirm_title)) {
                 PlanFields(draft.plan, draft.to, if (draft.everything) draft.plan.payments[0].amountSat else draft.plan.sentSat)
+                if (draft.against > 0) Text(stringResource(R.string.send_against_text), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("send-against"))
                 if (draft.plan.leftBehind > 0) Text(stringResource(R.string.partial_note, draft.plan.inputs.size.toString(), draft.plan.leftBehind), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 Text(stringResource(R.string.send_confirm_text), style = MaterialTheme.typography.bodySmall)
                 ProblemCard(state.sendProblem, "send-problem")

@@ -40,7 +40,7 @@ enum class SelfTest { NOT_RUN, RUNNING, PASSED, FAILED }
 /** A short message about something the app has just done. */
 enum class Notice {
     FILE_DELETED, FILE_NOT_DELETED, CLIPBOARD_CLEARED, FILE_UNREADABLE, CLIPBOARD_EMPTY, WALLET_READY, WALLET_REMOVED, SAVED,
-    PAYMENT_GONE, ADDRESS_LIMIT, WORDS_REMOVED, LOOK_LIMIT,
+    PAYMENT_GONE, ADDRESS_LIMIT, WORDS_REMOVED, LOOK_LIMIT, PAYMENT_BEATEN, PAYMENT_ARRIVED, PAYMENT_BACK,
 }
 
 /** Recovery words on their way through the app's state. A printed state or a log line never shows them. */
@@ -48,8 +48,11 @@ class SecretWords(val words: List<String>) {
     override fun toString(): String = "<recovery words>"
 }
 
-/** A payment worked out and waiting for the owner's yes. */
-data class Draft(val to: String, val plan: Plan, val everything: Boolean)
+/**
+ * A payment worked out and waiting for the owner's yes. [against] says how many earlier payments that did
+ * not go through it stands against: it spends a coin of each of them.
+ */
+data class Draft(val to: String, val plan: Plan, val everything: Boolean, val against: Int = 0)
 
 /**
  * The emptying of a paper address, worked out and waiting for the owner's yes. It carries the addresses the
@@ -89,6 +92,9 @@ data class WalletState(
 ) {
     /** Payments that left this phone and are not in a block yet. They live in the wallet's file. */
     val pending: List<Pending> get() = wallet?.pending ?: emptyList()
+
+    /** Payments that did not go through as far as the node showed, and that could still arrive. */
+    val dropped: List<Dropped> get() = wallet?.dropped ?: emptyList()
 }
 
 class WalletModel(app: Application) : AndroidViewModel(app) {
@@ -324,19 +330,26 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
      * Brings what the app remembers into line with what the chain shows. Waiting payments that are in a block
      * now are done. One that the node does not hold, that is in no block and whose coins nothing else is
      * spending did not go through, and its owner is told; but only when it is at least a minute old and two
-     * looks in a row say so. And the wallet's key numbers move past the keys the chain shows as used, as far
-     * as the app may look. Returns true when another look should follow at once.
+     * looks in a row say so. Such a payment is not forgotten: its transaction could still reach a block from
+     * elsewhere, so it is kept among the ones that did not go through until a block settles it, and the next
+     * payment is made to stand against it. And the wallet's key numbers move past the keys the chain shows as
+     * used, as far as the app may look. Returns true when another look should follow at once.
      */
     private fun settle(seen: Snapshot, judge: Boolean): Boolean {
         val wallet = state.wallet ?: return false
         val engine = engine ?: return false
         val confirmed = seen.moves.map { it.txid }.toSet()
-        var gone: Pending? = null
+        // in a block: the history shows it, or a block spends one of its coins with this very transaction
+        fun inBlock(txid: String, inputs: Set<String>): Boolean = txid in confirmed || inputs.any { seen.spentBy[it] == txid }
+        // another transaction in a block has spent one of its coins: it can never be in a block itself
+        fun beaten(txid: String, inputs: Set<String>): Boolean = inputs.any { coin -> seen.spentBy[coin].let { it != null && it != txid } }
+        val lost = ArrayList<Pending>()
         var again = !seen.steady
         val missed = HashSet<String>()
+        val room = WalletInfo.MAX_DROPPED - wallet.dropped.size
         val checked = if (!judge) wallet.pending.take(Engine.MAX_CHECKED) else wallet.pending.take(Engine.MAX_CHECKED).mapNotNull { p ->
             when {
-                p.txid in confirmed -> null
+                inBlock(p.txid, p.inputs) -> null
                 p.txid in seen.held -> if (p.unsure) p.copy(unsure = false) else p
                 // Neither in a block nor held by the node. That alone does not make it gone.
                 // Something the node holds spends its coins: they are not free, and the next blocks will tell.
@@ -349,14 +362,34 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
                     again = true
                     p
                 }
+                // It has to be remembered as not gone through. With no room left for that, it stays among the waiting ones.
+                lost.size >= room -> p
                 else -> {
-                    gone = p
+                    lost.add(p)
                     null
                 }
             }
         }
         if (judge) doubted = missed
-        val waiting = checked + wallet.pending.drop(Engine.MAX_CHECKED)
+        var waiting = checked + wallet.pending.drop(Engine.MAX_CHECKED)
+        // The payments that did not go through, with the ones just found. One that is in a block now arrived
+        // after all. One whose coin another transaction in a block has spent can never arrive, and is let go.
+        // One that the node holds again waits for a block again.
+        var arrived: Dropped? = null
+        var returned: Dropped? = null
+        val still = ArrayList<Dropped>()
+        for (d in wallet.dropped + lost.map { Dropped(it.txid, it.sentSat, it.feeSat, it.inputs, seen.atMillis) }) {
+            when {
+                inBlock(d.txid, d.inputs) -> arrived = d
+                beaten(d.txid, d.inputs) -> Unit
+                d.txid in seen.back && waiting.size < WalletInfo.MAX_PENDING -> {
+                    waiting = waiting + Pending(d.txid, d.sentSat, d.feeSat, d.inputs, unsure = false, atMillis = seen.atMillis)
+                    returned = d
+                    again = true            // the next look shows its coins as tied up again
+                }
+                else -> still.add(d)
+            }
+        }
         // The key numbers follow what the chain shows as used, but only as far as the app may look: what a node
         // shows is not checked against the work in its blocks, so it must not be able to move them far.
         val top = engine.allowed(wallet) - 1
@@ -364,20 +397,29 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         if (afresh) renumber = false
         val receive = if (afresh) minOf(seen.nextReceive, top) else maxOf(wallet.receiveIndex, minOf(seen.nextReceive, top))
         val change = if (afresh) minOf(seen.nextChange, top) else maxOf(wallet.changeIndex, minOf(seen.nextChange, top))
-        if (waiting == wallet.pending && receive == wallet.receiveIndex && change == wallet.changeIndex) {
+        if (waiting == wallet.pending && still == wallet.dropped && receive == wallet.receiveIndex && change == wallet.changeIndex) {
             if (afresh) state = state.copy(notice = Notice.SAVED, noticeDetail = "")
             return again
         }
-        val lost = gone
+        val gone = lost.lastOrNull()
+        val notice = when {
+            gone != null -> if (beaten(gone.txid, gone.inputs)) Notice.PAYMENT_BEATEN else Notice.PAYMENT_GONE
+            arrived != null -> Notice.PAYMENT_ARRIVED
+            returned != null -> Notice.PAYMENT_BACK
+            afresh -> Notice.SAVED
+            else -> null
+        }
+        val amount = gone?.sentSat ?: arrived?.sentSat ?: returned?.sentSat
+        val waitingNow = waiting
         change(
             {
                 it.copy(
-                    pending = waiting,
+                    pending = waitingNow, dropped = still,
                     receiveIndex = if (afresh) receive else maxOf(it.receiveIndex, receive),
                     changeIndex = if (afresh) change else maxOf(it.changeIndex, change),
                 )
             },
-            if (lost != null) Notice.PAYMENT_GONE else if (afresh) Notice.SAVED else null, lost?.let { Format.coins(it.sentSat) }.orEmpty(),
+            notice, amount?.let { Format.coins(it) }.orEmpty(),
         )
         return again
     }
@@ -576,11 +618,17 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
             val used = state.pending.flatMap { it.inputs }.toSet()
             val outcome = withContext(io) { runCatching { engine.plan(wallet, to, sat, feeRate, used) } }
             state = outcome.fold(
-                { state.copy(sending = false, draft = Draft(to.trim(), it, everything)) },
+                { state.copy(sending = false, draft = Draft(to.trim(), it, everything, standsAgainst(wallet, it))) },
                 { state.copy(sending = false, sendProblem = Problem.of(it)) },
             )
             lockIfWanted()
         }
+    }
+
+    /** How many of the wallet's payments that did not go through this plan stands against: it spends a coin of each of them. */
+    private fun standsAgainst(wallet: WalletInfo, plan: Plan): Int {
+        val coins = plan.inputs.map { it.txid + ":" + it.vout }.toSet()
+        return wallet.dropped.count { d -> d.inputs.any { it in coins } }
     }
 
     fun dropDraft() {
@@ -602,6 +650,13 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         if (wallet.pending.size >= WalletInfo.MAX_PENDING) {
             // more waiting payments than the wallet's file can hold are not started; they clear with the next blocks
             state = state.copy(sendProblem = Problem(Problem.Kind.TOO_MANY_WAITING))
+            return
+        }
+        val coins = draft.plan.inputs.map { it.txid + ":" + it.vout }.toSet()
+        if (wallet.unanswered.any { d -> d.inputs.none { it in coins } }) {
+            // Since this payment was worked out, an earlier one was found not to have gone through, and this
+            // one does not stand against it. It is not sent; worked out again, it will spend a coin of that one.
+            state = state.copy(draft = null, sendProblem = Problem(Problem.Kind.EARLIER_PAYMENT))
             return
         }
         state = state.copy(sending = true, sendProblem = null)
@@ -673,6 +728,17 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
 
     fun clearSent() {
         state = state.copy(sentTxid = null, sendProblem = null)
+    }
+
+    /**
+     * The owner says that a payment which did not go through can no longer arrive, and the app stops making
+     * the next payment stand against it. Only the owner may say so.
+     */
+    fun forgetDropped(txid: String, owner: Owner) {
+        viewModelScope.launch {
+            if (!runCatching { owner.present() }.getOrDefault(false)) return@launch
+            change({ it.copy(dropped = it.dropped.filter { d -> d.txid != txid }) }, Notice.SAVED)
+        }
     }
 
     // ------------------------------------------------------------------------------------------ a paper address
