@@ -117,3 +117,66 @@ internal class StandIn private constructor(private val process: Process, val por
         }
     }
 }
+
+/**
+ * Stands between the wallet and a wallet server. It keeps the paths that were asked for, can do something
+ * right after the server has answered and before the wallet hears of it ([after]), and can change an answer
+ * on its way back ([rewrite]): a server that is slow, and a server that lies.
+ */
+internal class ServerRelay(private val target: String) : AutoCloseable {
+    val paths = ArrayList<String>()
+    @Volatile var after: (path: String, count: Int) -> Unit = { _, _ -> }
+    @Volatile var rewrite: (path: String, answer: String) -> String = { _, answer -> answer }
+    private val server = ServerSocket(0, 50, java.net.InetAddress.getLoopbackAddress())
+    val url: String get() = "http://127.0.0.1:${server.localPort}"
+
+    init {
+        kotlin.concurrent.thread(isDaemon = true) {
+            while (!server.isClosed) {
+                val socket = try { server.accept() } catch (e: Exception) { break }
+                kotlin.concurrent.thread(isDaemon = true) { runCatching { handle(socket) } }
+            }
+        }
+    }
+
+    private fun handle(socket: java.net.Socket) = socket.use { s ->
+        val input = java.io.BufferedInputStream(s.getInputStream())
+        val head = StringBuilder()
+        while (!head.endsWith("\r\n\r\n")) {
+            val b = input.read()
+            if (b < 0) return@use
+            head.append(b.toChar())
+        }
+        val first = head.lines().first().split(' ')
+        val headers = head.lines().drop(1).filter { ':' in it }.associate { it.substringBefore(':').trim().lowercase() to it.substringAfter(':').trim() }
+        val raw = ByteArray(headers["content-length"]?.toInt() ?: 0)
+        var n = 0
+        while (n < raw.size) {
+            val got = input.read(raw, n, raw.size - n)
+            if (got < 0) break
+            n += got
+        }
+        val path = first[1]
+        val count = synchronized(paths) { paths.add(path); paths.count { it == path } }
+        val c = URL(target + path).openConnection() as HttpURLConnection
+        c.requestMethod = first[0]
+        if (first[0] == "POST") {
+            c.doOutput = true
+            c.setRequestProperty("Content-Type", headers["content-type"] ?: "application/json")
+            c.outputStream.use { it.write(raw) }
+        }
+        val status = c.responseCode
+        val answer = ((if (status in 200..299) c.inputStream else c.errorStream)?.use { it.readBytes() } ?: ByteArray(0)).decodeToString()
+        val retry = c.getHeaderField("Retry-After")
+        after(path, count)
+        val out = rewrite(path, answer).encodeToByteArray()
+        s.getOutputStream().apply {
+            write(("HTTP/1.1 $status relayed\r\nContent-Type: application/json\r\nContent-Length: ${out.size}\r\nConnection: close\r\n" +
+                (if (retry != null) "Retry-After: $retry\r\n" else "") + "\r\n").encodeToByteArray())
+            write(out)
+            flush()
+        }
+    }
+
+    override fun close() = server.close()
+}

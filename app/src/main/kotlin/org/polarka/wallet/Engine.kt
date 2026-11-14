@@ -88,6 +88,17 @@ data class Snapshot(
      * transaction in a block has spent, each with the id of that transaction.
      */
     val spentBy: Map<String, String> = emptyMap(),
+    /**
+     * What transactions that wait for a block pay to the wallet: payments on their way in, and the change of
+     * the wallet's own waiting payments. Only a look through a wallet server fills this. A node of one's own
+     * lists the coins of a waiting payment as they were until its block, and the change is not shown before.
+     */
+    val arrivingSat: Long = 0,
+    /**
+     * False when the history leaves a transaction out because the server's lines do not say what the wallet
+     * put into it, or when it is cut short (a look through a wallet server).
+     */
+    val historyWhole: Boolean = true,
 ) {
     private fun free(coin: Unspent): Boolean = (coin.txid + ":" + coin.vout) !in inWaiting
     val spendableSat: Long get() = NodeClient.total(coins.filter { it.spendableAt(tip) && free(it) }.map { it.amountSat })
