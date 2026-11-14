@@ -5,6 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class SetupTest {
     // The address of the public BIP39 test phrase (vectors/p2qrh-test-vectors.json). Nobody should send coins to it.
@@ -57,6 +58,46 @@ class SetupTest {
         assertEquals(SetupError.Reason.BAD_CHAIN, refused(text(chain = "testnet")))
         assertEquals(SetupError.Reason.NO_ADDRESS, refused(text(addresses = "[]")))
         assertEquals(SetupError.Reason.TOO_LONG, refused(text(password = "x".repeat(Setup.MAX_CHARS))))
+    }
+
+    @Test
+    fun aWalletServerIsNamedByItsAddressAlone() {
+        val typed = Setup.server(" api.example.org ")
+        assertEquals("https://api.example.org", typed.url)
+        assertTrue(typed.server)
+        assertFalse(typed.isPublic)
+        assertEquals("" to "", typed.user to typed.password)
+        assertEquals(Chain.MAIN, typed.chain)
+        assertTrue(typed.toJson().contains("\"format\":\"polarka-setup/3\""))
+        assertEquals(typed, Setup.parse(typed.toJson()))
+        assertEquals(Setup.DEFAULT_SERVER, Setup.server(Setup.DEFAULT_SERVER).url)
+        // addresses to watch go with it and come back from the stored form
+        val watching = typed.copy(addresses = listOf(main))
+        assertEquals(watching, Setup.parse(watching.toJson()))
+
+        assertEquals(SetupError.Reason.NOT_HTTPS, assertFailsWith<SetupError> { Setup.server("http://api.example.org") }.reason)
+        assertEquals(SetupError.Reason.BAD_URL, assertFailsWith<SetupError> { Setup.server("https://api.example.org/v1") }.reason)
+        assertEquals(SetupError.Reason.BAD_URL, assertFailsWith<SetupError> { Setup.server("x".repeat(301)) }.reason)
+
+        // a node stays a node, and a public node is not a server
+        assertFalse(Setup.parse(text()).server)
+        assertFalse(Setup.publicNode("node.example.org").server)
+        assertTrue(Setup.publicNode("node.example.org").isPublic)
+
+        // a text says one thing: a server and no node, or a node and no server, and a server has no account
+        fun third(body: String) = """{"format":"polarka-setup/3",$body,"chain":"main","addresses":[]}"""
+        assertTrue(Setup.parse(third(""""server":{"url":"https://api.example.org"}""")).server)
+        assertEquals(SetupError.Reason.WRONG_FORMAT, refused(third(""""node":{"url":"https://api.example.org"}""")))
+        assertEquals(SetupError.Reason.WRONG_FORMAT, refused(third(""""server":{"url":"https://api.example.org"},"node":{"url":"https://api.example.org"}""")))
+        assertEquals(SetupError.Reason.WRONG_FORMAT, refused(third(""""server":{"url":"https://api.example.org","user":"phone","password":"pw"}""")))
+        assertEquals(SetupError.Reason.WRONG_FORMAT, refused(third(""""server":"https://api.example.org"""")))
+        assertEquals(SetupError.Reason.NOT_HTTPS, refused(third(""""server":{"url":"http://api.example.org"}""")))
+        assertEquals(
+            SetupError.Reason.WRONG_FORMAT,
+            refused("""{"format":"polarka-setup/2","node":{"url":"https://n.example.org"},"server":{"url":"https://api.example.org"},"chain":"main","addresses":[]}"""),
+        )
+        // asked as a node, a server would be handed the key that shows the whole wallet: the node's engine does not take one
+        assertFailsWith<IllegalArgumentException> { Engine(typed) }
     }
 
     @Test

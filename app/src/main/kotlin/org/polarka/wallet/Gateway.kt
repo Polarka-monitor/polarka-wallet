@@ -2,6 +2,7 @@ package org.polarka.wallet
 
 import north.core.Plan
 import north.core.SignedSpend
+import north.node.ServerClient
 
 /**
  * What the app asks of whatever stands between it and the chain. Two things can stand there: a node, the
@@ -58,7 +59,9 @@ interface Gateway {
     fun paperSign(found: PaperFound, plan: Plan, words: List<String>): SignedSpend
 
     companion object {
-        /** What stands between the app and the chain for this setup. */
-        fun of(setup: Setup): Gateway = Engine(setup)
+        /** What stands between the app and the chain for this setup: the wallet server it names, or its node. */
+        fun of(setup: Setup): Gateway =
+            if (setup.server) ServerEngine(setup.chain, setup.addresses, ServerClient(setup.url, Engine.TIMEOUT_MILLIS))
+            else Engine(setup)
     }
 }

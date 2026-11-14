@@ -43,6 +43,8 @@ import north.node.Utxo
  *   history may not have caught up with its node. A payment in a block would show the same if it were older
  *   than the lines read for its addresses and had left the wallet no coin.
  * - There is no hash rate and no time between blocks.
+ * - The server does not say which network it works for. One that works for another does not take the
+ *   wallet's addresses, and by that it is known ([Problem.Kind.OTHER_CHAIN]).
  * - A payment is signed on the phone and handed over afterwards ([deliver]); the node behind the server checks
  *   it at the hand-over, not at the signing. The server answers every failed hand-over alike, so after one
  *   the outcome is asked for and, if nobody knows, stays "not known" until a look settles it.
@@ -110,6 +112,17 @@ class ServerEngine(
     override fun windowOf(wallet: WalletInfo): Int = allowed(wallet)
 
     private fun key(coin: Unspent): String = coin.txid + ":" + coin.vout
+
+    /**
+     * A server that will not take what the wallet asks (HTTP 400) is not told apart further: it works for
+     * another network than the setup names, which is what it says of addresses it does not know, or it is
+     * not a server of this kind. That is said as one thing, with the server's own words.
+     */
+    private inline fun <T> asked(what: () -> T): T = try {
+        what()
+    } catch (e: NodeError) {
+        if (e.httpStatus == 400) throw EngineError(Problem.Kind.OTHER_CHAIN, e.message.orEmpty()) else throw e
+    }
 
     private fun scriptFor(address: String): ByteArray =
         try { Qrh.scriptForAddress(chain, address.trim()) } catch (e: Exception) { throw EngineError(Problem.Kind.BAD_ADDRESS) }
@@ -313,7 +326,7 @@ class ServerEngine(
         var seen: Snapshot? = null
         repeat(TRIES) {
             val now = try {
-                look(wallet)
+                asked { look(wallet) }
             } catch (e: NodeError) {
                 if (e.code != ServerClient.MOVED) throw e
                 null
@@ -331,7 +344,9 @@ class ServerEngine(
      * Change that returns from the wallet's own payments is not counted, nor is what the wallet pays to
      * itself. Returns the height that every answer had reached, and what arrived up to that height.
      */
-    override fun incomingSince(wallet: WalletInfo?, afterHeight: Int): Pair<Int, List<Incoming>> {
+    override fun incomingSince(wallet: WalletInfo?, afterHeight: Int): Pair<Int, List<Incoming>> = asked { since(wallet, afterHeight) }
+
+    private fun since(wallet: WalletInfo?, afterHeight: Int): Pair<Int, List<Incoming>> {
         val top = server.tipHeight()
         if (afterHeight < 0 || afterHeight >= top) return top to emptyList()
         val result = ArrayList<Incoming>()
@@ -377,7 +392,7 @@ class ServerEngine(
         val script = scriptFor(to)
         val watch = wallet.watchKey()
         val keys = keysOf(watch, allowed(wallet))
-        val found = server.utxos(keys.addresses)
+        val found = asked { server.utxos(keys.addresses) }
         val spendable = placed(found.utxos, keys).filter { it.spendableAt(found.tip) && key(it) !in used }
         val must = Engine.against(wallet.unanswered, spendable)
         return if (amountSat == null) Planner.sweep(spendable, script, feeRate, must)
@@ -450,7 +465,7 @@ class ServerEngine(
     override fun paperLook(words: List<String>, spent: Set<String>): PaperFound {
         val account = try { Account.fromWords(words, chain) } catch (e: Exception) { throw EngineError(Problem.Kind.BAD_WORDS) }
         val keys = keysOf(account.watchKey(), WalletInfo.GAP, kept = false)
-        val found = server.utxos(keys.addresses)
+        val found = asked { server.utxos(keys.addresses) }
         return PaperFound(account.address(0, 0), found.tip, placed(found.utxos, keys).filter { key(it) !in spent })
     }
 

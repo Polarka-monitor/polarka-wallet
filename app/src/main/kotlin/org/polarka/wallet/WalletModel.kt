@@ -240,6 +240,16 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         return state.offered != null
     }
 
+    /** The address of a wallet server was typed in, or the offered one was left as it is. Only checked here. */
+    fun offerServer(url: String): Boolean {
+        state = try {
+            state.copy(offered = Setup.server(url), offeredFrom = null, offerError = null, offerDetail = "", problem = null, notice = null)
+        } catch (e: SetupError) {
+            state.copy(offered = null, offeredFrom = null, offerError = e.reason, offerDetail = e.detail, notice = null)
+        }
+        return state.offered != null
+    }
+
     /** Reads a setup file the user picked. Only the beginning is read: a setup is small. */
     fun offerFile(uri: Uri) {
         viewModelScope.launch {

@@ -131,6 +131,11 @@ class Incoming(val move: Movement, val own: Boolean)
  * address by address, so that the node never gets the key that shows the whole wallet, past and future.
  */
 class Engine(private val setup: Setup, private val node: NodeClient = NodeClient(setup.url, setup.user, setup.password, TIMEOUT_MILLIS)) : Gateway {
+    init {
+        // asked as a node, a wallet server would be handed what only a node of one's own may get
+        require(!setup.server) { "a wallet server is not a node" }
+    }
+
     private val blocks = HashMap<String, ChainBlock>()
     private var scannedTo = -1
     private var scannedWindow = 0
