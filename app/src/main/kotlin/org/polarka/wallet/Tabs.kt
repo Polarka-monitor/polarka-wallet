@@ -91,6 +91,19 @@ private fun NoWallet(model: WalletModel, state: WalletState, owner: Owner) {
     }
 }
 
+/** The chain shows used addresses close to the last one the app looks at. The owner decides whether it looks further. */
+@Composable
+private fun LookFurther(model: WalletModel, snapshot: Snapshot) {
+    Block(stringResource(R.string.further_title)) {
+        Text(stringResource(R.string.further_text, snapshot.lookedTo.toString()), modifier = Modifier.testTag("further-text"))
+        if (snapshot.lookedTo < WalletInfo.MAX_LOOK) {
+            Button(onClick = model::lookFurther, modifier = Modifier.fillMaxWidth().testTag("look-further")) {
+                Text(stringResource(R.string.further_go, minOf(WalletInfo.MAX_LOOK, snapshot.lookedTo * 2).toString()))
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------------------------- overview
 
 @Composable
@@ -126,6 +139,7 @@ fun OverviewTab(model: WalletModel, state: WalletState, owner: Owner, go: (Secti
         if (state.wallet == null) {
             NoWallet(model, state, owner)
         } else {
+            if (snapshot != null && snapshot.wantsFurther) LookFurther(model, snapshot)
             Block(stringResource(R.string.wallet_title)) {
                 if (snapshot != null) {
                     Field(stringResource(R.string.spendable), Format.coins(snapshot.spendableSat), "wallet-spendable")
@@ -427,6 +441,15 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner) {
                 Mono(descriptor)
                 OutlinedButton(onClick = { copyToClipboard(context, "descriptor", descriptor) }) { Text(stringResource(R.string.copy)) }
                 Tick(wallet.lockOnOpen, { model.saveLock(it, owner) }, stringResource(R.string.lock_setting), "lock-setting")
+                val looked = state.snapshot?.lookedTo ?: 0
+                if (looked > 1) {
+                    Text(stringResource(R.string.further_more_text, looked.toString()), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("looked-to"))
+                    if (looked < WalletInfo.MAX_LOOK) {
+                        OutlinedButton(onClick = model::lookFurther, modifier = Modifier.testTag("look-further-more")) { Text(stringResource(R.string.further_more_go)) }
+                    }
+                    Text(stringResource(R.string.renumber_text), style = MaterialTheme.typography.bodySmall)
+                    OutlinedButton(onClick = model::renumberKeys, modifier = Modifier.testTag("renumber")) { Text(stringResource(R.string.renumber_go)) }
+                }
                 OutlinedButton(onClick = { askRemoveWallet = true }, modifier = Modifier.testTag("wallet-remove")) { Text(stringResource(R.string.wallet_remove)) }
             }
             Block(stringResource(R.string.price_title)) {

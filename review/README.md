@@ -1,8 +1,10 @@
 # Review of Polarka Wallet
 
 This folder holds what is needed to repeat the checks made on a release, the results of the author's own review
-of 0.3.1 (`evidence-0.3.1/`, made when the app was still called North Wallet), and the report of the independent
-review of the same version (`independent-review-0.3.1/`). Neither replaces a review by an independent human expert.
+of 0.3.1 (`evidence-0.3.1/`, made when the app was still called North Wallet), the report of the independent
+review of the same version (`independent-review-0.3.1/`), the report of the same reviewer's second look at 0.4.0
+(`independent-review-0.4.0/`), and the scripts that run the package on emulators (`emulator/`). None of it
+replaces a review by an independent human expert.
 
 ## How to repeat the checks
 
@@ -12,8 +14,9 @@ build tools 36.0.0) on the path. `TN_BIN` must point to a folder with the offici
 
 | Check | Command | Passes when |
 |---|---|---|
-| All tests (80) | `gradle :core:test :node:test :app:testDebugUnitTest`, then `sh review/tests-summary.sh` | exit 0; 80 tests, 0 failures, 0 skipped |
-| The findings of the independent review stay fixed | the `Audit*Test` classes in the three modules | all pass |
+| All tests (93) | `gradle :core:test :node:test :app:testDebugUnitTest`, then `sh review/tests-summary.sh` | exit 0; 93 tests, 0 failures, 0 skipped |
+| The findings of the independent review and of its retest stay fixed | the `Audit*Test` classes in the three modules, `RetestModelTest`, `AfterRetestTest`, `AfterRetestScreenTest` | all pass |
+| The package on emulators (Android 12, 14, 16) | `review/emulator/README.md` | each script ends with `ALL 11 STEPS PASSED` or `LOCK STEPS PASSED` |
 | A public node never gets the account key | app test `PublicNodeTest` (needs python3 and `gateway.py` of polarka-node) | prints `PUBLIC NODE OK: ...` |
 | Nothing secret leaves the phone | app test `ReviewTest.nothingSecretLeavesThePhone` | prints `REVIEW OK: ... no word, seed, extended private key or private key in any of them` |
 | A lying node cannot make the wallet lose coins | app test `ReviewTest.aLyingNodeCannotMakeTheWalletLoseCoins` | prints `REVIEW OK: foreign coin refused, ...` |

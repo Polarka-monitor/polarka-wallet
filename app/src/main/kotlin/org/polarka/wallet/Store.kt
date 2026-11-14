@@ -23,6 +23,12 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
+/**
+ * The key of a sealed file is no longer in the phone. Android removes a key that needs the owner's unlocking
+ * when the screen lock of the phone is taken away.
+ */
+class KeyGone : Exception("the key for the stored file is gone")
+
 /** Where the key that locks a sealed file lives. */
 interface KeyHolder {
     /** The key, or null if there is none and [create] is false. */
@@ -66,7 +72,7 @@ class SealedBytes(private val file: File, private val keys: KeyHolder, purpose: 
 
     fun decryptor(): Cipher {
         val raw = header()
-        val key = checkNotNull(keys.key(create = false)) { "the key for the stored file is gone" }
+        val key = keys.key(create = false) ?: throw KeyGone()
         return Cipher.getInstance(TRANSFORMATION).apply { init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(TAG_BITS, raw, 2, IV_BYTES)) }
     }
 
@@ -130,10 +136,15 @@ data class WalletInfo(
     val chain: Chain, val xpub: String, val receiveIndex: Int = 0, val changeIndex: Int = 0,
     val hashrate: String = "", val price: String = "", val currency: String = "", val lockOnOpen: Boolean = true,
     val pending: List<Pending> = emptyList(),
+    /** How many keys of each branch the owner has allowed the app to look at, beyond what it looks at by itself. 0: nothing said. */
+    val lookTo: Int = 0,
 ) {
     fun watchKey(): WatchKey = WatchKey.parse(xpub, chain)
 
-    /** How many keys of each branch the node is asked about: everything used so far and twenty beyond. */
+    /**
+     * How many keys of each branch the wallet wants the node to be asked about: everything used so far and
+     * twenty beyond. How many are really asked about is decided by Engine.windowOf, which also knows the limit.
+     */
     val window: Int get() = maxOf(receiveIndex, changeIndex) + GAP
 
     fun toJson(): String = buildJsonObject {
@@ -146,6 +157,7 @@ data class WalletInfo(
         put("price", JsonPrimitive(price))
         put("currency", JsonPrimitive(currency))
         put("lockOnOpen", JsonPrimitive(lockOnOpen))
+        put("lookTo", JsonPrimitive(lookTo))
         put("pending", buildJsonArray {
             pending.forEach { p ->
                 add(buildJsonObject {
@@ -164,6 +176,8 @@ data class WalletInfo(
         const val FORMAT = "north-wallet-info/1"
         const val GAP = 20
         const val MAX_PENDING = 200
+        /** The most keys of one branch that are ever looked at. */
+        const val MAX_LOOK = 5000
 
         fun parse(text: String): WalletInfo {
             val o = Json.parseToJsonElement(text) as JsonObject
@@ -173,8 +187,10 @@ data class WalletInfo(
             val info = WalletInfo(
                 chain, s("xpub")!!, (o["receiveIndex"] as JsonPrimitive).intOrNull ?: 0, (o["changeIndex"] as JsonPrimitive).intOrNull ?: 0,
                 s("hashrate").orEmpty(), s("price").orEmpty(), s("currency").orEmpty(), (o["lockOnOpen"] as? JsonPrimitive)?.booleanOrNull ?: true,
+                lookTo = (o["lookTo"] as? JsonPrimitive)?.intOrNull ?: 0,
             )
             require(info.receiveIndex in 0..100_000 && info.changeIndex in 0..100_000) { "a key number is out of bounds" }
+            require(info.lookTo in 0..MAX_LOOK) { "the number of keys to look at is out of bounds" }
             info.watchKey()                                 // refuses a key of another network or a damaged one
             val waiting = (o["pending"] as? JsonArray).orEmpty().map { it as JsonObject }.map { w ->
                 fun text(name: String) = (w[name] as JsonPrimitive).content

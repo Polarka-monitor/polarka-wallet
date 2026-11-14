@@ -50,14 +50,19 @@ během několika minut; dřív ji peněženka nevidí. Po použití adresy nabí
 3. "Podepsat otiskem a odeslat". Odeslanou platbu nelze vzít zpět.
 
 Dokud nepřijde blok, je platba v Přehledu uvedena jako čekající a její mince se znovu nenabízejí. Pokud uzel
-ve chvíli odeslání neodpoví, aplikace řekne, že výsledek není znám. Neplaťte pak znovu: až bude uzel dosažitelný,
-obnovte přehled a aplikace ukáže, zda platba čeká na blok, nebo neproběhla.
+nepotvrdí, že platbu převzal, aplikace řekne, že výsledek není znám. Neplaťte pak znovu: za minutu obnovte
+přehled a aplikace ukáže, zda platba čeká na blok, nebo neproběhla.
 
 ## Obnova peněženky
 
 Více, "Obnova peněženky": napište 12 nebo 24 slov oddělených mezerami. Mince se najdou v řetězci, ať byla
 peněženka používaná jakkoli dlouho. Vyzkoušejte to jednou s malou částkou, než se na to spolehnete: je to
 jediná zkouška, že máte papír správně.
+
+Sama od sebe aplikace prohlíží prvních 200 adres peněženky, u veřejného uzlu 40. Pokud uzel ukazuje, že jich
+je použito víc, zeptá se Přehled, zda má aplikace hledat dál. Řekněte ano, pokud jste peněženku opravdu tolik
+používali. Pokud ne, uzel ukazuje něco, co není pravda: řekněte ne a použijte jiný uzel. Pokud po obnově
+chybí mince, o kterých víte, je na stránce Více volba "Prohlédnout dvakrát tolik".
 
 ## Vybrání papírové adresy
 

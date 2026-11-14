@@ -65,8 +65,8 @@ class EngineTest {
     fun aWalletIsFetchedPaidFromAndAPaperAddressIsEmptied() {
         val bin = System.getenv("TN_BIN")?.let { File(it) }
         if (bin == null || !File(bin, "truenorthd").canExecute()) {
-            println("SKIPPED: set TN_BIN to the folder with the official truenorthd and truenorth-cli")
-            return
+            // a test that cannot run is reported as skipped, not as passed
+            throw org.junit.AssumptionViolatedException("set TN_BIN to the folder with the official truenorthd and truenorth-cli")
         }
         val random = SecureRandom()
         val password = ByteArray(24).also { random.nextBytes(it) }.joinToString("") { "%02x".format(it) }

@@ -82,12 +82,15 @@ internal class AuditNode private constructor(private val bin: File) : AutoClosea
     }
 
     companion object {
-        /** Null when TN_BIN does not name the folder with the official programs: the test then reports that it was skipped. */
+        /**
+         * Adapted after the retest: when TN_BIN does not name the folder with the official programs, the test
+         * is reported as skipped. Before, it printed a line and was counted as passed.
+         */
         fun startOrNull(): AuditNode? {
             val bin = System.getenv("TN_BIN")?.let { File(it) }
             if (bin == null || !File(bin, "truenorthd").canExecute()) {
-                println("SKIPPED: set TN_BIN to the folder with the official truenorthd and truenorth-cli")
-                return null
+                // a test that cannot run is reported as skipped, not as passed
+                throw org.junit.AssumptionViolatedException("set TN_BIN to the folder with the official truenorthd and truenorth-cli")
             }
             return AuditNode(bin)
         }

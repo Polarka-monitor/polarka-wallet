@@ -53,15 +53,20 @@ offers a fresh one; old addresses keep working.
 3. "Sign with my fingerprint and send". A payment that has been sent cannot be taken back.
 
 Until its block arrives the payment is listed on the Overview as waiting, and its coins are not offered again.
-If the node does not answer at the moment of sending, the app says that the outcome is not known. Do not pay
-again then: refresh when the node can be reached, and the app shows whether the payment waits for a block or
-did not go through.
+If the node does not confirm that it took the payment, the app says that the outcome is not known. Do not pay
+again then: refresh after a minute, and the app shows whether the payment waits for a block or did not go
+through.
 
 ## Bringing a wallet back
 
 More, "Bring back a wallet": type the 12 or 24 words, separated by spaces. The coins are found from the chain,
 however long the wallet had been in use. Do this once with a small amount before you rely on it: it is the
 only test that your paper is right.
+
+By itself the app looks at the first 200 addresses of the wallet, 40 with a public node. If the node shows
+more of them in use, the Overview asks whether the app may look further. Say yes if you have used the wallet
+that much. If you have not, the node is showing something that is not true: say no and use another node. If
+coins that you know of are missing after a wallet was brought back, More has "Look at twice as many".
 
 ## Emptying a paper address
 

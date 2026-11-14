@@ -68,8 +68,8 @@ class RegtestAcceptanceTest {
     fun coreAcceptsAndMinesATransactionBuiltHere() {
         val bin = System.getenv("TN_BIN")?.let { File(it) }
         if (bin == null || !File(bin, "truenorthd").canExecute()) {
-            println("SKIPPED: set TN_BIN to the folder with the official truenorthd and truenorth-cli")
-            return
+            // a test that cannot run is reported as skipped, not as passed
+            throw org.opentest4j.TestAbortedException("set TN_BIN to the folder with the official truenorthd and truenorth-cli")
         }
         val random = SecureRandom()
         fun freshWords() = MnemonicCode.toMnemonics(ByteArray(32).also { random.nextBytes(it) })

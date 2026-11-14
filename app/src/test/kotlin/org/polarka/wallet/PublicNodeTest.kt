@@ -82,8 +82,8 @@ class PublicNodeTest {
         val found = listOfNotNull(named, File("../../polarka-node/gateway.py"), File("../polarka-node/gateway.py")).firstOrNull { it.isFile }
         val python = runCatching { ProcessBuilder("python3", "--version").start().waitFor(20, TimeUnit.SECONDS) }.getOrDefault(false)
         if (found == null || !python) {
-            println("SKIPPED: this test needs python3 and gateway.py (set POLARKA_GATEWAY to the file)")
-            return null
+            // a test that cannot run is reported as skipped, not as passed
+            throw org.junit.AssumptionViolatedException("this test needs python3 and gateway.py (set POLARKA_GATEWAY to the file)")
         }
         return found
     }

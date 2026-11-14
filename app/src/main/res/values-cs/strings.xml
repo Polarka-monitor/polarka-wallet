@@ -223,7 +223,7 @@
     <string name="problem_busy">Uzel je zaneprázdněný. Zkuste to za chvíli znovu.</string>
     <string name="problem_wallet_file">Soubor s popisem peněženky nelze přečíst (%1$s).</string>
     <string name="problem_in_waiting">Mince pro tuto platbu jsou vázané v platbách, které čekají na blok. Zkuste to po dalším bloku.</string>
-    <string name="problem_unsure">Uzel po předání platby neodpověděl, takže není známo, zda odešla (id %1$s). Teď neplaťte znovu. Až bude uzel dosažitelný, obnovte přehled: platba se ukáže jako čekající na blok, nebo vám aplikace oznámí, že neproběhla.</string>
+    <string name="problem_unsure">Není známo, zda platba odešla: uzel nepotvrdil, že ji převzal (id %1$s). Teď neplaťte znovu. Za minutu obnovte přehled: platba se pak ukáže jako čekající na blok, nebo vám aplikace oznámí, že neproběhla.</string>
     <string name="problem_key_gone">Android zničil klíč, který v tomto telefonu chránil slova pro obnovu. Stane se to při zrušení zámku obrazovky. K mincím teď vedou jen slova na vašem papíře: peněženku zde odeberte a obnovte ji z papíru.</string>
     <string name="problem_words_exist">V tomto telefonu jsou stále uložena slova dřívější peněženky. Nikdy se nepřepisují. Nejdřív tu peněženku obnovte, nebo její slova odstraňte.</string>
     <string name="problem_bad_price">Cena musí být obyčejné číslo, například 0,02.</string>
@@ -235,7 +235,7 @@
     <string name="notice_address_limit">Dvacet adres po sobě zatím nebylo použito. Peněženka obnovená ze slov hledá dvacet adres dopředu, proto se další adresa neotevře, dokud některá z těchto nebude použita.</string>
     <string name="notice_words_removed">Uložená slova byla odstraněna.</string>
     <string name="pending_unsure_title">Předáno uzlu, výsledek není znám</string>
-    <string name="pending_unsure_text">Uzel nepotvrdil, že platbu převzal. Její mince se zatím nechávají stranou. Až bude uzel dosažitelný, obnovte přehled.</string>
+    <string name="pending_unsure_text">Uzel nepotvrdil, že platbu převzal. Její mince se zatím nechávají stranou. Za minutu obnovte přehled: platba se pak ukáže jako čekající na blok, nebo vám aplikace oznámí, že neproběhla.</string>
     <string name="in_waiting">V platbách čekajících na blok</string>
     <string name="partial_note">Do jedné transakce se vejde nejvýš %1$s mincí a tato je plná. Zbývá mincí pro další krok: %2$d.</string>
     <string name="paper_warning_part">Do jedné transakce se vejde nejvýš %1$s mincí a tato je plná. Na papírové adrese zbývá mincí: %2$d. Další část se nabídne hned po této.</string>
@@ -243,4 +243,15 @@
     <string name="about_title">O aplikaci</string>
     <string name="about_text">Polarka Wallet %1$s pro TrueNorth (NORTH). Svobodný software pod licencí MIT, bez záruky. Nezávislý komunitní projekt, ne produkt vývojářů TrueNorth.</string>
     <string name="about_libraries">Využívá libsecp256k1 (MIT), bitcoin-kmp a secp256k1-kmp od ACINQ, Kotlin a kotlinx od JetBrains, AndroidX s Jetpack Compose a CameraX a ZXing (vše pod licencí Apache 2.0).</string>
+    <string name="lock_hint">Odemčení se nepodařilo. Pokud telefon o otisk ani o kód vůbec nepožádá, možná už nemá zámek obrazovky: nastavte ho v nastavení telefonu a vraťte se.</string>
+    <string name="further_title">Peněženka možná použila více adres</string>
+    <string name="further_text">Uzel ukazuje platby blízko adresy číslo %1$s této peněženky a dál se aplikace sama nedívá. Pokud jste peněženku opravdu tolik používali, nechte ji hledat dál; jinak se mince na pozdějších adresách neukážou. Pokud ne, uzel možná ukazuje něco, co není pravda: dál nehledejte a zvažte jiný uzel.</string>
+    <string name="further_go">Prohlédnout prvních %1$s adres</string>
+    <string name="further_more_text">Aplikace teď prohlíží prvních %1$s adres této peněženky. Pokud chybí mince, o kterých víte, například po obnově peněženky ze slov, nechte ji prohlédnout dvakrát tolik. Veřejný uzel se pak dozví dvakrát tolik adres.</string>
+    <string name="further_more_go">Prohlédnout dvakrát tolik</string>
+    <string name="renumber_text">Pokud čísla adres této peněženky utekla dopředu (může to způsobit uzel, který neukazoval pravdu), lze je znovu určit podle toho, co ukazuje současný uzel.</string>
+    <string name="renumber_go">Znovu určit čísla adres</string>
+    <string name="notice_look_limit">Další adresa by už byla za hranicí, kam se aplikace dívá. Nejdřív na stránce Více zvolte Prohlédnout dvakrát tolik.</string>
+    <string name="problem_too_many_waiting">Na blok čeká příliš mnoho plateb této peněženky. Zkuste to po dalším bloku.</string>
+    <string name="offer_own_sees">Nastavení se jménem a heslem se bere jako váš vlastní uzel. Jakmile je v telefonu peněženka, dostane takový uzel klíč, který ukazuje všechny adresy peněženky, minulé i budoucí. Utrácet jím nelze. Uložte toto nastavení jen pro uzel, který provozujete sami nebo mu věříte jako vlastnímu.</string>
 </resources>

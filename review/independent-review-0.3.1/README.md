@@ -28,6 +28,14 @@ the words "Adapted after the fix" and says why:
 | `AuditScreenTest.theLockEngagesAlsoWhenThePhoneRebuildsTheScreenOnReturn` | The moment the app left the front is kept in the model now (that is the fix); the test shifts it there instead of in the activity. |
 | `AuditScreenTest.thePaperConfirmationShowsTheAddressThatWillBePaid` | An edit of a field now throws the worked-out payment away; the test has it worked out again before confirming, and checks that the confirmation shows the address that is paid. |
 
+After the reviewer's second look (`../independent-review-0.4.0`) two more changes were made to its files.
+Neither changes what a test checks:
+
+| File | Change |
+|---|---|
+| `AuditScreenTest.theLockEngagesAlsoWhenThePhoneRebuildsTheScreenOnReturn` | Its first wait now brings the screen into line with the model before it looks (`waitForIdle`). Before, the test could time out before it began; `../independent-review-0.4.0/README.md` says how. A race in the test, not in the app. |
+| `AuditSupport.kt` | When the node programs are missing, the tests that need them are reported as skipped. Before, they printed a line and counted as passed. |
+
 ## Files
 
 - `AUDIT.md`: the report, unchanged.

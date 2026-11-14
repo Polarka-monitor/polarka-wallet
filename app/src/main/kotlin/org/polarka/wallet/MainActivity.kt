@@ -159,6 +159,9 @@ private fun LockScreen(model: WalletModel, owner: Owner) {
     LaunchedEffect(Unit) { model.unlockApp(owner) }
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(stringResource(R.string.lock_text), style = MaterialTheme.typography.bodyLarge)
+        if (model.state.lockNote) {
+            Text(stringResource(R.string.lock_hint), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp).testTag("lock-hint"))
+        }
         Button(onClick = { model.unlockApp(owner) }, modifier = Modifier.padding(top = 16.dp).testTag("unlock")) { Text(stringResource(R.string.lock_open)) }
     }
 }
@@ -226,7 +229,10 @@ private fun SetupScreen(model: WalletModel, state: WalletState) {
                     Text(stringResource(R.string.offer_addresses), style = MaterialTheme.typography.labelMedium)
                     offered.addresses.forEach { Mono(it) }
                 }
-                if (offered.isPublic) Text(stringResource(R.string.public_sees), style = MaterialTheme.typography.bodySmall)
+                Text(
+                    stringResource(if (offered.isPublic) R.string.public_sees else R.string.offer_own_sees),
+                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("offer-sees"),
+                )
                 if (state.offeredFrom != null && !offered.isPublic) {
                     Tick(deleteFile, { deleteFile = it }, stringResource(R.string.offer_delete_file))
                 }

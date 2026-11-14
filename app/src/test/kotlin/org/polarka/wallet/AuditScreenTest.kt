@@ -87,7 +87,21 @@ class AuditScreenTest {
         wallets.value = WalletInfo(Chain.MAIN, Account.fromWords(Words.generate(), Chain.MAIN).watchKey().xpub, lockOnOpen = true)
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val model = controller.get().model
-        screen.waitUntil(30_000) { model.state.loaded && !model.state.locked }          // the owner is there and unlocks
+        // Adapted after the retest: this wait now brings the screen into line with the model before it looks
+        // (waitForIdle). Before, it only watched the model, and nothing in it made the screen follow: the test
+        // timed out before it began whenever the stores were read after the activity was set up, or when
+        // Compose's own notice of changes made outside it had stopped working earlier in the same test run
+        // (under Robolectric its wake-up can be lost between two tests). A race in the test, not in the app.
+        try {
+            screen.waitUntil(30_000) {
+                screen.waitForIdle()
+                model.state.loaded && !model.state.locked                               // the owner is there and unlocks
+            }
+        } catch (e: androidx.compose.ui.test.ComposeTimeoutException) {
+            val s = model.state
+            throw AssertionError("the test did not get started: loaded=${s.loaded} locked=${s.locked} lockNote=${s.lockNote} busy=${s.busy} " +
+                "problem=${s.problem}, the owner was asked ${owner.shows} time(s)", e)
+        }
         // Adapted after the fix: the moment the app left the front is kept in the model now (that is the fix),
         // so the two minutes are subtracted there and no longer from a field of the activity.
         fun awayForTwoMinutes() {

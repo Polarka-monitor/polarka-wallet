@@ -85,7 +85,7 @@ class StoreTest {
         // a file without its key (copied from elsewhere) is refused, not silently replaced
         store.save(setup)
         keys.present = false
-        assertFailsWith<IllegalStateException> { store.load() }
+        assertFailsWith<KeyGone> { store.load() }
         assertTrue(file.exists())
     }
 }

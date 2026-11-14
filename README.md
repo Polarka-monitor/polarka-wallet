@@ -3,15 +3,18 @@
 A wallet for TrueNorth (NORTH) on Android. It keeps its keys in the phone, signs there, and asks a TrueNorth
 Core node what the addresses hold. There is no server of the wallet's own, no account and no analytics.
 
-**State: test build 0.4.0, not released.** The wallet has been checked twice: by its author and by an
-independent reviewer that had not seen the code being written (`review/independent-review-0.3.1`). Both were
-AI-assisted; a review by an independent human expert is still recommended. Until then it is for small amounts.
+**State: test build 0.4.1, not released.** The wallet has been checked by its author and, twice, by an
+independent reviewer that had not seen the code being written (`review/independent-review-0.3.1` and
+`review/independent-review-0.4.0`). All of that was AI-assisted; a review by an independent human expert is
+still recommended. Until then it is for small amounts.
 It is an independent community project and not a product of the TrueNorth developers.
 
 ## What it does
 
 - Makes a wallet from 24 recovery words (BIP39), or brings one back from its words. However long the wallet
-  was in use, its coins are found again: used keys are searched until twenty unused ones follow.
+  was in use, its coins are found again: used keys are searched until twenty unused ones follow. The app
+  looks at the first 200 addresses of each kind by itself (40 with a public node) and asks its owner before
+  it looks further.
 - Receives to P2QRH addresses (`north1z...`), a fresh one whenever the last one has been used; shows a QR code.
 - Sends: the payment is worked out, shown, and signed only after the owner's fingerprint or screen lock.
   The fee is exact before signing. Addresses can be pasted or read from a QR code.
@@ -40,6 +43,15 @@ What the node says is trusted for what exists, never for what is ours: an answer
 pay to the wallet's own scripts is refused as a whole, and so are amounts that cannot exist, malformed ids,
 a node on another network, and answers that are too long.
 
+The wallet does not check the proof of work behind the blocks a node shows. A node that lies can therefore
+show a false balance or a false history, and it can make addresses look used. Three things keep the damage
+small. The wallet moves its address numbers only within the addresses it looks at, asks its owner before it
+looks further, and can work the numbers out again with another node (More). A payment counts as refused only
+when the node itself says no to the transaction; a lost answer, or an error of a gateway or web server in
+front of the node, leaves it written down as "outcome not known" with its coins set aside. And a waiting
+payment is reported as gone only when it is in no block, the node does not hold it, nothing else is spending
+its coins, it is at least a minute old, and two looks in a row agree.
+
 ## Keys and what is stored
 
 - The recovery words are sealed with a key that lives in the Android Keystore (the phone's security chip
@@ -58,6 +70,11 @@ a node on another network, and answers that are too long.
 - A payment that has not reached a block yet is not shown to its receiver; it appears with the first block.
 - One account, P2QRH addresses only, no fee estimate from the node (three fixed fee rates).
 - The price of a coin is typed in by hand; nothing is looked up.
+- Before a payment the node is asked about at most 100 of the chosen coins whether a waiting payment already
+  uses them (a payment made on another phone with the same words); a payment with more coins is not protected
+  beyond the first hundred.
+- A block whose description is larger than 16 MB cannot be read, and a look that needs it fails. Today's
+  blocks are far smaller.
 - Tried on one real phone (Android 16) and on emulators with Android 12, 14 and 16.
 
 ## Code
@@ -82,7 +99,8 @@ a real network.
     TN_BIN=/path/to/bin gradle :core:test :node:test :app:testDebugUnitTest :app:lintDebug
     sh review/tests-summary.sh
 
-80 tests; none may be skipped. Every library is pinned by its SHA-256 in `gradle/verification-metadata.xml`:
+93 tests. A test that cannot run (no node programs, or no `gateway.py` of polarka-node next to this
+repository or named by `POLARKA_GATEWAY`) is reported as skipped; for a release none may be skipped. Every library is pinned by its SHA-256 in `gradle/verification-metadata.xml`:
 the build stops if one differs from the day it was first downloaded. The pins were made by Gradle on that day
 (trust on first download); signatures of the libraries are not verified.
 

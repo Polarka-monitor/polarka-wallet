@@ -2,6 +2,7 @@ package org.polarka.wallet
 
 import android.app.Application
 import android.net.Uri
+import android.os.SystemClock
 import android.provider.DocumentsContract
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,6 +21,7 @@ import north.core.Plan
 import north.core.Planner
 import north.core.SelfCheck
 import north.core.Words
+import north.node.NodeError
 import javax.crypto.Cipher
 
 /** The owner of the phone, as far as the app can ask for them. The screen provides it; a test lets everything through. */
@@ -38,7 +40,7 @@ enum class SelfTest { NOT_RUN, RUNNING, PASSED, FAILED }
 /** A short message about something the app has just done. */
 enum class Notice {
     FILE_DELETED, FILE_NOT_DELETED, CLIPBOARD_CLEARED, FILE_UNREADABLE, CLIPBOARD_EMPTY, WALLET_READY, WALLET_REMOVED, SAVED,
-    PAYMENT_GONE, ADDRESS_LIMIT, WORDS_REMOVED,
+    PAYMENT_GONE, ADDRESS_LIMIT, WORDS_REMOVED, LOOK_LIMIT,
 }
 
 /** Recovery words on their way through the app's state. A printed state or a log line never shows them. */
@@ -58,6 +60,7 @@ data class PaperDraft(val plan: Plan, val to: String, val restTo: String?)
 data class WalletState(
     val loaded: Boolean = false,
     val locked: Boolean = false,
+    val lockNote: Boolean = false,              // an attempt to unlock the app did not succeed
     val setup: Setup? = null,
     val offered: Setup? = null,                 // read from a file or the clipboard, not saved yet
     val offerError: SetupError.Reason? = null,
@@ -97,11 +100,20 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
     private var paperSpent: Set<String> = emptySet()    // coins sent away in earlier parts of the same emptying
     private var lockWanted = false
     private var lookAgain = false
+    private var relooks = 0             // looks the app started by itself, one right after another
+    private var doubted: Set<String> = emptySet()       // waiting payments that the last look found nowhere
+    private var renumber = false        // the owner asked for the key numbers to be worked out again
     private var sends = 0               // moves on when a payment starts and when it ends
     private val saving = Mutex()
     var io: CoroutineDispatcher = Dispatchers.IO
 
-    /** When the app left the front. Kept here and not in the screen: this object survives when Android rebuilds the screen. */
+    /** A waiting payment is not called gone before it is this old: it may still be on its way to the node that is asked. */
+    internal var goneAfterMillis = GONE_AFTER_MILLIS
+
+    /**
+     * When the app left the front, on the clock that runs since the phone was started and that nobody can set.
+     * Kept here and not in the screen: this object survives when Android rebuilds the screen.
+     */
     internal var leftAtMillis = 0L
 
     var state by mutableStateOf(WalletState())
@@ -130,20 +142,22 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
     fun unlockApp(owner: Owner) {
         viewModelScope.launch {
             if (runCatching { owner.present() }.getOrDefault(false)) {
-                state = state.copy(locked = false)
+                state = state.copy(locked = false, lockNote = false)
                 refresh()
+            } else {
+                state = state.copy(lockNote = true)
             }
         }
     }
 
     /** The app left the front. */
-    fun left(now: Long = System.currentTimeMillis()) {
-        leftAtMillis = now
+    fun left(now: Long = SystemClock.elapsedRealtime()) {
+        leftAtMillis = if (now == 0L) 1L else now
     }
 
-    /** The app is in front again. After more than a minute away it locks. */
-    fun returned(now: Long = System.currentTimeMillis()) {
-        val away = leftAtMillis != 0L && now - leftAtMillis > LOCK_AFTER_MILLIS
+    /** The app is in front again. After more than a minute away it locks; also when the clock seems to have run backwards. */
+    fun returned(now: Long = SystemClock.elapsedRealtime()) {
+        val away = leftAtMillis != 0L && (now - leftAtMillis > LOCK_AFTER_MILLIS || now < leftAtMillis)
         leftAtMillis = 0L
         if (away) lock()
     }
@@ -262,6 +276,11 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
     // ------------------------------------------------------------------------------------------ looking at the chain
 
     fun refresh() {
+        relooks = 0
+        look()
+    }
+
+    private fun look() {
         val engine = engine ?: return
         if (state.locked) return
         if (state.busy) {
@@ -273,53 +292,94 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         state = state.copy(busy = true, problem = null)
         viewModelScope.launch {
             val outcome = withContext(io) { runCatching { engine.fetch(wallet) } }
+            if (engine !== this@WalletModel.engine || state.wallet?.xpub != wallet?.xpub) {
+                // the node or the wallet was changed while this look was under way: what it saw belongs to neither
+                lookAgain = false
+                state = state.copy(busy = false)
+                refresh()
+                return@launch
+            }
             val seen = outcome.getOrNull()
             if (seen == null) {
                 lookAgain = false
+                renumber = false
                 state = state.copy(busy = false, problem = Problem.of(outcome.exceptionOrNull()!!))
                 return@launch
             }
             state = state.copy(busy = false, snapshot = seen, problem = null)
-            // a look that overlapped a payment being sent saw the node before or while the payment arrived there:
-            // it must not judge which waiting payments exist
-            settle(seen, judge = mark == sends && !state.sending)
+            // a look that overlapped a payment being sent saw the node before or while the payment arrived there,
+            // and a look during which a block arrived saw two different moments: neither may judge what waits
+            val more = settle(seen, judge = mark == sends && !state.sending && seen.steady)
             if (lookAgain) {
                 lookAgain = false
                 refresh()
+            } else if (more && relooks < MAX_RELOOKS) {
+                relooks++
+                look()
             }
         }
     }
 
     /**
-     * Brings what the app remembers into line with what the chain shows: waiting payments that are in a block
-     * now are done; one that the node does not hold any more, and that is in no block, did not go through and
-     * its owner is told; and the wallet's key numbers move past every key the chain shows as used.
+     * Brings what the app remembers into line with what the chain shows. Waiting payments that are in a block
+     * now are done. One that the node does not hold, that is in no block and whose coins nothing else is
+     * spending did not go through, and its owner is told; but only when it is at least a minute old and two
+     * looks in a row say so. And the wallet's key numbers move past the keys the chain shows as used, as far
+     * as the app may look. Returns true when another look should follow at once.
      */
-    private fun settle(seen: Snapshot, judge: Boolean) {
-        val wallet = state.wallet ?: return
+    private fun settle(seen: Snapshot, judge: Boolean): Boolean {
+        val wallet = state.wallet ?: return false
+        val engine = engine ?: return false
         val confirmed = seen.moves.map { it.txid }.toSet()
-        val unspent = seen.coins.map { it.txid + ":" + it.vout }.toSet()
         var gone: Pending? = null
+        var again = !seen.steady
+        val missed = HashSet<String>()
         val checked = if (!judge) wallet.pending.take(Engine.MAX_CHECKED) else wallet.pending.take(Engine.MAX_CHECKED).mapNotNull { p ->
             when {
                 p.txid in confirmed -> null
                 p.txid in seen.held -> if (p.unsure) p.copy(unsure = false) else p
+                // Neither in a block nor held by the node. That alone does not make it gone.
+                // Something the node holds spends its coins: they are not free, and the next blocks will tell.
+                p.inputs.any { it in seen.inWaiting } -> p
+                // It was written down a moment ago and may still be on its way to the node that was asked.
+                seen.atMillis - p.atMillis < goneAfterMillis -> p
+                // One look that does not find it is not enough: the next one decides.
+                p.txid !in doubted -> {
+                    missed.add(p.txid)
+                    again = true
+                    p
+                }
                 else -> {
-                    // neither in a block nor held by the node. If its coins are still there, it did not go through.
-                    if (p.inputs.any { it in unspent }) gone = p
+                    gone = p
                     null
                 }
             }
         }
+        if (judge) doubted = missed
         val waiting = checked + wallet.pending.drop(Engine.MAX_CHECKED)
-        val receive = maxOf(wallet.receiveIndex, seen.nextReceive)
-        val change = maxOf(wallet.changeIndex, seen.nextChange)
-        if (waiting == wallet.pending && receive == wallet.receiveIndex && change == wallet.changeIndex) return
+        // The key numbers follow what the chain shows as used, but only as far as the app may look: what a node
+        // shows is not checked against the work in its blocks, so it must not be able to move them far.
+        val top = engine.allowed(wallet) - 1
+        val afresh = renumber && judge
+        if (afresh) renumber = false
+        val receive = if (afresh) minOf(seen.nextReceive, top) else maxOf(wallet.receiveIndex, minOf(seen.nextReceive, top))
+        val change = if (afresh) minOf(seen.nextChange, top) else maxOf(wallet.changeIndex, minOf(seen.nextChange, top))
+        if (waiting == wallet.pending && receive == wallet.receiveIndex && change == wallet.changeIndex) {
+            if (afresh) state = state.copy(notice = Notice.SAVED, noticeDetail = "")
+            return again
+        }
         val lost = gone
         change(
-            { it.copy(pending = waiting, receiveIndex = maxOf(it.receiveIndex, receive), changeIndex = maxOf(it.changeIndex, change)) },
-            if (lost != null) Notice.PAYMENT_GONE else null, lost?.let { Format.coins(it.sentSat) }.orEmpty(),
+            {
+                it.copy(
+                    pending = waiting,
+                    receiveIndex = if (afresh) receive else maxOf(it.receiveIndex, receive),
+                    changeIndex = if (afresh) change else maxOf(it.changeIndex, change),
+                )
+            },
+            if (lost != null) Notice.PAYMENT_GONE else if (afresh) Notice.SAVED else null, lost?.let { Format.coins(it.sentSat) }.orEmpty(),
         )
+        return again
     }
 
     /** Called when the app comes back to the front: an old picture is replaced, a fresh one is left alone. */
@@ -358,7 +418,7 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
     private fun walletProblemOf(t: Throwable): Problem = when (t) {
         is OwnerRefused -> Problem(Problem.Kind.UNLOCK, t.detail)
         is EngineError -> Problem(t.kind, t.detail)
-        is android.security.keystore.KeyPermanentlyInvalidatedException -> Problem(Problem.Kind.KEY_GONE)
+        is android.security.keystore.KeyPermanentlyInvalidatedException, is KeyGone -> Problem(Problem.Kind.KEY_GONE)
         else -> Problem(Problem.Kind.STORE, t.javaClass.simpleName)
     }
 
@@ -445,8 +505,38 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
     fun nextAddress() {
         val wallet = state.wallet ?: return
         val used = state.snapshot?.nextReceive ?: 0
-        if (wallet.receiveIndex + 1 >= used + WalletInfo.GAP) state = state.copy(notice = Notice.ADDRESS_LIMIT, noticeDetail = "")
-        else change({ it.copy(receiveIndex = it.receiveIndex + 1) })
+        // the next address must be one that the app looks at: as far as it looks by itself, or as the owner has allowed
+        val looked = engine?.allowed(wallet.copy(receiveIndex = 0)) ?: Engine.AUTO_PUBLIC
+        state = when {
+            wallet.receiveIndex + 1 >= used + WalletInfo.GAP -> state.copy(notice = Notice.ADDRESS_LIMIT, noticeDetail = "")
+            wallet.receiveIndex + 1 >= looked -> state.copy(notice = Notice.LOOK_LIMIT, noticeDetail = "")
+            else -> return change({ it.copy(receiveIndex = it.receiveIndex + 1) })
+        }
+    }
+
+    /**
+     * The owner allows the app to look at more keys of the wallet than it does by itself: twice as many as
+     * now. For a wallet that has used many addresses, or whose coins are not all found after it was brought
+     * back from its words.
+     */
+    fun lookFurther() {
+        val engine = engine ?: return
+        val wallet = state.wallet ?: return
+        val now = maxOf(state.snapshot?.lookedTo ?: 0, engine.windowOf(wallet))
+        val to = minOf(WalletInfo.MAX_LOOK, now * 2)
+        if (to <= now) return
+        change({ it.copy(lookTo = maxOf(it.lookTo, to)) })
+        refresh()
+    }
+
+    /**
+     * Works the wallet's key numbers out again from what the node shows now. For a wallet whose numbers were
+     * moved ahead by a node that did not show the truth: with an honest node they return to the first unused key.
+     */
+    fun renumberKeys() {
+        if (state.wallet == null || engine == null) return
+        renumber = true
+        refresh()
     }
 
     fun saveMining(hashrate: String) = change({ it.copy(hashrate = hashrate.trim().take(20)) }, Notice.SAVED)
@@ -509,6 +599,11 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         val wallet = state.wallet ?: return
         val draft = state.draft ?: return
         if (state.sending) return
+        if (wallet.pending.size >= WalletInfo.MAX_PENDING) {
+            // more waiting payments than the wallet's file can hold are not started; they clear with the next blocks
+            state = state.copy(sendProblem = Problem(Problem.Kind.TOO_MANY_WAITING))
+            return
+        }
         state = state.copy(sending = true, sendProblem = null)
         sends++
         viewModelScope.launch {
@@ -542,7 +637,11 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
                 plan.inputs.map { it.txid + ":" + it.vout }.toSet(), unsure = true, atMillis = System.currentTimeMillis(),
             )
             val before = state.wallet ?: wallet
-            state = state.copy(wallet = before.copy(pending = before.pending + record, changeIndex = before.changeIndex + (if (plan.changeSat > 0) 1 else 0)))
+            // The change key moves on for the next payment, but never further than a wallet brought back from its
+            // words would look (twenty past the last key the chain shows as used), nor past what the app looks at.
+            val top = minOf(engine.allowed(before) - 1, (state.snapshot?.nextChange ?: 0) + WalletInfo.GAP - 1)
+            val moved = if (plan.changeSat > 0) maxOf(before.changeIndex, minOf(before.changeIndex + 1, top)) else before.changeIndex
+            state = state.copy(wallet = before.copy(pending = before.pending + record, changeIndex = moved))
             if (!persist()) {
                 // it could not be written down, so it is not sent: better no payment than one the app would not know about
                 state = state.copy(wallet = before, sending = false, sendProblem = Problem(Problem.Kind.STORE, "wallet"))
@@ -550,9 +649,15 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
             }
             val delivery = withContext(io) { runCatching { engine.deliver(signed) } }
             if (delivery.isFailure) {
-                // the node refused it: it is certain that it did not go out, and the note about it is taken back
-                change({ it.copy(pending = it.pending.filter { p -> p.txid != record.txid }) })
-                state = state.copy(sending = false, sendProblem = Problem.of(delivery.exceptionOrNull()!!))
+                // The node itself refused it: it is certain that it did not go out. The note about it is taken
+                // back, and so is the change key, which nothing has used.
+                change({
+                    it.copy(
+                        pending = it.pending.filter { p -> p.txid != record.txid },
+                        changeIndex = if (it.changeIndex == moved) before.changeIndex else it.changeIndex,
+                    )
+                })
+                state = state.copy(sending = false, sendProblem = refusal(delivery.exceptionOrNull()!!))
             } else if (delivery.getOrThrow()) {
                 change({ it.copy(pending = it.pending.map { p -> if (p.txid == record.txid) p.copy(unsure = false) else p }) })
                 state = state.copy(sending = false, draft = null, sentTxid = record.txid)
@@ -562,6 +667,9 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    /** Why a payment was refused. Only what the node itself decided is thrown as a refusal, so nothing was sent. */
+    private fun refusal(t: Throwable): Problem = if (t is NodeError) Problem(Problem.Kind.REJECTED, t.message.orEmpty()) else Problem.of(t)
 
     fun clearSent() {
         state = state.copy(sentTxid = null, sendProblem = null)
@@ -631,7 +739,7 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
             }
             val delivery = withContext(io) { runCatching { engine.deliver(signed) } }
             when {
-                delivery.isFailure -> state = state.copy(paperBusy = false, paperProblem = Problem.of(delivery.exceptionOrNull()!!))
+                delivery.isFailure -> state = state.copy(paperBusy = false, paperProblem = refusal(delivery.exceptionOrNull()!!))
                 delivery.getOrThrow() -> {
                     val more = draft.plan.leftBehind > 0
                     paperSpent = paperSpent + draft.plan.inputs.map { it.txid + ":" + it.vout }
@@ -680,6 +788,8 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
     companion object {
         const val STALE_MILLIS = 60_000L
         const val LOCK_AFTER_MILLIS = 60_000L
+        const val GONE_AFTER_MILLIS = 60_000L
+        const val MAX_RELOOKS = 2
         val FEE_RATES = listOf(1L, Planner.DEFAULT_FEE_RATE, 5L)
     }
 }

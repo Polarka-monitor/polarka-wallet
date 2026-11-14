@@ -223,7 +223,7 @@
     <string name="problem_busy">The node is busy. Try again in a moment.</string>
     <string name="problem_wallet_file">The file that describes the wallet cannot be read (%1$s).</string>
     <string name="problem_in_waiting">The coins for this payment are tied up in payments that wait for a block. Try again after the next block.</string>
-    <string name="problem_unsure">The node did not answer after the payment was handed over, so it is not known whether it went out (id %1$s). Do not pay again now. Refresh when the node can be reached: the payment then shows as waiting for a block, or the app tells you that it did not go through.</string>
+    <string name="problem_unsure">It is not known whether the payment went out: the node did not confirm that it took it (id %1$s). Do not pay again now. Refresh in a minute: the payment then shows as waiting for a block, or the app tells you that it did not go through.</string>
     <string name="problem_key_gone">Android has destroyed the key that protected the recovery words in this phone. That happens when the screen lock is removed. The words on your paper are now the only way to the coins: remove the wallet here and bring it back from the paper.</string>
     <string name="problem_words_exist">This phone still stores the recovery words of an earlier wallet. They are never written over. Rebuild that wallet or remove its words first.</string>
     <string name="problem_bad_price">The price must be a plain number such as 0.02.</string>
@@ -235,7 +235,7 @@
     <string name="notice_address_limit">Twenty addresses in a row have not been used yet. A wallet brought back from its words looks twenty addresses ahead, so no further one is opened until one of these has been used.</string>
     <string name="notice_words_removed">The stored recovery words were removed.</string>
     <string name="pending_unsure_title">Handed to the node, outcome not known</string>
-    <string name="pending_unsure_text">The node did not confirm that it took this payment. Its coins are kept aside meanwhile. Refresh when the node can be reached.</string>
+    <string name="pending_unsure_text">The node did not confirm that it took this payment. Its coins are kept aside meanwhile. Refresh in a minute: it then shows as waiting for a block, or the app tells you that it did not go through.</string>
     <string name="in_waiting">In payments waiting for a block</string>
     <string name="partial_note">One transaction takes at most %1$s coins, and this one is full. Coins left for the next step: %2$d.</string>
     <string name="paper_warning_part">One transaction takes at most %1$s coins, and this one is full. Coins left on the paper address: %2$d. The next part is offered right after this one.</string>
@@ -243,4 +243,15 @@
     <string name="about_title">About</string>
     <string name="about_text">Polarka Wallet %1$s for TrueNorth (NORTH). Free software under the MIT licence, with no warranty. An independent community project, not a product of the TrueNorth developers.</string>
     <string name="about_libraries">Built with libsecp256k1 (MIT), bitcoin-kmp and secp256k1-kmp by ACINQ, Kotlin and kotlinx by JetBrains, AndroidX with Jetpack Compose and CameraX, and ZXing (all under the Apache licence 2.0).</string>
+    <string name="lock_hint">Unlocking did not succeed. If the phone does not ask for a fingerprint or a code at all, it may have no screen lock any more: set one in the settings of the phone and come back.</string>
+    <string name="further_title">This wallet may have used more addresses</string>
+    <string name="further_text">The node shows payments close to address number %1$s of this wallet, and the app looks no further by itself. If you have used the wallet that much, let it look further; otherwise coins on later addresses are not shown. If you have not, the node may be showing something that is not true: do not look further, and consider another node.</string>
+    <string name="further_go">Look at the first %1$s addresses</string>
+    <string name="further_more_text">At the moment the app looks at the first %1$s addresses of this wallet. If coins that you know of are missing, for example after the wallet was brought back from its words, let it look at twice as many. A public node is then told twice as many addresses.</string>
+    <string name="further_more_go">Look at twice as many</string>
+    <string name="renumber_text">If the address numbers of this wallet have run ahead (a node that did not show the truth can cause that), they can be worked out again from what the current node shows.</string>
+    <string name="renumber_go">Work out the address numbers again</string>
+    <string name="notice_look_limit">The next address would be one that the app does not look at. Choose Look at twice as many on the More page first.</string>
+    <string name="problem_too_many_waiting">Too many payments of this wallet wait for a block. Try again after the next block.</string>
+    <string name="offer_own_sees">A setup with a user name and a password is treated as a node of your own. Once the phone has a wallet, such a node is given the key that shows every address of the wallet, past and future. It cannot spend with it. Save this setup only for a node that you run yourself or trust like your own.</string>
 </resources>

@@ -165,6 +165,7 @@ fun NoticeCard(model: WalletModel, state: WalletState) {
         Notice.PAYMENT_GONE -> R.string.notice_payment_gone
         Notice.ADDRESS_LIMIT -> R.string.notice_address_limit
         Notice.WORDS_REMOVED -> R.string.notice_words_removed
+        Notice.LOOK_LIMIT -> R.string.notice_look_limit
     }
     Card(Modifier.fillMaxWidth()) {
         Row(Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -205,6 +206,7 @@ fun problemText(problem: Problem): String = when (problem.kind) {
     Problem.Kind.WORDS_EXIST -> stringResource(R.string.problem_words_exist)
     Problem.Kind.WALLET_FILE -> stringResource(R.string.problem_wallet_file, problem.detail)
     Problem.Kind.BAD_PRICE -> stringResource(R.string.problem_bad_price)
+    Problem.Kind.TOO_MANY_WAITING -> stringResource(R.string.problem_too_many_waiting)
 }
 
 @Composable

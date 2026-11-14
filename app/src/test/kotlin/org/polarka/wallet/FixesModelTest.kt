@@ -106,15 +106,29 @@ class FixesModelTest {
                 assertEquals(0L, model.state.snapshot!!.spendableSat, "the coin of a waiting payment is not offered")
                 assertEquals(512_00000000L, model.state.snapshot!!.waitingSat)
 
-                // the node drops the payment from its waiting list (here: it says so; a real node does after two weeks, or when it is short of memory)
+                // the node drops the payment from its waiting list and its coin is free again (here: it says so for
+                // both; a real node does after two weeks, or when it is short of memory)
                 relay.rewrite = { method, answer ->
-                    if (method == "getmempoolentry") "{\"result\":null,\"error\":{\"code\":-5,\"message\":\"Transaction not in mempool\"},\"id\":\"north\"}" else answer
+                    when (method) {
+                        "getmempoolentry" -> "{\"result\":null,\"error\":{\"code\":-5,\"message\":\"Transaction not in mempool\"},\"id\":\"north\"}"
+                        "gettxout" -> "{\"result\":{\"confirmations\":101},\"error\":null,\"id\":\"north\"}"
+                        else -> answer
+                    }
                 }
+                // a payment written down a moment ago is not called gone: it may still be on its way to the node
+                model.refresh()
+                settled(model)
+                assertEquals(1, model.state.pending.size, "a payment made a moment ago is not judged yet")
+                assertNull(model.state.notice)
+                // a minute later (the minute is switched off here) two looks in a row decide
+                model.goneAfterMillis = 0
+                val looksBefore = relay.count("scantxoutset")
                 model.refresh()
                 settled(model)
                 assertEquals(0, model.state.pending.size)
                 assertEquals(Notice.PAYMENT_GONE, model.state.notice)
                 assertEquals("100.00000000", model.state.noticeDetail)
+                assertEquals(2, relay.count("scantxoutset") - looksBefore, "one look alone does not call a payment gone")
                 until("the wallet's file is written") { wallets.value!!.pending.isEmpty() }
             }
         }
