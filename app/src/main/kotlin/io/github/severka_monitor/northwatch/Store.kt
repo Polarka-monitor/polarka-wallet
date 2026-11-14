@@ -3,16 +3,20 @@ package io.github.severka_monitor.northwatch
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import android.security.keystore.StrongBoxUnavailableException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.longOrNull
 import north.core.Chain
 import north.core.WatchKey
+import north.node.NodeClient
 import java.io.File
+import java.io.FileOutputStream
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -48,9 +52,16 @@ class SealedBytes(private val file: File, private val keys: KeyHolder, purpose: 
         val sealed = cipher.doFinal(plain)
         val iv = cipher.iv
         check(iv != null && iv.size == IV_BYTES) { "unexpected nonce length" }
-        val tmp = File(file.parentFile, file.name + ".tmp")
-        tmp.writeBytes(byteArrayOf(VERSION, IV_BYTES.toByte()) + iv + sealed)
-        check(tmp.renameTo(file)) { "the file could not be written" }
+        // written to the side, forced onto the disk, then moved into place: a power loss leaves the old file or the new one
+        synchronized(WRITING) {
+            val tmp = File(file.parentFile, file.name + ".tmp")
+            FileOutputStream(tmp).use { out ->
+                out.write(byteArrayOf(VERSION, IV_BYTES.toByte()) + iv + sealed)
+                out.flush()
+                runCatching { out.fd.sync() }
+            }
+            check(tmp.renameTo(file)) { "the file could not be written" }
+        }
     }
 
     fun decryptor(): Cipher {
@@ -81,6 +92,7 @@ class SealedBytes(private val file: File, private val keys: KeyHolder, purpose: 
     }
 
     private companion object {
+        val WRITING = Any()
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val VERSION: Byte = 1
         const val IV_BYTES = 12
@@ -96,11 +108,19 @@ interface SetupStore {
 }
 
 class SealedFileStore(file: File, keys: KeyHolder) : SetupStore {
-    private val sealed = SealedBytes(file, keys, Setup.FORMAT)
+    private val sealed = SealedBytes(file, keys, "north-watch-setup/1")
     override fun load(): Setup? = sealed.read()?.let { Setup.parse(it.decodeToString()) }
     override fun save(setup: Setup) = sealed.write(setup.toJson().encodeToByteArray())
     override fun clear() = sealed.delete()
 }
+
+/**
+ * A payment that left this phone and is not in a block yet. It is written down before the transaction is
+ * handed to the node, so that the app knows about it even if it is closed, or if the node's answer is lost.
+ * [unsure] is true until the node has been seen to hold the transaction. [inputs] are the coins it spends
+ * ("txid:n"); they are not offered for another payment.
+ */
+data class Pending(val txid: String, val sentSat: Long, val feeSat: Long, val inputs: Set<String>, val unsure: Boolean = false, val atMillis: Long = 0)
 
 /**
  * What the app keeps about its own wallet without any secret: enough to show it, not enough to spend.
@@ -109,6 +129,7 @@ class SealedFileStore(file: File, keys: KeyHolder) : SetupStore {
 data class WalletInfo(
     val chain: Chain, val xpub: String, val receiveIndex: Int = 0, val changeIndex: Int = 0,
     val hashrate: String = "", val price: String = "", val currency: String = "", val lockOnOpen: Boolean = true,
+    val pending: List<Pending> = emptyList(),
 ) {
     fun watchKey(): WatchKey = WatchKey.parse(xpub, chain)
 
@@ -125,11 +146,24 @@ data class WalletInfo(
         put("price", JsonPrimitive(price))
         put("currency", JsonPrimitive(currency))
         put("lockOnOpen", JsonPrimitive(lockOnOpen))
+        put("pending", buildJsonArray {
+            pending.forEach { p ->
+                add(buildJsonObject {
+                    put("txid", JsonPrimitive(p.txid))
+                    put("sent", JsonPrimitive(p.sentSat))
+                    put("fee", JsonPrimitive(p.feeSat))
+                    put("inputs", buildJsonArray { p.inputs.forEach { add(JsonPrimitive(it)) } })
+                    put("unsure", JsonPrimitive(p.unsure))
+                    put("at", JsonPrimitive(p.atMillis))
+                })
+            }
+        })
     }.toString()
 
     companion object {
         const val FORMAT = "north-wallet-info/1"
         const val GAP = 20
+        const val MAX_PENDING = 200
 
         fun parse(text: String): WalletInfo {
             val o = Json.parseToJsonElement(text) as JsonObject
@@ -142,7 +176,19 @@ data class WalletInfo(
             )
             require(info.receiveIndex in 0..100_000 && info.changeIndex in 0..100_000) { "a key number is out of bounds" }
             info.watchKey()                                 // refuses a key of another network or a damaged one
-            return info
+            val waiting = (o["pending"] as? JsonArray).orEmpty().map { it as JsonObject }.map { w ->
+                fun text(name: String) = (w[name] as JsonPrimitive).content
+                val inputs = (w["inputs"] as JsonArray).map { (it as JsonPrimitive).content }.toSet()
+                val p = Pending(
+                    text("txid"), (w["sent"] as JsonPrimitive).longOrNull ?: -1, (w["fee"] as JsonPrimitive).longOrNull ?: -1, inputs,
+                    (w["unsure"] as? JsonPrimitive)?.booleanOrNull ?: false, (w["at"] as? JsonPrimitive)?.longOrNull ?: 0,
+                )
+                require(NodeClient.isId(p.txid) && p.sentSat in 0..NodeClient.MAX_SAT && p.feeSat in 0..NodeClient.MAX_SAT) { "a waiting payment is damaged" }
+                require(inputs.isNotEmpty() && inputs.all { NodeClient.isId(it.substringBefore(':')) && it.substringAfter(':', "").toLongOrNull() in 0..NodeClient.MAX_VOUT }) { "a waiting payment is damaged" }
+                p
+            }
+            require(waiting.size <= MAX_PENDING) { "too many waiting payments" }
+            return info.copy(pending = waiting)
         }
     }
 }
@@ -200,9 +246,11 @@ class AndroidKeystoreKey(private val alias: String, private val ownerOnly: Boole
             if (strongBox) spec.setIsStrongBoxBacked(true)
             return KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, PROVIDER).apply { init(spec.build()) }.generateKey()
         }
+        // Phones differ in how they say that they have no separate security chip, or that it cannot make this key.
+        // Whatever the reason, the processor's secure area is tried next; if that fails too, its error is the one reported.
         return try {
             generate(strongBox = true)
-        } catch (e: StrongBoxUnavailableException) {
+        } catch (e: Exception) {
             generate(strongBox = false)
         }
     }

@@ -2,16 +2,16 @@
 <resources>
     <string name="app_name" translatable="false">North Wallet</string>
 
-    <string name="banner_title">Test build 0.3.1</string>
-    <string name="banner_text">This wallet has not been reviewed yet. Use it with small amounts only.</string>
+    <string name="banner_title">Test build 0.4</string>
+    <string name="banner_text">This wallet has been checked twice, but not yet by an independent human expert. Use it with small amounts only.</string>
 
     <string name="refresh">Refresh</string>
     <string name="cancel">Cancel</string>
     <string name="ok">OK</string>
     <string name="copy">Copy</string>
 
-    <string name="setup_title">Connect to your node</string>
-    <string name="setup_intro">North Watch asks your own TrueNorth node what your addresses hold. For that it needs a small setup file: where the node is, how to log in, and which addresses to watch.</string>
+    <string name="setup_title">Connect to a node of your own</string>
+    <string name="setup_intro">With a TrueNorth node of your own nobody else learns your addresses. The app needs a small setup file for it: where the node is, how to log in, and which addresses to watch, if any.</string>
     <string name="setup_how">Make the file on the computer that runs the node and send it to this phone. The password in it is never shown on the screen.</string>
     <string name="setup_pick_file">Choose the setup file</string>
     <string name="setup_paste">Paste from the clipboard</string>
@@ -54,7 +54,7 @@
         <item quantity="other">The next one matures in %1$d blocks.</item>
     </plurals>
 
-    <string name="node_title">Your node</string>
+    <string name="node_title">Node</string>
     <string name="node_address">Address</string>
     <string name="node_network">Network</string>
     <string name="node_height">Block height</string>
@@ -62,15 +62,8 @@
     <string name="node_syncing">The node is still catching up with the network (%1$d of %2$d blocks). The balance below is not complete yet.</string>
 
     <string name="address_title">Watched addresses</string>
-    <string name="outputs_title">Unspent outputs: %1$d</string>
-    <string name="no_outputs">The node finds nothing unspent on these addresses.</string>
     <string name="output_reward">block reward</string>
-    <string name="output_payment">payment</string>
     <string name="output_where">block %1$d, confirmations: %2$d</string>
-    <plurals name="matures_in">
-        <item quantity="one">matures in %1$d block</item>
-        <item quantity="other">matures in %1$d blocks</item>
-    </plurals>
 
     <string name="selftest_title">Self-test</string>
     <string name="selftest_text">Checks on this phone that the key code and its native library give the published answers for the public test phrase: its address and a signed test transaction. It uses no key of yours.</string>
@@ -81,16 +74,16 @@
 
     <string name="forget">Remove the setup</string>
     <string name="forget_title">Remove the setup?</string>
-    <string name="forget_text">The app forgets the node, the password and the addresses. Your coins are not touched: this app holds no keys.</string>
+    <string name="forget_text">The app forgets the node, its password and the watched addresses. The wallet in this phone and your coins are not touched.</string>
     <string name="forget_yes">Remove</string>
 
-    <string name="problem_unreachable">The node cannot be reached. Check that Tailscale is connected on this phone and that the computer with the node is running.</string>
+    <string name="problem_unreachable">The node cannot be reached. Check the internet connection of this phone. With a node of your own, check also that Tailscale is connected and that the computer with the node is running.</string>
     <string name="problem_login">The node refused the user name or the password.</string>
-    <string name="problem_not_allowed">The node does not allow this user to ask that. Check the rpcwhitelist line of the node.</string>
+    <string name="problem_not_allowed">The node does not allow that question. With a node of your own, check its rpcwhitelist line.</string>
     <string name="problem_node">The node answered with an error: %1$s</string>
     <string name="problem_other_chain">The node works on another network (%1$s) than the setup says.</string>
     <string name="problem_foreign">The node answered with outputs that do not belong to your addresses. Nothing is shown. Check the node.</string>
-    <string name="problem_store">The stored setup cannot be read (%1$s). Import the setup file again.</string>
+    <string name="problem_store">Something stored in this phone cannot be read or written (%1$s). If the node setup is missing, import it again.</string>
     <string name="problem_unexpected">Something unexpected happened (%1$s).</string>
 
     <string name="unlock_title">North Wallet</string>
@@ -129,7 +122,7 @@
     <string name="check_save">Lock the wallet with my fingerprint</string>
     <string name="check_back">Show the words again</string>
     <string name="restore_title">Bring back a wallet</string>
-    <string name="restore_text">Type the 12 or 24 recovery words of an existing wallet, separated by spaces. They will be stored in this phone, protected by your fingerprint.</string>
+    <string name="restore_text">Type the 12 or 24 recovery words of an existing wallet, separated by spaces. They will be stored in this phone, protected by your fingerprint. The coins of the wallet are found from the chain.</string>
     <string name="words_label">Recovery words</string>
     <string name="restore_go">Store the wallet</string>
     <string name="notice_wallet_ready">The wallet is ready.</string>
@@ -191,12 +184,12 @@
     <string name="paper_to_wallet">To this wallet</string>
     <string name="paper_keep">Amount for this wallet (empty means everything)</string>
     <string name="paper_rest_to">Address for the rest (a new paper address)</string>
-    <string name="paper_warning">This empties the paper address completely. Check both addresses character by character.</string>
+    <string name="paper_warning">This empties the paper address completely.</string>
     <string name="paper_go">Sign and send</string>
 
     <string name="problem_bad_address">This is not a valid address of this network.</string>
     <string name="problem_bad_amount">The amount is not valid. Use a number such as 12.5; the smallest amount is 0.00001.</string>
-    <string name="problem_nothing_to_spend">There is nothing that can be spent now.</string>
+    <string name="problem_nothing_to_spend">There is nothing that can be spent now. Coins of a payment that waits for a block, and block rewards younger than 100 blocks, cannot be spent yet.</string>
     <string name="problem_not_enough">Not enough coins. With the fee, the most that can be sent is %1$s.</string>
     <string name="problem_fee_rate">The fee rate is out of bounds.</string>
     <string name="problem_too_many_inputs">Too many small coins for one transaction. Send a smaller amount first.</string>
@@ -220,4 +213,31 @@
 
     <string name="pending_title">Sent, waiting for a block</string>
     <string name="pending_text">The node shows the old balance until the payment is in a block. The coins of this payment are not offered for another one meanwhile.</string>
+    <string name="public_title">Connect to a public node</string>
+    <string name="public_intro">The quickest way to start. The wallet asks a public TrueNorth node what your addresses hold and hands it your signed payments.</string>
+    <string name="public_sees">A public node sees your addresses and your internet address, and it could show you a false balance or hold a payment back. It cannot take your coins: your keys never leave this phone. For more privacy use a node of your own.</string>
+    <string name="public_address">Address of the public node</string>
+    <string name="public_go">Connect</string>
+    <string name="offer_no_account">none (public node)</string>
+    <string name="problem_timeout">The node did not answer in time. It may be busy. Try again in a moment.</string>
+    <string name="problem_busy">The node is busy. Try again in a moment.</string>
+    <string name="problem_wallet_file">The file that describes the wallet cannot be read (%1$s).</string>
+    <string name="problem_in_waiting">The coins for this payment are tied up in payments that wait for a block. Try again after the next block.</string>
+    <string name="problem_unsure">The node did not answer after the payment was handed over, so it is not known whether it went out (id %1$s). Do not pay again now. Refresh when the node can be reached: the payment then shows as waiting for a block, or the app tells you that it did not go through.</string>
+    <string name="problem_key_gone">Android has destroyed the key that protected the recovery words in this phone. That happens when the screen lock is removed. The words on your paper are now the only way to the coins: remove the wallet here and bring it back from the paper.</string>
+    <string name="problem_words_exist">This phone still stores the recovery words of an earlier wallet. They are never written over. Rebuild that wallet or remove its words first.</string>
+    <string name="problem_bad_price">The price must be a plain number such as 0.02.</string>
+    <string name="stored_words_title">Recovery words are stored, the wallet file is missing</string>
+    <string name="stored_words_text">This phone holds the recovery words of a wallet, but the file that describes the wallet is missing or cannot be read. The wallet can be rebuilt from the stored words with your fingerprint. Its coins are then found again from the chain.</string>
+    <string name="stored_words_rebuild">Rebuild the wallet with my fingerprint</string>
+    <string name="stored_words_discard">Remove the stored words</string>
+    <string name="notice_payment_gone">A payment of %1$s NORTH that waited for a block is no longer held by the node and is in no block. It did not go through. Look at History before paying again.</string>
+    <string name="notice_address_limit">Twenty addresses in a row have not been used yet. A wallet brought back from its words looks twenty addresses ahead, so no further one is opened until one of these has been used.</string>
+    <string name="notice_words_removed">The stored recovery words were removed.</string>
+    <string name="pending_unsure_title">Handed to the node, outcome not known</string>
+    <string name="pending_unsure_text">The node did not confirm that it took this payment. Its coins are kept aside meanwhile. Refresh when the node can be reached.</string>
+    <string name="in_waiting">In payments waiting for a block</string>
+    <string name="partial_note">One transaction takes at most %1$s coins, and this one is full. Coins left for the next step: %2$d.</string>
+    <string name="paper_warning_part">One transaction takes at most %1$s coins, and this one is full. Coins left on the paper address: %2$d. The next part is offered right after this one.</string>
+    <string name="paper_warning_rest">%1$s NORTH in block rewards are not ripe yet and stay on the paper address. Keep the paper. Empty the address once more when the last reward has ripened. Blocks until then: about %2$d.</string>
 </resources>

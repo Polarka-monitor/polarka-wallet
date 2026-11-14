@@ -7,7 +7,9 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
+import android.os.Build
 import android.os.CancellationSignal
+import android.view.View
 import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.Canvas
@@ -19,8 +21,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,7 +36,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -95,6 +101,33 @@ fun SecureWindow() {
     }
 }
 
+/**
+ * While this is on the screen, recovery words are shown or typed there. From Android 14 on, apps with
+ * accessibility rights that are not screen readers are then not given what the screen holds.
+ */
+@Composable
+fun WordsOnScreen() {
+    val view = LocalView.current
+    DisposableEffect(view) {
+        if (Build.VERSION.SDK_INT >= 34) view.setAccessibilityDataSensitive(View.ACCESSIBILITY_DATA_SENSITIVE_YES)
+        onDispose {
+            if (Build.VERSION.SDK_INT >= 34) view.setAccessibilityDataSensitive(View.ACCESSIBILITY_DATA_SENSITIVE_AUTO)
+        }
+    }
+}
+
+/** A box to tick with its text; a tap anywhere on the line counts. */
+@Composable
+fun Tick(checked: Boolean, onChange: (Boolean) -> Unit, text: String, tag: String? = null) {
+    Row(
+        (if (tag == null) Modifier else Modifier.testTag(tag)).fillMaxWidth().toggleable(value = checked, role = Role.Checkbox, onValueChange = onChange),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null)
+        Text(text, modifier = Modifier.padding(start = 12.dp, top = 10.dp, bottom = 10.dp))
+    }
+}
+
 fun copyToClipboard(context: Context, label: String, text: String) {
     context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(label, text))
 }
@@ -124,10 +157,16 @@ fun NoticeCard(model: WalletModel, state: WalletState) {
         Notice.WALLET_READY -> R.string.notice_wallet_ready
         Notice.WALLET_REMOVED -> R.string.notice_wallet_removed
         Notice.SAVED -> R.string.notice_saved
+        Notice.PAYMENT_GONE -> R.string.notice_payment_gone
+        Notice.ADDRESS_LIMIT -> R.string.notice_address_limit
+        Notice.WORDS_REMOVED -> R.string.notice_words_removed
     }
     Card(Modifier.fillMaxWidth()) {
         Row(Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(text), modifier = Modifier.weight(1f).testTag("notice"), style = MaterialTheme.typography.bodyMedium)
+            Text(
+                if (notice == Notice.PAYMENT_GONE) stringResource(text, state.noticeDetail) else stringResource(text),
+                modifier = Modifier.weight(1f).testTag("notice"), style = MaterialTheme.typography.bodyMedium,
+            )
             TextButton(onClick = { model.note(null) }) { Text(stringResource(R.string.ok)) }
         }
     }
@@ -136,6 +175,8 @@ fun NoticeCard(model: WalletModel, state: WalletState) {
 @Composable
 fun problemText(problem: Problem): String = when (problem.kind) {
     Problem.Kind.UNREACHABLE -> stringResource(R.string.problem_unreachable)
+    Problem.Kind.TIMEOUT -> stringResource(R.string.problem_timeout)
+    Problem.Kind.BUSY -> stringResource(R.string.problem_busy)
     Problem.Kind.LOGIN -> stringResource(R.string.problem_login)
     Problem.Kind.NOT_ALLOWED -> stringResource(R.string.problem_not_allowed)
     Problem.Kind.NODE -> stringResource(R.string.problem_node, problem.detail)
@@ -153,6 +194,12 @@ fun problemText(problem: Problem): String = when (problem.kind) {
     Problem.Kind.BAD_WORDS -> stringResource(R.string.problem_bad_words)
     Problem.Kind.REJECTED -> stringResource(R.string.problem_rejected, problem.detail)
     Problem.Kind.UNLOCK -> stringResource(R.string.problem_unlock, problem.detail)
+    Problem.Kind.IN_WAITING_PAYMENT -> stringResource(R.string.problem_in_waiting)
+    Problem.Kind.UNSURE -> stringResource(R.string.problem_unsure, problem.detail)
+    Problem.Kind.KEY_GONE -> stringResource(R.string.problem_key_gone)
+    Problem.Kind.WORDS_EXIST -> stringResource(R.string.problem_words_exist)
+    Problem.Kind.WALLET_FILE -> stringResource(R.string.problem_wallet_file, problem.detail)
+    Problem.Kind.BAD_PRICE -> stringResource(R.string.problem_bad_price)
 }
 
 @Composable

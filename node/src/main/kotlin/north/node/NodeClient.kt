@@ -13,14 +13,24 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.io.InputStream
 import java.math.BigDecimal
 import java.net.HttpURLConnection
 import java.net.InetAddress
+import java.net.SocketTimeoutException
 import java.net.URI
 import java.util.Base64
+import java.util.concurrent.ConcurrentHashMap
 
-/** The node answered, but with an error; or it could not be reached (httpStatus 0). */
-class NodeError(val httpStatus: Int, val code: Int?, message: String) : Exception(message)
+/**
+ * The node answered, but with an error; or it could not be reached (httpStatus 0).
+ * With httpStatus 0, [code] is [TIMEOUT] when the node was reached and did not answer in time.
+ */
+class NodeError(val httpStatus: Int, val code: Int?, message: String) : Exception(message) {
+    companion object {
+        const val TIMEOUT = -1
+    }
+}
 
 /** One unspent output of a watched address. */
 data class Utxo(val txid: String, val vout: Long, val amountSat: Long, val height: Int, val coinbase: Boolean, val script: String)
@@ -32,9 +42,9 @@ data class Utxo(val txid: String, val vout: Long, val amountSat: Long, val heigh
 data class Balance(val tip: Int, val utxos: List<Utxo>) {
     val spendable: List<Utxo> get() = utxos.filter { !it.coinbase || it.height <= tip - MATURITY }
     val immature: List<Utxo> get() = utxos.filter { it.coinbase && it.height > tip - MATURITY }
-    val spendableSat: Long get() = spendable.sumOf { it.amountSat }
-    val immatureSat: Long get() = immature.sumOf { it.amountSat }
-    val totalSat: Long get() = utxos.sumOf { it.amountSat }
+    val spendableSat: Long get() = NodeClient.total(spendable.map { it.amountSat })
+    val immatureSat: Long get() = NodeClient.total(immature.map { it.amountSat })
+    val totalSat: Long get() = NodeClient.total(utxos.map { it.amountSat })
 
     companion object {
         const val MATURITY = 100
@@ -46,17 +56,22 @@ data class ChainInfo(val chain: String, val blocks: Int, val headers: Int, val s
 data class Verdict(val allowed: Boolean, val vsize: Int?, val feeSat: Long?, val rejectReason: String?)
 
 /**
- * A small JSON-RPC client for a TrueNorth Core node of one's own.
+ * A small JSON-RPC client for a TrueNorth Core node.
  *
- * It uses only the calls a wallet needs and nothing that touches a wallet on the node:
- * getblockcount, getblockchaininfo, scantxoutset, testmempoolaccept, sendrawtransaction, getrawtransaction.
- * The node should give this user exactly those rights (-rpcwhitelist).
+ * It uses only the calls a wallet needs and nothing that touches a wallet on the node (the list is in the
+ * tests). A node of one's own should give this user exactly those rights (-rpcwhitelist). With an empty
+ * [user] no login is sent at all: that is a public node behind a gateway, which needs none.
  *
- * The password travels in every request, so the address must be https, or plain http only to this machine or
+ * A password travels in every request, so the address must be https, or plain http only to this machine or
  * to a private network address (which includes a Tailscale address). Anything else is refused here.
+ *
+ * Nothing the node says is taken on trust beyond what it must be trusted for: amounts must be amounts that
+ * can exist, ids must look like ids, an answer has a largest size, and the node's own words are cut short
+ * before anybody sees them.
  */
 class NodeClient(url: String, private val user: String, private val password: String, private val timeoutMs: Int = 60_000) {
     private val endpoint: URI = URI(url)
+    private val scanLock: Any
 
     init {
         val host = endpoint.host ?: throw IllegalArgumentException("the node address has no host")
@@ -65,57 +80,119 @@ class NodeClient(url: String, private val user: String, private val password: St
             "http" -> require(isPrivate(host)) { "plain http is only allowed to a private or Tailscale address; use https for $host" }
             else -> throw IllegalArgumentException("the node address must start with https:// or http://")
         }
+        scanLock = LOCKS.computeIfAbsent(endpoint.toString()) { Any() }
     }
 
-    fun call(method: String, params: JsonArray = JsonArray(emptyList())): JsonElement {
+    private class Answer(val status: Int, val text: String, val retryAfter: Int?)
+
+    private class TooLong : RuntimeException()
+
+    private fun read(stream: InputStream?): String {
+        if (stream == null) return ""
+        stream.use { input ->
+            val out = java.io.ByteArrayOutputStream()
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val n = input.read(buffer)
+                if (n < 0) break
+                if (out.size() + n > MAX_ANSWER_BYTES) throw TooLong()
+                out.write(buffer, 0, n)
+            }
+            return out.toByteArray().decodeToString()
+        }
+    }
+
+    private fun once(method: String, params: JsonArray, readTimeoutMs: Int): Answer {
         val body = buildJsonObject {
             put("jsonrpc", JsonPrimitive("1.0"))
             put("id", JsonPrimitive("north"))
             put("method", JsonPrimitive(method))
             put("params", params)
         }.toString().encodeToByteArray()
-        val status: Int
-        val text: String
+        var asked = false
         try {
             val c = endpoint.toURL().openConnection() as HttpURLConnection
             c.requestMethod = "POST"
             c.connectTimeout = timeoutMs
-            c.readTimeout = timeoutMs
+            c.readTimeout = readTimeoutMs
             c.instanceFollowRedirects = false           // never carry the password to another address
             c.doOutput = true
             c.setRequestProperty("Content-Type", "application/json")
-            c.setRequestProperty("Authorization", "Basic " + Base64.getEncoder().encodeToString("$user:$password".encodeToByteArray()))
+            if (user.isNotEmpty()) {
+                c.setRequestProperty("Authorization", "Basic " + Base64.getEncoder().encodeToString("$user:$password".encodeToByteArray()))
+            }
             c.outputStream.use { it.write(body) }
-            status = c.responseCode
-            text = (if (status in 200..299) c.inputStream else c.errorStream)?.use { it.readBytes().decodeToString() } ?: ""
+            asked = true
+            val status = c.responseCode
+            val text = read(if (status in 200..299) c.inputStream else c.errorStream)
+            val retry = c.getHeaderField("Retry-After")?.trim()?.toIntOrNull()
             c.disconnect()
+            return Answer(status, text, retry)
+        } catch (e: TooLong) {
+            throw NodeError(200, null, "the node sent an answer that is too long")
+        } catch (e: SocketTimeoutException) {
+            if (asked) throw NodeError(0, NodeError.TIMEOUT, "the node did not answer in time")
+            throw NodeError(0, null, "the node cannot be reached (${e.javaClass.simpleName})")
         } catch (e: java.io.IOException) {
             throw NodeError(0, null, "the node cannot be reached (${e.javaClass.simpleName})")
         }
+    }
+
+    /**
+     * One call. A gateway that asks to slow down (429) or is busy (503), and a node that is still running an
+     * earlier scan, are waited for a little while and asked again; everything else is answered at once.
+     */
+    fun call(method: String, params: JsonArray = JsonArray(emptyList()), readTimeoutMs: Int = timeoutMs): JsonElement {
+        var waited = 0L
+        while (true) {
+            val answer = once(method, params, readTimeoutMs)
+            val busy = answer.status == 429 || answer.status == 503 || "Scan already in progress" in answer.text.take(600)
+            if (!busy || waited >= MAX_WAIT_MS) return result(method, answer)
+            val pause = (answer.retryAfter ?: 2).coerceIn(1, 5) * 1000L
+            try {
+                Thread.sleep(pause)
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                throw NodeError(0, null, "the node cannot be reached (interrupted)")
+            }
+            waited += pause
+        }
+    }
+
+    private fun result(method: String, answer: Answer): JsonElement {
+        val status = answer.status
         when (status) {
             401 -> throw NodeError(status, null, "the node refused the user name or password")
-            403 -> throw NodeError(status, null, "the node does not allow this user to call $method")
+            403 -> throw NodeError(status, null, "the node does not allow the call $method")
+            429, 503 -> throw NodeError(status, null, "the node is busy")
         }
         val json = try {
-            Json.parseToJsonElement(text).jsonObject
+            Json.parseToJsonElement(answer.text).jsonObject
         } catch (e: Exception) {
             throw NodeError(status, null, "the node sent an answer that is not JSON (HTTP $status)")
         }
         val error = json["error"]
         if (error != null && error !is JsonNull) {
-            val e = error.jsonObject
-            throw NodeError(status, e["code"]?.jsonPrimitive?.int, e["message"]?.jsonPrimitive?.content ?: "error")
+            val e = error as? JsonObject ?: throw NodeError(status, null, "the node sent an error in an unknown form")
+            val code = runCatching { e["code"]?.jsonPrimitive?.int }.getOrNull()
+            throw NodeError(status, code, clean(runCatching { e["message"]?.jsonPrimitive?.content }.getOrNull() ?: "error"))
         }
         return json["result"] ?: JsonNull
     }
 
+    /** Runs [block] when no other scan of this app is running on the same node: the node does one scan at a time. */
+    fun <T> scanning(block: () -> T): T = synchronized(scanLock) { block() }
+
+    /** The time a scan may take: longer than an ordinary call. */
+    val scanTimeoutMs: Int get() = maxOf(timeoutMs, SCAN_TIMEOUT_MS)
+
     fun blockCount(): Int = call("getblockcount").jsonPrimitive.int
 
-    fun chainInfo(): ChainInfo {
+    fun chainInfo(): ChainInfo = shaped("getblockchaininfo") {
         val r = call("getblockchaininfo").jsonObject
-        return ChainInfo(
-            r.text("chain"), r["blocks"]!!.jsonPrimitive.int, r["headers"]!!.jsonPrimitive.int,
-            r["initialblockdownload"]!!.jsonPrimitive.boolean, r.text("bestblockhash"),
+        ChainInfo(
+            clean(r.text("chain"), 20), height(r["blocks"]!!), height(r["headers"]!!),
+            r["initialblockdownload"]!!.jsonPrimitive.boolean, id(r.text("bestblockhash")),
         )
     }
 
@@ -123,32 +200,23 @@ class NodeClient(url: String, private val user: String, private val password: St
     fun balance(addresses: List<String>): Balance {
         require(addresses.isNotEmpty()) { "no address to look up" }
         require(addresses.all { a -> a.all { it.isLetterOrDigit() } }) { "an address contains a character that cannot be in an address" }
-        val r = call("scantxoutset", buildJsonArray {
-            add(JsonPrimitive("start"))
-            add(buildJsonArray { addresses.forEach { add(JsonPrimitive("addr($it)")) } })
-        }).jsonObject
-        if (r["success"]?.jsonPrimitive?.boolean != true) throw NodeError(200, null, "the node could not finish the scan")
-        val utxos = r["unspents"]!!.jsonArray.map { it.jsonObject }.map { u ->
-            Utxo(
-                u.text("txid"), u["vout"]!!.jsonPrimitive.content.toLong(), sats(u["amount"]!!),
-                u["height"]!!.jsonPrimitive.int, u["coinbase"]?.jsonPrimitive?.boolean ?: false, u.text("scriptPubKey"),
-            )
-        }
-        return Balance(r["height"]!!.jsonPrimitive.int, utxos)
+        return scanDescriptors(addresses.map { "addr($it)" }, 1)
     }
 
     /** Asks the node whether it would accept this transaction, without sending it. */
-    fun testAccept(hex: String): Verdict {
+    fun testAccept(hex: String): Verdict = shaped("testmempoolaccept") {
         val r = call("testmempoolaccept", buildJsonArray { add(buildJsonArray { add(JsonPrimitive(hex)) }) }).jsonArray[0].jsonObject
         val fees = r["fees"]?.jsonObject
-        return Verdict(
+        Verdict(
             r["allowed"]!!.jsonPrimitive.boolean, r["vsize"]?.jsonPrimitive?.int,
-            fees?.get("base")?.let { sats(it) }, r["reject-reason"]?.jsonPrimitive?.content,
+            fees?.get("base")?.let { sats(it) }, r["reject-reason"]?.jsonPrimitive?.content?.let { clean(it) },
         )
     }
 
-    /** Sends a signed transaction to the network. Returns its id. */
-    fun broadcast(hex: String): String = call("sendrawtransaction", buildJsonArray { add(JsonPrimitive(hex)) }).jsonPrimitive.content
+    /** Sends a signed transaction to the network. Returns what the node answers, which should be the transaction's id. */
+    fun broadcast(hex: String): String = shaped("sendrawtransaction") {
+        clean(call("sendrawtransaction", buildJsonArray { add(JsonPrimitive(hex)) }).jsonPrimitive.content, 80)
+    }
 
     /** Confirmations of a transaction the node knows (0 while it waits in the mempool), or null if it does not know it. */
     fun confirmations(txid: String): Int? = try {
@@ -158,11 +226,87 @@ class NodeClient(url: String, private val user: String, private val password: St
         if (e.code == -5) null else throw e
     }
 
+    /** True if the node holds this transaction among those that wait for a block. */
+    fun waiting(txid: String): Boolean {
+        require(isId(txid)) { "this is not a transaction id" }
+        return try {
+            call("getmempoolentry", buildJsonArray { add(JsonPrimitive(txid)) }) is JsonObject
+        } catch (e: NodeError) {
+            if (e.code == -5) false else throw e
+        }
+    }
+
+    /**
+     * True if this output exists and nothing spends it, counting the transactions that wait for a block.
+     * A coin that a waiting payment uses is still in the node's set of unspent outputs; this is how to tell.
+     */
+    fun unspent(txid: String, vout: Long): Boolean {
+        require(isId(txid) && vout in 0..MAX_VOUT) { "this is not an output" }
+        return call("gettxout", buildJsonArray { add(JsonPrimitive(txid)); add(JsonPrimitive(vout)); add(JsonPrimitive(true)) }) !is JsonNull
+    }
+
     private fun JsonObject.text(name: String): String = this[name]!!.jsonPrimitive.content
 
     companion object {
-        /** An amount as the node prints it (a decimal number of coins) to base units, exactly. */
-        fun sats(e: JsonElement): Long = BigDecimal(e.jsonPrimitive.content).movePointRight(8).longValueExact()
+        /** No amount and no sum of amounts can be larger: two thousand million coins, far above everything that will ever be mined. */
+        const val MAX_SAT = 2_000_000_000L * 100_000_000L
+        const val MAX_VOUT = 0xffffffffL
+        const val MAX_ANSWER_BYTES = 16 * 1024 * 1024
+        const val MAX_WAIT_MS = 45_000L
+        const val SCAN_TIMEOUT_MS = 120_000
+        private val LOCKS = ConcurrentHashMap<String, Any>()
+
+        /** An amount as the node prints it (a decimal number of coins) to base units, exactly; refused if it cannot exist. */
+        fun sats(e: JsonElement): Long {
+            val text = e.jsonPrimitive.content
+            if (text.length > 40) throw NodeError(200, null, "the node sent an amount that cannot exist")
+            val sat = try {
+                BigDecimal(text).movePointRight(8).longValueExact()
+            } catch (x: Exception) {
+                throw NodeError(200, null, "the node sent an amount that cannot exist")
+            }
+            if (sat < 0 || sat > MAX_SAT) throw NodeError(200, null, "the node sent an amount that cannot exist")
+            return sat
+        }
+
+        /** A sum of amounts, refused if it is more than can exist. */
+        fun total(amounts: Iterable<Long>): Long {
+            var sum = 0L
+            for (a in amounts) {
+                if (a < 0 || a > MAX_SAT) throw NodeError(200, null, "the node sent an amount that cannot exist")
+                sum += a
+                if (sum > MAX_SAT) throw NodeError(200, null, "the node sent amounts that cannot exist together")
+            }
+            return sum
+        }
+
+        fun isId(text: String): Boolean = text.length == 64 && text.all { it in '0'..'9' || it in 'a'..'f' }
+
+        /** A transaction id or block hash as the node writes it: 64 hexadecimal characters in lower case. */
+        fun id(text: String): String = if (isId(text)) text else throw NodeError(200, null, "the node sent something that is not an id")
+
+        fun height(e: JsonElement): Int {
+            val h = e.jsonPrimitive.int
+            if (h < 0 || h > 500_000_000) throw NodeError(200, null, "the node sent a height that cannot exist")
+            return h
+        }
+
+        /** Words of the node, made safe to show: printable characters only, and not too many of them. */
+        fun clean(text: String, max: Int = 200): String = text.filter { it >= ' ' && it != '\u007f' }.take(max)
+
+        /** Unspent outputs as scantxoutset lists them. The same output twice, or anything malformed, refuses the whole answer. */
+        fun utxos(list: JsonArray): List<Utxo> {
+            val seen = HashSet<String>()
+            return list.map { it.jsonObject }.map { u ->
+                val txid = id(u["txid"]!!.jsonPrimitive.content)
+                val vout = u["vout"]!!.jsonPrimitive.content.toLong()
+                if (vout < 0 || vout > MAX_VOUT) throw NodeError(200, null, "the node sent an output number that cannot exist")
+                if (!seen.add("$txid:$vout")) throw NodeError(200, null, "the node listed the same output twice")
+                val script = u["scriptPubKey"]!!.jsonPrimitive.content
+                if (script.length > 200 || !script.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) throw NodeError(200, null, "the node sent a script in an unknown form")
+                Utxo(txid, vout, sats(u["amount"]!!), height(u["height"]!!), u["coinbase"]?.jsonPrimitive?.boolean ?: false, script)
+            }
+        }
 
         /** Loopback, the private ranges of RFC 1918, link-local, and 100.64.0.0/10 (Tailscale). Only literal addresses and "localhost". */
         fun isPrivate(host: String): Boolean {
@@ -174,4 +318,13 @@ class NodeClient(url: String, private val user: String, private val password: St
             return b.size == 4 && (b[0].toInt() and 0xff) == 100 && (b[1].toInt() and 0xc0) == 64
         }
     }
+}
+
+/** Runs the reading of one answer; anything that is not in the expected form becomes one clear error. */
+internal inline fun <T> shaped(what: String, block: () -> T): T = try {
+    block()
+} catch (e: NodeError) {
+    throw e
+} catch (e: Exception) {
+    throw NodeError(200, null, "the node sent an answer in an unknown form ($what)")
 }

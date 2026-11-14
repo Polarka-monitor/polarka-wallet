@@ -55,12 +55,16 @@ import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
     internal val model: WalletModel by viewModels()
-    private var leftAt = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // a released build never lets its screen be captured; a test build does, except where words are shown
         if (!isDebugBuild(this)) window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+        // no other app may draw over this one: a window laid over a confirmation could show another address than the real one
+        runCatching { window.setHideOverlayWindows(true) }
+        // Android may build this screen anew while the app is in the background (the phone was turned, folded,
+        // switched to dark mode). The time away is kept in the model, which survives that, and is looked at here too.
+        model.returned()
         enableEdgeToEdge()
         runCatching { Notifier.schedule(this) }          // never a reason for the app not to start
         val owner = testOwner ?: PhoneOwner(this, getString(R.string.unlock_title), getString(R.string.unlock_subtitle))
@@ -69,12 +73,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        leftAt = System.currentTimeMillis()
+        model.left()
     }
 
     override fun onStart() {
         super.onStart()
-        if (leftAt != 0L && System.currentTimeMillis() - leftAt > LOCK_AFTER_MILLIS) model.lock()
+        model.returned()
     }
 
     override fun onResume() {
@@ -83,8 +87,6 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        const val LOCK_AFTER_MILLIS = 60_000L
-
         /** A test puts its own owner here; the app itself always asks the phone. */
         @Volatile
         var testOwner: Owner? = null
@@ -95,6 +97,9 @@ enum class Section(val title: Int) {
     OVERVIEW(R.string.tab_overview), RECEIVE(R.string.tab_receive), SEND(R.string.tab_send),
     HISTORY(R.string.tab_history), MINING(R.string.tab_mining), MORE(R.string.tab_more),
 }
+
+/** The public node offered on the first screen. The user may type another one. */
+const val PUBLIC_NODE = "https://node.polarka.org"
 
 val screenPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
 val gap = Arrangement.spacedBy(12.dp)
@@ -135,8 +140,8 @@ fun NorthApp(model: WalletModel, owner: Owner) {
                             }
                         }
                         when (section) {
-                            Section.OVERVIEW -> OverviewTab(model, state) { section = it }
-                            Section.RECEIVE -> ReceiveTab(model, state)
+                            Section.OVERVIEW -> OverviewTab(model, state, owner) { section = it }
+                            Section.RECEIVE -> ReceiveTab(model, state, owner)
                             Section.SEND -> SendTab(model, state, owner)
                             Section.HISTORY -> HistoryTab(state)
                             Section.MINING -> MiningTab(model, state)
@@ -164,6 +169,7 @@ private fun LockScreen(model: WalletModel, owner: Owner) {
 private fun SetupScreen(model: WalletModel, state: WalletState) {
     val context = LocalContext.current
     var deleteFile by rememberSaveable { mutableStateOf(true) }
+    var publicUrl by rememberSaveable { mutableStateOf(PUBLIC_NODE) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) model.offerFile(uri) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(screenPadding), verticalArrangement = gap) {
@@ -172,12 +178,24 @@ private fun SetupScreen(model: WalletModel, state: WalletState) {
         ProblemCard(state.problem)
         val offered = state.offered
         if (offered == null) {
+            state.offerError?.let { reason ->
+                Text(setupErrorText(reason, state.offerDetail), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("setup-error"))
+            }
+            Block(stringResource(R.string.public_title)) {
+                Text(stringResource(R.string.public_intro))
+                Text(stringResource(R.string.public_sees), style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(
+                    value = publicUrl, onValueChange = { publicUrl = it.trim() }, singleLine = true, label = { Text(stringResource(R.string.public_address)) },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, keyboardType = KeyboardType.Uri),
+                    modifier = Modifier.fillMaxWidth().testTag("public-url"),
+                )
+                Button(onClick = { model.offerPublic(publicUrl) }, enabled = publicUrl.isNotBlank(), modifier = Modifier.fillMaxWidth().testTag("public-go")) {
+                    Text(stringResource(R.string.public_go))
+                }
+            }
             Block(stringResource(R.string.setup_title)) {
                 Text(stringResource(R.string.setup_intro))
                 Text(stringResource(R.string.setup_how))
-                state.offerError?.let { reason ->
-                    Text(setupErrorText(reason, state.offerDetail), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("setup-error"))
-                }
                 // every file type: phones do not agree on what kind of file a .json is, and the content is checked anyway
                 Button(onClick = { picker.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.setup_pick_file)) }
                 OutlinedButton(
@@ -197,18 +215,22 @@ private fun SetupScreen(model: WalletModel, state: WalletState) {
         } else {
             Block(stringResource(R.string.offer_title)) {
                 Field(stringResource(R.string.offer_node), offered.url)
-                Field(stringResource(R.string.offer_user), offered.user)
-                Field(stringResource(R.string.offer_password), stringResource(R.string.offer_password_set, offered.password.length))
-                Field(stringResource(R.string.offer_chain), offered.chainName)
-                Text(stringResource(R.string.offer_addresses), style = MaterialTheme.typography.labelMedium)
-                offered.addresses.forEach { Mono(it) }
-                if (state.offeredFrom != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = deleteFile, onCheckedChange = { deleteFile = it })
-                        Text(stringResource(R.string.offer_delete_file))
-                    }
+                if (offered.isPublic) {
+                    Field(stringResource(R.string.offer_user), stringResource(R.string.offer_no_account))
+                } else {
+                    Field(stringResource(R.string.offer_user), offered.user)
+                    Field(stringResource(R.string.offer_password), stringResource(R.string.offer_password_set, offered.password.length))
                 }
-                Button(onClick = { model.acceptOffer(deleteFile) }, modifier = Modifier.fillMaxWidth().testTag("save")) { Text(stringResource(R.string.offer_save)) }
+                Field(stringResource(R.string.offer_chain), offered.chainName)
+                if (offered.addresses.isNotEmpty()) {
+                    Text(stringResource(R.string.offer_addresses), style = MaterialTheme.typography.labelMedium)
+                    offered.addresses.forEach { Mono(it) }
+                }
+                if (offered.isPublic) Text(stringResource(R.string.public_sees), style = MaterialTheme.typography.bodySmall)
+                if (state.offeredFrom != null && !offered.isPublic) {
+                    Tick(deleteFile, { deleteFile = it }, stringResource(R.string.offer_delete_file))
+                }
+                Button(onClick = { model.acceptOffer(deleteFile && !offered.isPublic) }, modifier = Modifier.fillMaxWidth().testTag("save")) { Text(stringResource(R.string.offer_save)) }
                 TextButton(onClick = model::dropOffer, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cancel)) }
             }
         }
@@ -240,6 +262,7 @@ val secretKeyboard = KeyboardOptions(capitalization = KeyboardCapitalization.Non
 private fun NewWalletScreen(model: WalletModel, state: WalletState, owner: Owner) {
     val words = state.newWords?.words ?: return
     SecureWindow()
+    WordsOnScreen()
     var written by rememberSaveable { mutableStateOf(false) }
     var checking by rememberSaveable { mutableStateOf(false) }
     val asked = remember(words) { words.indices.shuffled().take(3).sorted() }
@@ -257,10 +280,7 @@ private fun NewWalletScreen(model: WalletModel, state: WalletState, owner: Owner
                     }
                 }
                 Text(stringResource(R.string.new_warning), color = MaterialTheme.colorScheme.error)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = written, onCheckedChange = { written = it }, modifier = Modifier.testTag("written"))
-                    Text(stringResource(R.string.new_written))
-                }
+                Tick(written, { written = it }, stringResource(R.string.new_written), "written")
                 Button(onClick = { checking = true }, enabled = written, modifier = Modifier.fillMaxWidth().testTag("new-next")) { Text(stringResource(R.string.new_next)) }
                 TextButton(onClick = model::cancelNewWallet, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cancel)) }
             }

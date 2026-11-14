@@ -19,11 +19,13 @@ android {
         versionName = "0.3.1"
     }
     // The key that signs releases lives outside the project, on the owner's computer only (see make-signing-key.sh).
-    // Without it a release cannot be built here, and that is intended.
+    // Without it a release cannot be built here, and that is intended. The file that names the key is opened only
+    // when a release is being built: tests, lint and debug builds never touch it.
+    val wantsRelease = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
     val signingFile = File(System.getProperty("user.home"), ".config/north-wallet/signing.properties")
-    val signing = Properties().apply { if (signingFile.exists()) signingFile.inputStream().use { load(it) } }
+    val signing = Properties().apply { if (wantsRelease && signingFile.exists()) signingFile.inputStream().use { load(it) } }
     signingConfigs {
-        if (signingFile.exists()) create("release") {
+        if (wantsRelease && signingFile.exists()) create("release") {
             storeFile = file(signing.getProperty("storeFile"))
             storePassword = signing.getProperty("storePassword")
             keyAlias = signing.getProperty("keyAlias")

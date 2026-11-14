@@ -38,7 +38,11 @@ class PlanError(val reason: Reason, val availableSat: Long = 0) : Exception(reas
 }
 
 /** A payment worked out but not signed: which coins go in, what goes out, and what it costs. */
-class Plan(val inputs: List<Unspent>, val payments: List<Payment>, val feeSat: Long, val vsize: Int, val changeSat: Long) {
+class Plan(
+    val inputs: List<Unspent>, val payments: List<Payment>, val feeSat: Long, val vsize: Int, val changeSat: Long,
+    /** Coins that could be spent but did not fit into this one transaction; emptying must be repeated for them. */
+    val leftBehind: Int = 0,
+) {
     val inputSat: Long get() = inputs.sumOf { it.amountSat }
     val sentSat: Long get() = payments.sumOf { it.amountSat } - changeSat
 
@@ -101,30 +105,35 @@ object Planner {
 
     /**
      * Spends every coin: [keepSat] to the script [to], and all the rest, less the fee, to the script [rest].
-     * Used to empty a paper address into two places at once.
+     * Used to empty a paper address into two places at once. One transaction takes at most [MAX_INPUTS] coins;
+     * if there are more, the largest ones go now and the caller repeats with what is left.
      */
     fun split(spendable: List<Unspent>, to: ByteArray, keepSat: Long, feeRate: Long, rest: ByteArray): Plan {
         checkRate(feeRate)
         if (keepSat < MIN_OUTPUT_SAT) throw PlanError(PlanError.Reason.AMOUNT_TOO_SMALL)
-        val coins = ordered(spendable)
+        val every = ordered(spendable)
+        val coins = every.take(MAX_INPUTS)
         if (coins.isEmpty()) throw PlanError(PlanError.Reason.NOTHING_TO_SPEND)
-        if (coins.size > MAX_INPUTS) throw PlanError(PlanError.Reason.TOO_MANY_INPUTS, coins.take(MAX_INPUTS).sumOf { it.amountSat })
         val size = Spend.vsize(coins.size, listOf(to, rest))
         val all = coins.sumOf { it.amountSat }
         val left = all - keepSat - size * feeRate
         if (left < MIN_OUTPUT_SAT) throw PlanError(PlanError.Reason.NOT_ENOUGH, maxOf(0, all - size * feeRate - MIN_OUTPUT_SAT))
-        return Plan(coins, listOf(Payment(to, keepSat), Payment(rest, left)), size * feeRate, size, left)
+        return Plan(coins, listOf(Payment(to, keepSat), Payment(rest, left)), size * feeRate, size, left, every.size - coins.size)
     }
 
-    /** Sends everything in [spendable] to the script [to], less the fee. Used to empty a wallet or a paper address. */
+    /**
+     * Sends everything in [spendable] to the script [to], less the fee. Used to empty a wallet or a paper address.
+     * One transaction takes at most [MAX_INPUTS] coins; if there are more, the largest ones go now and the
+     * caller repeats with what is left (compare the plan's inputs with what was offered).
+     */
     fun sweep(spendable: List<Unspent>, to: ByteArray, feeRate: Long): Plan {
         checkRate(feeRate)
-        val coins = ordered(spendable)
+        val every = ordered(spendable)
+        val coins = every.take(MAX_INPUTS)
         if (coins.isEmpty()) throw PlanError(PlanError.Reason.NOTHING_TO_SPEND)
-        if (coins.size > MAX_INPUTS) throw PlanError(PlanError.Reason.TOO_MANY_INPUTS, coins.take(MAX_INPUTS).sumOf { it.amountSat })
         val size = Spend.vsize(coins.size, listOf(to))
         val amount = coins.sumOf { it.amountSat } - size * feeRate
         if (amount < MIN_OUTPUT_SAT) throw PlanError(PlanError.Reason.NOT_ENOUGH, maxOf(0, amount))
-        return Plan(coins, listOf(Payment(to, amount)), size * feeRate, size, 0)
+        return Plan(coins, listOf(Payment(to, amount)), size * feeRate, size, 0, every.size - coins.size)
     }
 }

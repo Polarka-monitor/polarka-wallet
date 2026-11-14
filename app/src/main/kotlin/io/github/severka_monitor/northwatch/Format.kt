@@ -57,10 +57,17 @@ object Format {
     fun dateTime(seconds: Long): String = dateFormat.withZone(java.time.ZoneId.systemDefault()).format(java.time.Instant.ofEpochSecond(seconds))
 
     /** What an amount is worth at a price per coin typed in by the user; null if no usable price is set. */
-    fun value(sat: Long, price: String, currency: String): String? {
-        val each = price.trim().replace(',', '.').toBigDecimalOrNull() ?: return null
-        if (each.signum() <= 0) return null
-        val worth = java.math.BigDecimal(sat).movePointLeft(8).multiply(each).setScale(2, java.math.RoundingMode.HALF_UP)
-        return worth.toPlainString() + (if (currency.isBlank()) "" else " " + currency)
+    fun value(sat: Long, price: String, currency: String): String? = try {
+        val plain = price.trim().replace(',', '.')
+        // only a plain number is a price: this runs every time the overview is drawn and must never fail there
+        if (sat < 0 || !Regex("[0-9]{1,12}(\\.[0-9]{1,8})?").matches(plain)) null else {
+            val each = java.math.BigDecimal(plain)
+            if (each.signum() <= 0) null else {
+                val worth = java.math.BigDecimal(sat).movePointLeft(8).multiply(each).setScale(2, java.math.RoundingMode.HALF_UP)
+                worth.toPlainString() + (if (currency.isBlank()) "" else " " + currency)
+            }
+        }
+    } catch (e: Exception) {
+        null
     }
 }

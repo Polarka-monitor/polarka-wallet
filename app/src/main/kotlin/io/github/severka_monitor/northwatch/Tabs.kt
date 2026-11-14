@@ -63,7 +63,27 @@ private fun Busy(text: Int) {
 }
 
 @Composable
-private fun NoWallet(model: WalletModel) {
+private fun NoWallet(model: WalletModel, state: WalletState, owner: Owner) {
+    if (state.wordsWithoutWallet) {
+        // recovery words are stored, but the wallet's own file is missing or cannot be read: nothing here may write over them
+        var askDiscard by rememberSaveable { mutableStateOf(false) }
+        Block(stringResource(R.string.stored_words_title)) {
+            Text(stringResource(R.string.stored_words_text))
+            ProblemCard(state.walletProblem, "wallet-problem")
+            Button(onClick = { model.rebuildWallet(owner) }, modifier = Modifier.fillMaxWidth().testTag("wallet-rebuild")) { Text(stringResource(R.string.stored_words_rebuild)) }
+            TextButton(onClick = { askDiscard = true }, modifier = Modifier.fillMaxWidth().testTag("words-discard")) { Text(stringResource(R.string.stored_words_discard)) }
+        }
+        if (askDiscard) {
+            AlertDialog(
+                onDismissRequest = { askDiscard = false },
+                title = { Text(stringResource(R.string.stored_words_discard)) },
+                text = { Text(stringResource(R.string.wallet_remove_text)) },
+                confirmButton = { TextButton(onClick = { askDiscard = false; model.discardStoredWords(owner) }, modifier = Modifier.testTag("words-discard-yes")) { Text(stringResource(R.string.wallet_remove_yes)) } },
+                dismissButton = { TextButton(onClick = { askDiscard = false }) { Text(stringResource(R.string.cancel)) } },
+            )
+        }
+        return
+    }
     Block(stringResource(R.string.wallet_none_title)) {
         Text(stringResource(R.string.wallet_none_text))
         Button(onClick = model::startNewWallet, modifier = Modifier.fillMaxWidth().testTag("wallet-new")) { Text(stringResource(R.string.wallet_new)) }
@@ -74,7 +94,7 @@ private fun NoWallet(model: WalletModel) {
 // ---------------------------------------------------------------------------------------------- overview
 
 @Composable
-fun OverviewTab(model: WalletModel, state: WalletState, go: (Section) -> Unit) {
+fun OverviewTab(model: WalletModel, state: WalletState, owner: Owner, go: (Section) -> Unit) {
     val setup = state.setup ?: return
     val snapshot = state.snapshot
     Page {
@@ -97,18 +117,19 @@ fun OverviewTab(model: WalletModel, state: WalletState, go: (Section) -> Unit) {
             }
         }
         state.pending.forEach { waiting ->
-            Block(stringResource(R.string.pending_title)) {
+            Block(stringResource(if (waiting.unsure) R.string.pending_unsure_title else R.string.pending_title)) {
                 Field(stringResource(R.string.send_amount), "-" + Format.coins(waiting.sentSat + waiting.feeSat), "pending-amount")
                 Mono(waiting.txid)
-                Text(stringResource(R.string.pending_text), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(if (waiting.unsure) R.string.pending_unsure_text else R.string.pending_text), style = MaterialTheme.typography.bodySmall)
             }
         }
         if (state.wallet == null) {
-            NoWallet(model)
+            NoWallet(model, state, owner)
         } else {
             Block(stringResource(R.string.wallet_title)) {
                 if (snapshot != null) {
                     Field(stringResource(R.string.spendable), Format.coins(snapshot.spendableSat), "wallet-spendable")
+                    if (snapshot.waitingSat > 0) Field(stringResource(R.string.in_waiting), Format.coins(snapshot.waitingSat), "wallet-waiting")
                     if (snapshot.immatureSat > 0) Field(stringResource(R.string.immature), Format.coins(snapshot.immatureSat))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -147,12 +168,13 @@ fun OverviewTab(model: WalletModel, state: WalletState, go: (Section) -> Unit) {
 // ---------------------------------------------------------------------------------------------- receive
 
 @Composable
-fun ReceiveTab(model: WalletModel, state: WalletState) {
+fun ReceiveTab(model: WalletModel, state: WalletState, owner: Owner) {
     val wallet = state.wallet
     val context = LocalContext.current
     Page {
+        NoticeCard(model, state)
         if (wallet == null) {
-            NoWallet(model)
+            NoWallet(model, state, owner)
             return@Page
         }
         val address = remember(wallet.xpub, wallet.receiveIndex) { wallet.watchKey().address(0, wallet.receiveIndex) }
@@ -204,7 +226,7 @@ fun SendTab(model: WalletModel, state: WalletState, owner: Owner) {
     }
     Page {
         if (state.wallet == null) {
-            NoWallet(model)
+            NoWallet(model, state, owner)
             return@Page
         }
         state.sentTxid?.let { txid ->
@@ -248,10 +270,7 @@ fun SendTab(model: WalletModel, state: WalletState, owner: Owner) {
                     label = { Text(stringResource(R.string.send_amount)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth().testTag("send-amount"),
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = everything, onCheckedChange = { everything = it }, modifier = Modifier.testTag("send-all"))
-                    Text(stringResource(R.string.send_everything))
-                }
+                Tick(everything, { everything = it }, stringResource(R.string.send_everything), "send-all")
                 FeeChips(rate) { rate = it }
                 ProblemCard(state.sendProblem, "send-problem")
                 if (state.sending) Busy(R.string.asking_node)
@@ -262,6 +281,7 @@ fun SendTab(model: WalletModel, state: WalletState, owner: Owner) {
         } else {
             Block(stringResource(R.string.send_confirm_title)) {
                 PlanFields(draft.plan, draft.to, if (draft.everything) draft.plan.payments[0].amountSat else draft.plan.sentSat)
+                if (draft.plan.leftBehind > 0) Text(stringResource(R.string.partial_note, draft.plan.inputs.size.toString(), draft.plan.leftBehind), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 Text(stringResource(R.string.send_confirm_text), style = MaterialTheme.typography.bodySmall)
                 ProblemCard(state.sendProblem, "send-problem")
                 if (state.sending) Busy(R.string.sending)
@@ -371,7 +391,9 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner) {
     val context = LocalContext.current
     val wallet = state.wallet
     SecureWindow()                              // recovery words are typed on this page
-    var restoring by rememberSaveable { mutableStateOf("") }
+    WordsOnScreen()
+    // remember, not rememberSaveable: what is typed here must not be written into the saved state of the screen
+    var restoring by remember { mutableStateOf("") }
     var askRemoveWallet by rememberSaveable { mutableStateOf(false) }
     var askForget by rememberSaveable { mutableStateOf(false) }
     var price by rememberSaveable(wallet?.price) { mutableStateOf(wallet?.price.orEmpty()) }
@@ -386,8 +408,8 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner) {
     Page {
         NoticeCard(model, state)
         if (wallet == null) {
-            NoWallet(model)
-            Block(stringResource(R.string.restore_title)) {
+            NoWallet(model, state, owner)
+            if (!state.wordsWithoutWallet) Block(stringResource(R.string.restore_title)) {
                 Text(stringResource(R.string.restore_text), style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(
                     value = restoring, onValueChange = { restoring = it }, label = { Text(stringResource(R.string.words_label)) }, keyboardOptions = secretKeyboard,
@@ -404,10 +426,7 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner) {
                 val descriptor = remember(wallet.xpub) { wallet.watchKey().descriptor(0) }
                 Mono(descriptor)
                 OutlinedButton(onClick = { copyToClipboard(context, "descriptor", descriptor) }) { Text(stringResource(R.string.copy)) }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = wallet.lockOnOpen, onCheckedChange = { model.saveLock(it) })
-                    Text(stringResource(R.string.lock_setting))
-                }
+                Tick(wallet.lockOnOpen, { model.saveLock(it, owner) }, stringResource(R.string.lock_setting), "lock-setting")
                 OutlinedButton(onClick = { askRemoveWallet = true }, modifier = Modifier.testTag("wallet-remove")) { Text(stringResource(R.string.wallet_remove)) }
             }
             Block(stringResource(R.string.price_title)) {
@@ -420,6 +439,7 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner) {
                     value = currency, onValueChange = { currency = it }, singleLine = true, label = { Text(stringResource(R.string.price_currency)) },
                     modifier = Modifier.fillMaxWidth().testTag("currency"),
                 )
+                ProblemCard(state.walletProblem?.takeIf { it.kind == Problem.Kind.BAD_PRICE }, "price-problem")
                 OutlinedButton(onClick = { model.savePrice(price, currency) }, modifier = Modifier.testTag("save-price")) { Text(stringResource(R.string.save)) }
             }
         }
@@ -455,7 +475,7 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner) {
             onDismissRequest = { askRemoveWallet = false },
             title = { Text(stringResource(R.string.wallet_remove_title)) },
             text = { Text(stringResource(R.string.wallet_remove_text)) },
-            confirmButton = { TextButton(onClick = { askRemoveWallet = false; model.removeWallet() }, modifier = Modifier.testTag("wallet-remove-yes")) { Text(stringResource(R.string.wallet_remove_yes)) } },
+            confirmButton = { TextButton(onClick = { askRemoveWallet = false; model.removeWallet(owner) }, modifier = Modifier.testTag("wallet-remove-yes")) { Text(stringResource(R.string.wallet_remove_yes)) } },
             dismissButton = { TextButton(onClick = { askRemoveWallet = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
@@ -464,13 +484,18 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner) {
             onDismissRequest = { askForget = false },
             title = { Text(stringResource(R.string.forget_title)) },
             text = { Text(stringResource(R.string.forget_text)) },
-            confirmButton = { TextButton(onClick = { askForget = false; model.forgetSetup() }, modifier = Modifier.testTag("forget-yes")) { Text(stringResource(R.string.forget_yes)) } },
+            confirmButton = { TextButton(onClick = { askForget = false; model.forgetSetup(owner) }, modifier = Modifier.testTag("forget-yes")) { Text(stringResource(R.string.forget_yes)) } },
             dismissButton = { TextButton(onClick = { askForget = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }
 
-/** Emptying a paper address: its words are typed in for this one use and are not stored. */
+/**
+ * Emptying a paper address: its words are typed in for this one use and are not stored.
+ *
+ * What was worked out is kept with the addresses it was worked out for, and the confirmation shows those.
+ * A change in any field throws the worked-out payment away, so that what is confirmed is always what is paid.
+ */
 @Composable
 private fun PaperBlock(model: WalletModel, state: WalletState) {
     val wallet = state.wallet
@@ -485,7 +510,7 @@ private fun PaperBlock(model: WalletModel, state: WalletState) {
         state.paperTxid?.let { txid ->
             Text(stringResource(R.string.sent_text))
             Mono(txid, "paper-txid")
-            TextButton(onClick = model::paperDrop) { Text(stringResource(R.string.ok)) }
+            if (state.paper == null && !state.paperBusy) TextButton(onClick = model::paperDrop) { Text(stringResource(R.string.ok)) }
         }
         val found = state.paper
         if (found == null) {
@@ -507,29 +532,41 @@ private fun PaperBlock(model: WalletModel, state: WalletState) {
                 Text(stringResource(R.string.paper_to_wallet), style = MaterialTheme.typography.labelMedium)
                 Mono(mine)
             } else {
-                OutlinedTextField(value = other, onValueChange = { other = it.trim() }, label = { Text(stringResource(R.string.send_to)) }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(
+                    value = other, onValueChange = { other = it.trim(); model.paperEdited() }, label = { Text(stringResource(R.string.send_to)) },
+                    modifier = Modifier.fillMaxWidth().testTag("paper-to"), textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                )
             }
             OutlinedTextField(
-                value = keep, onValueChange = { keep = it }, singleLine = true, label = { Text(stringResource(R.string.paper_keep)) },
+                value = keep, onValueChange = { keep = it; model.paperEdited() }, singleLine = true, label = { Text(stringResource(R.string.paper_keep)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth().testTag("paper-keep"),
             )
             OutlinedTextField(
-                value = restTo, onValueChange = { restTo = it.trim() }, label = { Text(stringResource(R.string.paper_rest_to)) },
+                value = restTo, onValueChange = { restTo = it.trim(); model.paperEdited() }, label = { Text(stringResource(R.string.paper_rest_to)) },
                 modifier = Modifier.fillMaxWidth().testTag("paper-rest"), textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
             )
-            FeeChips(rate) { rate = it }
+            FeeChips(rate) { rate = it; model.paperEdited() }
             ProblemCard(state.paperProblem, "paper-problem")
-            val plan = state.paperDraft
-            if (plan == null) {
-                Button(onClick = { model.paperPrepare(to, keep, restTo, rate) }, modifier = Modifier.fillMaxWidth().testTag("paper-check")) { Text(stringResource(R.string.send_check)) }
+            val draft = state.paperDraft
+            if (draft == null) {
+                Button(onClick = { model.paperPrepare(to, keep, restTo, rate) }, enabled = !state.paperBusy, modifier = Modifier.fillMaxWidth().testTag("paper-check")) {
+                    Text(stringResource(R.string.send_check))
+                }
             } else {
-                PlanFields(plan, to, plan.payments[0].amountSat, showChange = false)
-                if (plan.payments.size > 1) {
+                val plan = draft.plan
+                Text(stringResource(R.string.send_confirm_title), style = MaterialTheme.typography.titleSmall)
+                PlanFields(plan, draft.to, plan.payments[0].amountSat, showChange = false)
+                if (plan.payments.size > 1 && draft.restTo != null) {
                     Text(stringResource(R.string.paper_rest_to), style = MaterialTheme.typography.labelMedium)
-                    Mono(restTo)
+                    Mono(draft.restTo, "paper-rest-shown")
                     Field(stringResource(R.string.send_amount), Format.coins(plan.payments[1].amountSat))
                 }
-                Text(stringResource(R.string.paper_warning), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                val notes = ArrayList<String>()
+                if (plan.leftBehind > 0) notes.add(stringResource(R.string.paper_warning_part, plan.inputs.size.toString(), plan.leftBehind))
+                if (found.immatureSat > 0) notes.add(stringResource(R.string.paper_warning_rest, Format.coins(found.immatureSat), found.blocksUntilRipe))
+                if (notes.isEmpty()) notes.add(stringResource(R.string.paper_warning))
+                notes.forEach { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("paper-warning")) }
+                Text(stringResource(R.string.send_confirm_text), style = MaterialTheme.typography.bodySmall)
                 if (state.paperBusy) Busy(R.string.sending)
                 Button(onClick = model::paperSend, enabled = !state.paperBusy, modifier = Modifier.fillMaxWidth().testTag("paper-go")) { Text(stringResource(R.string.paper_go)) }
             }
