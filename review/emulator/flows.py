@@ -171,6 +171,24 @@ def restore_wallet(p, words):
     fingerprint(p)
 
 
+def answer(p, text, seconds=20):
+    """Waits for what the app says after a button was pressed. The answer stands above the button, and when the
+    field above it became shorter at the same moment (words that match are taken out of it), the answer can lie
+    just above the part of the page that is on the screen. So between the looks the page is moved a little down
+    and back."""
+    moves = (None, "input swipe 540 1000 540 1400 250", "input swipe 540 1400 540 1000 250")
+    end, i = time.time() + seconds, 0
+    while True:
+        if p.has(text):
+            return
+        if time.time() > end:
+            raise RuntimeError("%r was not said within %d s; on screen: %s" % (text, seconds, p.texts()[:40]))
+        if moves[i % 3]:
+            p.sh(moves[i % 3])
+        i += 1
+        time.sleep(0.8)
+
+
 def field_of(p, title, label="Recovery words"):
     """The field with that label in the block with that title: the first one below the title. More has two
     fields for recovery words since 0.5.1 (the check of the whole paper, and the paper address)."""
@@ -212,15 +230,16 @@ def restore_wallet_with_a_slip(p, words):
     button = seek(p, "Store the wallet")
     p.tap_xy(*button.center)
     said = "Not on the list of recovery words: %d (%sx)" % (len(words), words[-1])
-    p.wait(said, 15)
+    answer(p, said, 20)
     if p.has("Confirm that it is you"):
         raise RuntimeError("the fingerprint is asked for although the words are not valid")
-    field = seek(p, "Recovery words", exact=True)
-    p.tap_xy(*field.center)
+    seek(p, " ".join(words) + "x", exact=True)          # what was typed is still in the field
+    # The field was not touched again, so it still has the cursor. Control and End take it behind the last letter
+    # (End alone would stop at the end of the line it stands in), and the one letter too many is deleted.
+    p.sh("input keycombination 113 123")
+    p.sh("input keyevent 67")
     time.sleep(0.6)
-    p.sh("input keyevent 123")          # to the end of what was typed, wherever the tap put the cursor
-    p.sh("input keyevent 67")           # and the one letter too many is deleted
-    time.sleep(0.4)
+    seek(p, " ".join(words), exact=True)                # the words as they are on the paper
     button = seek(p, "Store the wallet")
     p.tap_xy(*button.center)
     fingerprint(p)

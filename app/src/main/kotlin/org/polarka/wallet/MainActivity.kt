@@ -324,7 +324,7 @@ private fun NewWalletScreen(model: WalletModel, state: WalletState, owner: Owner
                 }
                 val right = asked.indices.all { typed[it].value == words[asked[it]] }
                 ProblemCard(state.walletProblem, "wallet-problem")
-                Button(onClick = { model.confirmNewWallet(owner) }, enabled = right, modifier = Modifier.fillMaxWidth().testTag("new-save")) {
+                Button(onClick = { model.confirmNewWallet(owner) }, enabled = right && !state.walletBusy, modifier = Modifier.fillMaxWidth().testTag("new-save")) {
                     Text(stringResource(R.string.check_save))
                 }
                 TextButton(onClick = { checking = false }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.check_back)) }

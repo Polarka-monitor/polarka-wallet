@@ -278,10 +278,10 @@
     <string name="wallet_remove_open">Tento telefon si také pamatuje platby, které čekají na blok nebo neproběhly. Tato paměť zmizí s peněženkou: některá z těch plateb by pak mohla dorazit vedle nové platby z týchž slov.</string>
     <string name="problem_words_list">V seznamu slov pro obnovu není: %1$s. Číslo je pořadí slova v tom, co jste napsali. Zkontrolujte pravopis.</string>
     <string name="problem_words_count">Počet napsaných slov: %1$s. Peněženka jich má 12 nebo 24.</string>
-    <string name="problem_words_fit">Všechna slova jsou v seznamu, ale dohromady netvoří platnou sadu slov pro obnovu. Některé je jiné než na papíře, nebo je jiné pořadí.</string>
+    <string name="problem_words_fit">Všechna slova jsou v seznamu, ale dohromady netvoří platnou sadu slov pro obnovu. Aspoň jedno z nich není to správné, nebo není správné pořadí. Pokud jste napsali přesně to, co je na papíře, je papír opsaný chybně.</string>
     <string name="backup_title">Kontrola celého papíru</string>
     <string name="backup_text">Napište slova z papíru. Aplikace řekne, zda jsou to slova peněženky v tomto telefonu. Nic se neukládá a nic se nemění.</string>
     <string name="backup_go">Zkontrolovat slova</string>
     <string name="backup_same">Souhlasí: jsou to slova peněženky v tomto telefonu.</string>
-    <string name="backup_other">Jsou to platná slova pro obnovu, ale jiné peněženky, ne té v tomto telefonu.</string>
+    <string name="backup_other">Jsou to platná slova pro obnovu, ale jiné peněženky, ne té v tomto telefonu. Takto může vypadat i papír s jedním chybným slovem.</string>
 </resources>

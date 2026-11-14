@@ -481,11 +481,14 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner, go: (Section) 
             if (!state.wordsWithoutWallet) Block(stringResource(R.string.restore_title)) {
                 Text(stringResource(R.string.restore_text), style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(
-                    value = restoring, onValueChange = { restoring = it }, label = { Text(stringResource(R.string.words_label)) }, keyboardOptions = secretKeyboard,
+                    value = restoring, onValueChange = { restoring = it; model.restoreEdited(it.isBlank()) }, label = { Text(stringResource(R.string.words_label)) }, keyboardOptions = secretKeyboard,
                     modifier = Modifier.fillMaxWidth().testTag("restore-words"), minLines = 3,
                 )
                 ProblemCard(state.walletProblem, "wallet-problem")
-                Button(onClick = { model.restoreWallet(restoring, owner) }, enabled = restoring.isNotBlank(), modifier = Modifier.testTag("restore-go")) {
+                Button(
+                    onClick = { model.restoreWallet(restoring, owner) }, enabled = restoring.isNotBlank() && !state.walletBusy,
+                    modifier = Modifier.testTag("restore-go"),
+                ) {
                     Text(stringResource(R.string.restore_go))
                 }
             }
@@ -610,8 +613,8 @@ private fun PaperBlock(model: WalletModel, state: WalletState) {
         val found = state.paper
         if (found == null) {
             OutlinedTextField(
-                value = words, onValueChange = { words = it }, label = { Text(stringResource(R.string.words_label)) }, keyboardOptions = secretKeyboard,
-                modifier = Modifier.fillMaxWidth().testTag("paper-words"), minLines = 3,
+                value = words, onValueChange = { words = it; model.paperEdited(it.isBlank()) }, label = { Text(stringResource(R.string.words_label)) },
+                keyboardOptions = secretKeyboard, modifier = Modifier.fillMaxWidth().testTag("paper-words"), minLines = 3,
             )
             ProblemCard(state.paperProblem, "paper-problem")
             if (state.paperBusy) Busy(R.string.asking_node)
@@ -682,7 +685,7 @@ private fun BackupBlock(model: WalletModel, state: WalletState) {
     Block(stringResource(R.string.backup_title)) {
         Text(stringResource(R.string.backup_text), style = MaterialTheme.typography.bodySmall)
         OutlinedTextField(
-            value = words, onValueChange = { words = it; model.backupEdited() }, label = { Text(stringResource(R.string.words_label)) },
+            value = words, onValueChange = { words = it; model.backupEdited(it.isBlank()) }, label = { Text(stringResource(R.string.words_label)) },
             keyboardOptions = secretKeyboard, modifier = Modifier.fillMaxWidth().testTag("backup-words"), minLines = 3,
         )
         ProblemCard(state.backupProblem, "backup-problem")

@@ -279,10 +279,10 @@
     <string name="wallet_remove_open">This phone also remembers payments that wait for a block or that did not go through. That memory goes with the wallet: one of those payments could then arrive beside a new one made with the same words.</string>
     <string name="problem_words_list">Not on the list of recovery words: %1$s. The number is the place of the word in what you typed. Check the spelling.</string>
     <string name="problem_words_count">Words typed: %1$s. A wallet has 12 or 24.</string>
-    <string name="problem_words_fit">Every word is on the list, but together they are not a valid set of recovery words. One of them is a different word than on your paper, or the order is different.</string>
+    <string name="problem_words_fit">Every word is on the list, but together they are not a valid set of recovery words. At least one of them is not the right word, or the order is not right. If this is exactly what your paper says, the paper was copied wrongly.</string>
     <string name="backup_title">Check the whole paper</string>
     <string name="backup_text">Type the words from your paper. The app says whether they are the words of the wallet in this phone. Nothing is stored and nothing is changed.</string>
     <string name="backup_go">Check the words</string>
     <string name="backup_same">They match: these are the words of the wallet in this phone.</string>
-    <string name="backup_other">These are valid recovery words, but of another wallet, not of the one in this phone.</string>
+    <string name="backup_other">These are valid recovery words, but of another wallet, not of the one in this phone. A paper with one wrong word can also look like this.</string>
 </resources>

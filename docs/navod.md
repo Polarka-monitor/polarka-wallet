@@ -1,6 +1,7 @@
 # Polarka Wallet: krátký návod
 
-Polarka Wallet je zkušební verze. Prošla trojí kontrolou, zatím ne kontrolou nezávislého lidského odborníka.
+Polarka Wallet je zkušební verze. Zkontroloval ji autor a nezávislý recenzent, oba s pomocí AI, zatím ne
+nezávislý lidský odborník.
 Mějte v ní jen malé částky. Větší úspory patří na papír (studená adresa).
 
 ## Před instalací
@@ -71,8 +72,13 @@ peněženka používaná jakkoli dlouho.
 
 Pokud slova nejsou platná, aplikace řekne, co je špatně, a napsaný text nechá, abyste ho mohli opravit:
 slovo, které není v seznamu, pojmenuje i s pořadím ("5 (slovox)" je páté slovo), špatný počet slov spočítá
-a u slov, která v seznamu jsou, ale nepatří k sobě, je některé jiné než na papíře, nebo je jiné pořadí.
-Napsaný text zmizí, když stránku opustíte, a když je aplikace minutu na pozadí.
+a u slov, která v seznamu jsou, ale nepatří k sobě, není aspoň jedno to správné, nebo není správné pořadí.
+Pokud jste napsali přesně to, co je na papíře, je papír opsaný chybně. Napsaný text zmizí, když stránku
+opustíte, a když se do aplikace vrátíte po minutě nebo déle.
+
+Vzácně dá chybné slovo stále platnou sadu: u 24 slov zhruba jedno chybné slovo z 256, u 12 slov jedno z 16.
+Aplikace pak obnoví jinou, prázdnou peněženku. Pokud se peněženka, na které mají být mince, obnoví prázdná,
+podívejte se nejdřív znovu na papír.
 
 Papír, který nikdo nevyzkoušel, je naděje, ne záloha. Zkontrolujte ho, dokud je peněženka v telefonu
 (Více, "Kontrola celého papíru"), nebo z něj peněženku jednou obnovte s malou částkou.

@@ -92,6 +92,7 @@ data class WalletState(
     val backupProblem: Problem? = null,
     val backupBusy: Boolean = false,
     val typedEpoch: Int = 0,                    // goes up when recovery words that were typed have to leave the screen
+    val walletBusy: Boolean = false,            // words are being stored: their key is made and the owner is asked
     val selfTest: SelfTest = SelfTest.NOT_RUN,
     val selfTestDetail: String = "",
 ) {
@@ -510,6 +511,10 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
 
     /** [made]: the words are new and were only read from the screen, so the owner is told to check the paper in full. */
     private fun keepWords(words: List<String>, owner: Owner, made: Boolean) {
+        // One at a time. A second tap while the first is still making the key or asking the owner would start a
+        // second store beside the first one (see AndroidKeystoreKey.key for what that could do to the key).
+        if (state.walletBusy) return
+        state = state.copy(walletBusy = true)
         val chain = state.setup?.chain ?: Chain.MAIN
         viewModelScope.launch {
             val outcome = runCatching {
@@ -525,11 +530,16 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
             state = outcome.fold(
                 {
                     state.copy(
-                        wallet = it, newWords = null, walletProblem = null, wordsWithoutWallet = false,
+                        walletBusy = false, wallet = it, newWords = null, walletProblem = null, wordsWithoutWallet = false,
                         notice = if (made) Notice.WALLET_MADE else Notice.WALLET_READY,
                     )
                 },
-                { state.copy(walletProblem = walletProblemOf(it), wordsWithoutWallet = state.wordsWithoutWallet || (it is EngineError && it.kind == Problem.Kind.WORDS_EXIST)) },
+                {
+                    state.copy(
+                        walletBusy = false, walletProblem = walletProblemOf(it),
+                        wordsWithoutWallet = state.wordsWithoutWallet || (it is EngineError && it.kind == Problem.Kind.WORDS_EXIST),
+                    )
+                },
             )
             if (state.wallet != null) refresh()
         }
@@ -919,9 +929,22 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         return true
     }
 
-    /** The words on the screen were changed: what was said about the earlier ones no longer stands. */
-    fun backupEdited() {
-        if (state.backupSame != null || state.backupProblem != null) state = state.copy(backupSame = null, backupProblem = null)
+    /**
+     * Words in a field were changed by hand. An answer about the earlier words (they match, they are another
+     * wallet's) no longer stands. A message about what is wrong stays while the words are being put right, and
+     * goes when the field is empty: it must not go on naming words that are no longer there.
+     */
+    fun backupEdited(empty: Boolean) {
+        val next = state.copy(backupSame = null, backupProblem = if (empty) null else state.backupProblem)
+        if (next != state) state = next
+    }
+
+    fun restoreEdited(empty: Boolean) {
+        if (empty && state.walletProblem?.kind == Problem.Kind.BAD_WORDS) state = state.copy(walletProblem = null)
+    }
+
+    fun paperEdited(empty: Boolean) {
+        if (empty && state.paperProblem?.kind == Problem.Kind.BAD_WORDS) state = state.copy(paperProblem = null)
     }
 
     /**

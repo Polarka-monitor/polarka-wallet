@@ -14,24 +14,25 @@ the 24 words. A single word copied wrongly is noticed in one case out of eight.
 
 | Change | Where | Tests |
 |---|---|---|
-| Typed words that are not valid are answered with what is wrong: the words that are not on the list, by their place and as they were typed (at most six, each cut to 16 characters), or the number of words, or that the words do not fit each other. What was typed stays in the field. | core: `Words.fault` in `Planner.kt`; app: `WalletModel.restoreWallet`, `paperLook`, `wordsDetail`, and `wordsProblemText` in `Parts.kt` | core `WalletEngineTest.whatIsWrongWithTypedWordsIsNamed`; app `WordsHelpTest.wordsThatAreNotValidAreAnsweredWithWhatIsWrongAndStayInTheField` |
+| Typed words that are not valid are answered with what is wrong: the words that are not on the list, by their place and as they were typed (at most six, each cut to 16 characters), or the number of words, or that the words do not fit each other. What was typed stays in the field. | core: `Words.fault` in `Planner.kt`; app: `WalletModel.restoreWallet`, `paperLook`, `wordsDetail`, and `wordsProblemText` in `Parts.kt` | core `WalletEngineTest.whatIsWrongWithTypedWordsIsNamed`, `Retest4CoreTest`; app `WordsHelpTest.wordsThatAreNotValidAreAnsweredWithWhatIsWrongAndStayInTheField` |
 | "Check the whole paper" (More): typed words are compared with the wallet in the phone. The stored words are not opened and the fingerprint is not asked for: the account key derived from the typed words is compared with the one in the wallet's public file. Words that match are taken out of the field; others stay to be put right. | `WalletModel.checkBackup`, `backupEdited`; `BackupBlock` in `Tabs.kt` | `WordsHelpTest.aPaperIsCheckedInFullAgainstTheWalletInThePhone` |
 | A wallet that was just made is followed by the advice to check the paper in full before coins are sent to it. | `Notice.WALLET_MADE`, `keepWords(made)` | `WordsHelpTest.aWalletThatWasJustMadeIsFollowedByTheAdviceToCheckThePaperInFull` |
-| Typed words now stay in their field after a check that failed, so they are taken away at the other end: when the page is left, and when the app has been in the background for a minute, also where the wallet does not lock. A message that names a typed word goes with them. | `WalletState.typedEpoch`, `WalletModel.lock`, `typedWordsGone`; `remember(state.typedEpoch)` and the `DisposableEffect` in `Tabs.kt` | `WordsHelpTest.typedWordsAndWhatWasSaidAboutThemGoWhenTheAppWasAwayOrThePageIsLeft` |
+| Typed words now stay in their field after a check that failed, so they are taken away at the other end: when the page is left, and when the app is opened again after a minute or more in the background, also where the wallet does not lock. A message that names a typed word goes with them, and it goes when the field is emptied by hand. | `WalletState.typedEpoch`, `WalletModel.lock`, `typedWordsGone`, `restoreEdited`, `paperEdited`, `backupEdited`; `remember(state.typedEpoch)` and the `DisposableEffect` in `Tabs.kt` | `WordsHelpTest.typedWordsAndWhatWasSaidAboutThemGoWhenTheAppWasAwayOrThePageIsLeft`, `Retest4Test.aMessageThatNamesWhatWasTypedGoesWhenTheTextIsDeletedByHand` |
+| Because the field keeps the words, the button that stores them could be tapped a second time while the first tap was still at work. A second store no longer starts beside the first, and a Keystore key is looked for and made in one step. (Found by the reviewer, R4-01; the button for a new wallet had allowed two taps since 0.3.1.) | `WalletState.walletBusy`, `WalletModel.keepWords`; `AndroidKeystoreKey.key` in `Store.kt` | `Retest4Test.aSecondTapOnStoreTheWalletLeavesWordsThatCanBeOpened`, `WordsHelpTest.aSecondTapWhileTheWordsAreBeingStoredIsIgnored` |
 | The first screen names no public node while the project has none, says so, and puts the node of one's own first. | `PUBLIC_NODE` and `SetupScreen` in `MainActivity.kt` | `FirstScreenTest` |
 
-Nothing changed in how keys are derived, how the words are stored, how a payment is built and signed, or in
-what is said to a node.
+Nothing changed in how keys are derived, how the words are sealed, how a payment is built and signed, or in
+what is said to a node. What changed about storing the words is how often it can be started at once: once.
 
 ## What the check of the whole paper is not
 
 It does not show the words, and it cannot mend a paper: it says whether the typed words are those of the
-wallet in the phone, not which word is wrong. It needs the app to be open, and with it the Receive page shows
-an address of the wallet; somebody who knows most of the words learns no more from the check than from that
-address.
+wallet in the phone, not which word is wrong. It needs the app to be open, and with it the More page shows
+the wallet's public descriptor and the Receive page an address; somebody who knows most of the words learns
+no more from the check than from those.
 
 ## How it was checked
 
-- 122 tests, none failed, none skipped; lint without errors (14 November 2026, macOS, JDK 21).
-- The independent reviewer's look at the change and the runs of the signed package on emulators are recorded
-  below when they are done.
+- The independent reviewer looked at the change (`independent-review-0.5.1`): it does what it says; two low
+  findings and three notes, all dealt with before the package was built again.
+- The tests, lint, the checks of the signed package and its runs on emulators are recorded below.

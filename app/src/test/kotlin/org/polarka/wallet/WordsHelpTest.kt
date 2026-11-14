@@ -97,6 +97,14 @@ class WordsHelpTest {
             says("wallet-problem", "Not on the list of recovery words: 5 (${words[4]}x), 21 (zzz).")
             assertEquals(slipped, typedIn("restore-words"), "what was typed is gone")
 
+            // while the words are being put right the message stays; it goes when the field is emptied by hand
+            screen.onNodeWithTag("restore-words").performTextInput("a")
+            screen.waitForIdle()
+            assertTrue(shown("wallet-problem"), "the message went at the first change, before anything was put right")
+            screen.onNodeWithTag("restore-words").performTextReplacement("")
+            screen.waitUntil(15_000) { screen.waitForIdle(); !shown("wallet-problem") }
+            assertNull(model.state.walletProblem, "a message goes on naming words that are no longer in the field")
+
             // one word short
             screen.onNodeWithTag("restore-words").performTextReplacement(words.dropLast(1).joinToString(" "))
             screen.onNodeWithTag("restore-go").performClick()
@@ -185,6 +193,12 @@ class WordsHelpTest {
             says("backup-problem", "Not on the list of recovery words: 12 (qqq).")
             assertFalse(shown("backup-result"))
             assertEquals(slipped, typedIn("backup-words"))
+            // the message stays while the words are being put right, and goes with them when the field is emptied
+            screen.onNodeWithTag("backup-words").performTextInput("a")
+            screen.waitForIdle()
+            assertTrue(shown("backup-problem"), "the message went at the first change, before anything was put right")
+            screen.onNodeWithTag("backup-words").performTextReplacement("")
+            screen.waitUntil(15_000) { screen.waitForIdle(); !shown("backup-problem") }
 
             // nothing was stored or changed, and the owner was not asked: the stored words stayed closed
             assertEquals(wallet.xpub, wallets.value!!.xpub)
@@ -198,6 +212,46 @@ class WordsHelpTest {
             screen.onNodeWithTag("paper-look").performClick()
             says("paper-problem", "Not on the list of recovery words: 1 (paperr).")
             assertEquals(paper, typedIn("paper-words"))
+            screen.onNodeWithTag("paper-words").performTextReplacement("")
+            screen.waitUntil(15_000) { screen.waitForIdle(); !shown("paper-problem") }
+        }
+    }
+
+    /**
+     * R4-01 of the reviewer's fifth look. Since 0.5.1 the field keeps the words, so "Store the wallet" can be
+     * tapped a second time while the first tap is still making the key or asking the owner. A second store
+     * beside the first must not start: the owner is asked once, and the words are stored once.
+     */
+    @Test
+    fun aSecondTapWhileTheWordsAreBeingStoredIsIgnored() {
+        emptyNode().use { fake ->
+            setups.value = fake.setup()
+            val model = Robolectric.buildActivity(MainActivity::class.java).setup().get().model
+            waitFor("tab-MORE")
+            val words = Words.generate()
+            screen.runOnIdle {
+                assertTrue(model.restoreWallet(words.joinToString(" "), owner))
+                assertTrue(model.state.walletBusy, "nothing says that words are being stored")
+                model.restoreWallet(words.joinToString(" "), owner)         // the second tap, before the first has got anywhere
+            }
+            screen.waitUntil(30_000) { screen.waitForIdle(); wallets.value != null && !model.state.walletBusy }
+            assertEquals(1, owner.unlocks, "the owner was asked twice: two stores ran side by side")
+            assertNull(model.state.walletProblem)
+            assertEquals(Account.fromWords(words, Chain.REGTEST).watchKey().xpub, model.state.wallet!!.xpub)
+
+            // and the same for a wallet that is being made
+            screen.runOnIdle { model.removeWallet(owner) }
+            screen.waitUntil(30_000) { screen.waitForIdle(); wallets.value == null && model.state.wallet == null }
+            screen.runOnIdle { model.startNewWallet() }
+            screen.waitUntil(15_000) { screen.waitForIdle(); model.state.newWords != null }
+            val before = owner.unlocks
+            screen.runOnIdle {
+                model.confirmNewWallet(owner)
+                model.confirmNewWallet(owner)
+            }
+            screen.waitUntil(30_000) { screen.waitForIdle(); wallets.value != null && !model.state.walletBusy }
+            assertEquals(before + 1, owner.unlocks, "the owner was asked twice for one new wallet")
+            assertNull(model.state.walletProblem)
         }
     }
 

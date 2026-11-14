@@ -279,7 +279,14 @@ class WordVault(private val sealed: SealedBytes) {
  * first; a phone without one keeps it in the processor's secure area.
  */
 class AndroidKeystoreKey(private val alias: String, private val ownerOnly: Boolean = false) : KeyHolder {
-    override fun key(create: Boolean): SecretKey? {
+    /**
+     * Looking for the key and making it are one step for the whole app. Two callers at once would otherwise both
+     * find no key and both make one; the second key takes the name of the first, and what was sealed with the
+     * first could never be opened again.
+     */
+    override fun key(create: Boolean): SecretKey? = synchronized(ONE_AT_A_TIME) { lookOrMake(create) }
+
+    private fun lookOrMake(create: Boolean): SecretKey? {
         val ks = KeyStore.getInstance(PROVIDER).apply { load(null) }
         (ks.getKey(alias, null) as? SecretKey)?.let { return it }
         if (!create) return null
@@ -306,12 +313,15 @@ class AndroidKeystoreKey(private val alias: String, private val ownerOnly: Boole
     }
 
     override fun delete() {
-        val ks = KeyStore.getInstance(PROVIDER).apply { load(null) }
-        if (ks.containsAlias(alias)) ks.deleteEntry(alias)
+        synchronized(ONE_AT_A_TIME) {
+            val ks = KeyStore.getInstance(PROVIDER).apply { load(null) }
+            if (ks.containsAlias(alias)) ks.deleteEntry(alias)
+        }
     }
 
     private companion object {
         const val PROVIDER = "AndroidKeyStore"
+        val ONE_AT_A_TIME = Any()
     }
 }
 
