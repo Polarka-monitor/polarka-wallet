@@ -115,7 +115,7 @@ a real network.
     TN_BIN=/path/to/bin gradle :core:test :node:test :app:testDebugUnitTest :app:lintDebug
     sh review/tests-summary.sh
 
-114 tests. A test that cannot run (no node programs, or no `gateway.py` of polarka-node next to this
+116 tests. A test that cannot run (no node programs, or no `gateway.py` of polarka-node next to this
 repository or named by `POLARKA_GATEWAY`) is reported as skipped; for a release none may be skipped. Every library is pinned by its SHA-256 in `gradle/verification-metadata.xml`:
 the build stops if one differs from the day it was first downloaded. The pins were made by Gradle on that day
 (trust on first download); signatures of the libraries are not verified.

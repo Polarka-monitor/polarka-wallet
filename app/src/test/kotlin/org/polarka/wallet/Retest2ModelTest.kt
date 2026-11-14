@@ -299,9 +299,11 @@ class Retest2ModelTest {
      * arrive (the node may lag, or the coin may lie on an address the app does not look at). What was put right
      * is what the owner is told: the message no longer says that a block will change it, the entry on the
      * Overview says what can be done, and "Forget this payment" is the way out. The end of the test follows that.
+     * The test was called aKeptPaymentWhoseCoinIsGoneDoesNotStopTheWalletAfterTheNextBlock; in its fourth look
+     * the reviewer found the change fair and said that the name should follow it.
      */
     @Test
-    fun aKeptPaymentWhoseCoinIsGoneDoesNotStopTheWalletAfterTheNextBlock() {
+    fun aKeptPaymentWhoseCoinIsGoneStopsTheWalletUntilItsOwnerLetsItGo() {
         OwnNode(bin()).use { node ->
             val words = Words.generate()
             val wallet = Account.fromWords(words, Chain.REGTEST)

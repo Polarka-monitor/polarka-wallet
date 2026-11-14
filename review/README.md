@@ -3,7 +3,7 @@
 This folder holds what is needed to repeat the checks made on a release, the results of the author's own review
 of 0.3.1 (`evidence-0.3.1/`, made when the app was still called North Wallet), the report of the independent
 review of the same version (`independent-review-0.3.1/`), the report of the same reviewer's second look at 0.4.0
-(`independent-review-0.4.0/`) and of its third look at 0.4.1 and 0.4.2 (`independent-review-0.4.2/`), and the
+(`independent-review-0.4.0/`) and of its third and fourth look at 0.4.1, 0.4.2 and what followed (`independent-review-0.4.2/`), and the
 scripts that run the package on emulators (`emulator/`). None of it replaces a review by an independent human
 expert.
 
@@ -15,8 +15,8 @@ build tools 36.0.0) on the path. `TN_BIN` must point to a folder with the offici
 
 | Check | Command | Passes when |
 |---|---|---|
-| All tests (114) | `gradle :core:test :node:test :app:testDebugUnitTest`, then `sh review/tests-summary.sh` | exit 0; 114 tests, 0 failures, 0 skipped |
-| The findings of the independent review, of its retest and of its third look stay fixed | the `Audit*Test` classes in the three modules, `RetestModelTest`, `AfterRetestTest`, `AfterRetestScreenTest`, `Retest2ModelTest`, `ThirdLookTest` | all pass |
+| All tests (116) | `gradle :core:test :node:test :app:testDebugUnitTest`, then `sh review/tests-summary.sh` | exit 0; 116 tests, 0 failures, 0 skipped |
+| The findings of the independent review, of its retest and of its third look stay fixed | the `Audit*Test` classes in the three modules, `RetestModelTest`, `AfterRetestTest`, `AfterRetestScreenTest`, `Retest2ModelTest`, `Retest3ModelTest`, `ThirdLookTest` | all pass |
 | A payment that did not go through cannot arrive beside the next one | `NotGoneThroughTest`, `NotGoneThroughPlainTest`, `NotGoneThroughScreenTest`, core test `PlannerMustTest`, node test `SpendersTest` | all pass |
 | The package on emulators (Android 12, 14, 16) | `review/emulator/README.md` | each script ends with its line of success (`ALL 11 STEPS PASSED`, `LOCK STEPS PASSED`, `NOT GONE THROUGH: ALL 6 STEPS PASSED`, `UPGRADE: ALL 3 STEPS PASSED`) |
 | A public node never gets the account key | app test `PublicNodeTest` (needs python3 and `gateway.py` of polarka-node) | prints `PUBLIC NODE OK: ...` |

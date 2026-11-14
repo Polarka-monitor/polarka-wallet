@@ -375,8 +375,11 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
                 // Neither in a block nor held by the node. That alone does not make it gone.
                 // Something the node holds spends its coins: they are not free, and the next blocks will tell.
                 p.inputs.any { it in seen.inWaiting } -> p
-                // It was written down a moment ago and may still be on its way to the node that was asked.
-                seen.atMillis - p.atMillis < goneAfterMillis -> p
+                // It was written down a moment ago and may still be on its way to the node that was asked. A time
+                // that lies further than that in the future means that the phone's clock was ahead then and has
+                // been put right since: such a payment counts as old enough. It would otherwise wait, and keep
+                // every other payment waiting, until the clock has caught up.
+                kotlin.math.abs(seen.atMillis - p.atMillis) < goneAfterMillis -> p
                 // One look that does not find it is not enough: the next one decides.
                 p.txid !in doubted -> {
                     missed.add(p.txid)

@@ -57,8 +57,25 @@ leaves the decision to the owner.
   one payment.
 - N-1, N-2 and N-6 of the second look, N2-2 and N2-6 of this one.
 - The reviewer checked nothing on a phone or an emulator. The emulator runs are described in `../emulator`.
-- What 0.5.0 changed after this report (the table above, and the new look) is said under "After the report".
+- The fix for R3-01 (below) and the look of the screens (`Look.kt`) have not been seen by the reviewer.
+
+## After the report: a short fourth look
+
+The reviewer was then asked to look at what 0.5.0 changed after the report: the table above, and the logic
+that the new look for the screens touches (the lock by hand, and coins set aside on the screens). Its answer is
+`RETEST3.md`, unchanged. Nothing in those changes breaks what it had found sound. It found one new thing, of low
+severity, which the rule of N2-1 had opened:
+
+| Finding | What was done | Tests |
+|---|---|---|
+| R3-01 a payment written down while the phone's clock was ahead is not judged until the clock has caught up, and since N2-1 no other payment is made meanwhile | A time that lies more than a minute in the future counts as old enough (`WalletModel.settle`). | the reviewer's `Retest3ModelTest`, which failed, passes; `ThirdLookTest.aPaymentWrittenDownByAClockThatWasAheadIsSettledAllTheSame` |
+
+`Retest3ModelTest.kt` is in the suite as the reviewer wrote it (SHA-256
+`929f8cb1504e6c20d095f7621ac2190e7923d99e6860c6f4562b4a52b2399dba`). The reviewer found the change to the end
+of its third test of `Retest2ModelTest` fair and said that the name of the test should follow it; the test is
+now called `aKeptPaymentWhoseCoinIsGoneStopsTheWalletUntilItsOwnerLetsItGo`.
 
 ## Files
 
-- `RETEST2.md`: the report, unchanged.
+- `RETEST2.md`: the report of the third look, unchanged.
+- `RETEST3.md`: the report of the short fourth look, unchanged.

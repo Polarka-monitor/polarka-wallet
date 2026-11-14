@@ -173,4 +173,42 @@ class ThirdLookTest {
         until("the wallet's file is written") { wallets.value!!.lookTo == 0 }
         assertEquals(61, Engine(setups.value!!).allowed(model.state.wallet!!), "a public node is named the keys in use, and no more")
     }
+
+    /**
+     * R3-01, from the reviewer's short fourth look (RETEST3.md). A payment is judged only when it is a minute
+     * old by the phone's clock. If that clock was ahead when the payment was written down and was put right
+     * later, the payment stayed "younger than a minute" until the clock had caught up; and since no payment is
+     * made while the outcome of another is not known, the wallet could not pay at all meanwhile. A time that
+     * lies more than a minute in the future now counts as old enough.
+     */
+    @Test
+    fun aPaymentWrittenDownByAClockThatWasAheadIsSettledAllTheSame() {
+        val hash = "ab".repeat(32)
+        AuditFakeNode { method, _ ->
+            when (method) {
+                "getblockchaininfo" -> "{\"chain\":\"regtest\",\"blocks\":1,\"headers\":1,\"initialblockdownload\":false,\"bestblockhash\":\"$hash\"}"
+                "scanblocks" -> "{\"from_height\":0,\"to_height\":1,\"relevant_blocks\":[],\"completed\":true}"
+                "scantxoutset" -> "{\"success\":true,\"height\":1,\"unspents\":[]}"
+                "getnetworkhashps" -> "1"
+                else -> "null"
+            }
+        }.use { fake ->
+            val now = System.currentTimeMillis()
+            val ahead = Pending("cd".repeat(32), 5_00000000L, 326, setOf("ef".repeat(32) + ":0"), unsure = true, atMillis = now + 3 * 24 * 3_600_000L)
+            val young = Pending("12".repeat(32), 1_00000000L, 326, setOf("34".repeat(32) + ":0"), unsure = true, atMillis = now)
+            setups.value = fake.setup()
+            wallets.value = WalletInfo(
+                Chain.REGTEST, Account.fromWords(Words.generate(), Chain.REGTEST).watchKey().xpub, lockOnOpen = false, pending = listOf(ahead, young),
+            )
+            val model = WalletModel(app)
+            until("the stores are read") { model.state.loaded }
+            repeat(3) {
+                until("no look in progress") { !model.state.busy && model.state.snapshot != null }
+                Thread.sleep(40)
+            }
+            assertEquals(listOf(ahead.txid), model.state.dropped.map { it.txid }, "the payment written down by a clock that was ahead is settled")
+            assertEquals(listOf(young.txid), model.state.pending.map { it.txid }, "a payment written down a moment ago is not judged yet")
+            assertEquals(Notice.PAYMENT_GONE, model.state.notice)
+        }
+    }
 }
