@@ -1,0 +1,6 @@
+Android 12, polarka-wallet-0.4.1.apk, then polarka-wallet-0.5.0.apk over it
+ok     1  version 0.4.1: a wallet with 25 NORTH and a payment of 5 NORTH that waits for a block
+ok     2  version 0.5.0 installed over it: the same wallet opens after the fingerprint and still knows the waiting payment
+ok     3  the new package signs with the words the old one stored: a payment of 3 NORTH went through, 16.99999348 NORTH are left
+UPGRADE: ALL 3 STEPS PASSED (0.4.1 -> 0.5.0)
+exit 0

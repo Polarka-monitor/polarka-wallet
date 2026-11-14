@@ -85,8 +85,10 @@ that holds more than you would carry in a phone.
 ## Lock and removal
 
 The app locks after a minute in the background and asks for the fingerprint again (More, "Ask for the
-fingerprint when the app opens"). Removing the wallet from the phone destroys the stored words; the coins stay
-on the chain and are reached with the words on paper. Uninstalling the app or clearing its data does the same.
+fingerprint when the app opens"). The lock in the top bar locks it at once; the phone then asks for the
+fingerprint only after a tap on Unlock. Removing the wallet from the phone destroys the stored words; the
+coins stay on the chain and are reached with the words on paper. Uninstalling the app or clearing its data
+does the same.
 
 ## A node of your own
 

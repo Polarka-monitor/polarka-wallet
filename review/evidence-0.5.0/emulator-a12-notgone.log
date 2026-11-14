@@ -1,0 +1,9 @@
+Android 12, polarka-wallet-0.5.0.apk, a node of one's own behind a gate
+ok     1  a wallet with one coin of 10 NORTH, at a node behind a gate that can keep a transaction to itself
+ok     2  a payment of 5 NORTH was kept from the node: the app says that the outcome is not known and sets the coin aside
+ok     3  while that is open, no other payment is worked out
+ok     4  a minute later: 'it did not go through', the payment stays on the overview, its coin is free, a coin of 50 has arrived
+ok     5  the next payment of 5 NORTH spends the coin of the old one, not the larger coin, and the screen says why
+ok     6  the kept transaction is refused by the node beside the new payment and after its block; one payment arrived
+NOT GONE THROUGH: ALL 6 STEPS PASSED
+exit 0

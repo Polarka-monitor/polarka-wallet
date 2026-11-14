@@ -1,0 +1,21 @@
+== Libraries in the release (group:name:version)
+count: 153
+by publisher:
+ 121 androidx
+  14 org.jetbrains
+   4 fr.acinq.secp256k1
+   3 com.google.guava
+   1 org.jspecify
+   1 org.checkerframework
+   1 javax.inject
+   1 jakarta.inject
+   1 fr.acinq.bitcoin
+   1 com.google.zxing
+   1 com.google.j2objc
+   1 com.google.errorprone
+   1 com.google.dagger
+   1 com.google.code.findbugs
+   1 com.google.auto.value
+
+== Advertising, analytics, crash reporting or Google Play services among them (expected: none)
+none

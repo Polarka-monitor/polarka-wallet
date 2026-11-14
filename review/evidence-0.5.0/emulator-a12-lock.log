@@ -1,0 +1,7 @@
+Android 12
+ok     1  twenty seconds away: the wallet stays open
+ok     2  more than a minute away: locked, and opened again with the fingerprint
+ok     3  more than a minute away with the screen rebuilt meanwhile (dark mode switched): locked as well
+ok     4  the lock in the top bar: locked at once, no dialog by itself, opened again with the fingerprint
+LOCK STEPS PASSED: 4 on Android 12
+exit 0

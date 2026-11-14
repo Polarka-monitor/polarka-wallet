@@ -6,7 +6,9 @@
 1. More than a minute in the background: the app asks for the fingerprint again.
 2. The same, with Android building the screen anew meanwhile (dark mode switched while the app is away):
    finding F-04 of the independent review, here on a (virtual) phone.
-3. With "keygone": the screen lock of the phone is removed. Android then destroys the key that protects the
+3. The lock in the top bar (since 0.5.0): the app locks at once, and the phone's dialog does not come up by
+   itself; a tap on Unlock brings it.
+4. With "keygone": the screen lock of the phone is removed. Android then destroys the key that protects the
    recovery words; the app must say so in plain words when a payment is to be signed. This ruins the wallet in
    the emulator and leaves the emulator without a screen lock.
 """
@@ -71,6 +73,16 @@ time.sleep(2)
 flows.unlock_if_locked(p)
 p.wait("Total", 40, exact=True)
 step("more than a minute away with the screen rebuilt meanwhile (dark mode switched): locked as well")
+
+p.tap("Lock", exact=True)                   # the lock in the top bar
+time.sleep(1.5)
+expect(p.has("The wallet is locked") and not p.has("Can be spent"), "the lock in the top bar did not lock the wallet")
+time.sleep(2.5)
+expect(not p.has("Confirm that it is you"), "after the app was locked by hand the phone's dialog came up by itself")
+p.tap("Unlock", exact=True)
+flows.fingerprint(p)
+p.wait("Total", 40, exact=True)
+step("the lock in the top bar: locked at once, no dialog by itself, opened again with the fingerprint")
 
 if keygone:
     print(p.sh("locksettings clear --old 1234").strip(), flush=True)

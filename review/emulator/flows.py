@@ -23,37 +23,46 @@ def bench_state():
         return json.load(f)
 
 
-TABS = ("Overview", "Receive", "Send", "History", "Mining", "More")
+PAGES = ("Overview", "Receive", "Send", "History", "More")
+# what of the screen shows the page itself: below the bar at the top, and above the bar with the pages at the
+# bottom where there is one (the first screens and the lock screen have none)
+VISIBLE_TOP = 250
+SCREEN_BOTTOM = 2400        # the virtual phones are 1080 x 2400
+
+
+def visible(nodes):
+    """Which nodes can be touched: those that lie in the part of the screen that shows the page."""
+    floor = max((n.box[3] for n in nodes), default=2400)
+    bar = [n.box[1] for n in nodes if n.label in PAGES and n.box[1] > floor * 0.8]
+    # without that bar: keep off the last 150 of the glass, where the phone's own bar may lie, and off the very
+    # edge of what the app shows (on Android 12 here the page ends at 2274, above the phone's bar)
+    bottom = (min(bar) - 10) if len(bar) >= 3 else min(floor - 20, SCREEN_BOTTOM - 150)
+    return [n for n in nodes if VISIBLE_TOP < n.center[1] < bottom]
 
 
 def tab(p, name):
-    """Opens a tab. The row of tabs scrolls sideways, so the name may have to be brought into view first."""
+    """Opens a page from the bar at the bottom of the screen (since 0.5.0). The mining page is opened from More."""
+    if name == "Mining":
+        tab(p, "More")
+        p.tap_xy(*seek(p, "Open the mining page").center)
+        time.sleep(1.2)
+        return
     for attempt in range(6):
         nodes = p.nodes()
-        row = [n for n in nodes if n.label in TABS and n.box[1] < 600 and n.box[2] - n.box[0] > 20]
-        if row:
-            highest = min(n.box[1] for n in row)            # the row of tabs is the highest of them; a page title is lower
-            row = [n for n in row if n.box[1] - highest < 30]
-        found = [n for n in row if n.label == name]
-        if found:
-            p.tap_xy(*found[0].center)
+        floor = max((n.box[3] for n in nodes), default=2400)
+        bar = [n for n in nodes if n.label == name and n.box[1] > floor * 0.8]
+        if bar:
+            p.tap_xy(*max(bar, key=lambda n: n.box[1]).center)
             time.sleep(1.2)
             return
-        y = row[0].center[1] if row else 360
-        # which way: the tab is left of what is visible, or right of it
-        visible = [TABS.index(n.label) for n in row]
-        left = bool(visible) and TABS.index(name) < min(visible)
-        if left:
-            p.sh("input swipe 250 %d 950 %d 300" % (y, y))
-        else:
-            p.sh("input swipe 950 %d 250 %d 300" % (y, y))
-        time.sleep(1.0)
-    raise RuntimeError("no tab %r; on screen: %s" % (name, p.texts()[:12]))
+        hide_keyboard(p)            # an open keyboard covers the bar
+        time.sleep(0.7)
+    raise RuntimeError("no page %r in the bar at the bottom; on screen: %s" % (name, p.texts()[:12]))
 
 
 def scroll_to(p, text, tries=8, exact=False):
     for _ in range(tries):
-        found = [n for n in p.find(text, exact) if 420 < n.center[1] < 2150]
+        found = p.find(text, exact, nodes=visible(p.nodes()))
         if found:
             return found[0]
         p.swipe_up()
@@ -276,12 +285,12 @@ def seek(p, text, exact=False, up=7, down=14):
     """Finds a text on a page that scrolls: first downwards from where the page stands, then back up to the top."""
     hide_keyboard(p)
     for _ in range(up):
-        found = [n for n in p.find(text, exact) if 420 < n.center[1] < 2150]
+        found = p.find(text, exact, nodes=visible(p.nodes()))
         if found:
             return found[0]
         p.swipe_up()
     for _ in range(down):
-        found = [n for n in p.find(text, exact) if 420 < n.center[1] < 2150]
+        found = p.find(text, exact, nodes=visible(p.nodes()))
         if found:
             return found[0]
         p.sh("input swipe 540 900 540 1500 250")

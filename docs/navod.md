@@ -81,6 +81,7 @@ adresy, na které je víc, než byste v telefonu nosili.
 ## Zámek a odebrání
 
 Aplikace se po minutě na pozadí zamkne a chce otisk znovu (Více, "Při otevření aplikace chtít otisk prstu").
+Zámek v horní liště ji zamkne hned; telefon se pak na otisk zeptá až po klepnutí na Odemknout.
 Odebrání peněženky z telefonu zničí uložená slova; mince zůstávají v řetězci a dostanete se k nim slovy
 z papíru. Odinstalování aplikace nebo vymazání jejích dat udělá totéž.
 

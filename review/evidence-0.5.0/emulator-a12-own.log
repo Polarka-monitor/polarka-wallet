@@ -1,0 +1,14 @@
+Android 12, polarka-wallet-0.5.0.apk, node: own
+ok     1  installed and started; the first screen offers a public node and a node of one's own
+ok     2  self-test passed: this Android derives and signs like the published vectors
+ok     3  setup imported from a file and saved; the node answers over TLS
+ok     4  wallet A made: 24 words shown once, three asked back, sealed with the fingerprint
+ok     5  received 25 NORTH; the wallet moved on to a fresh address
+ok     6  sent 5 NORTH with the fingerprint; the app was closed and still knows the waiting payment
+ok     7  a second payment on the same coin is refused while the first one waits
+ok     8  after the block: 19.99999674 NORTH, history shows both movements
+ok     9  an address that was used still receives; wallet A removed after the fingerprint
+ok    10  the words of wallet A, typed as a paper address, were emptied into wallet B: 26.99999302 NORTH (fee 0.00000372)
+ok    11  wallet B removed and brought back from its 24 words: the coins are found again
+ALL 11 STEPS PASSED on Android 12 (own node)
+exit 0
