@@ -1,0 +1,21 @@
+Android 16, polarka-wallet-0.5.1.apk, node: own
+ok     1  installed and started; the first screen offers a node of one's own and names no public node, because the project has none yet
+ok     2  self-test passed: this Android derives and signs like the published vectors
+ok     3  setup imported from a file and saved; the node answers over TLS
+ok     4  wallet A made: 24 words shown once, three asked back, sealed with the fingerprint
+ok     5  the whole paper checked against the wallet without the fingerprint: its 24 words match, valid words of another wallet do not
+ok     6  received 25 NORTH; the wallet moved on to a fresh address
+ok     7  sent 5 NORTH with the fingerprint; the app was closed and still knows the waiting payment
+ok     8  a second payment on the same coin is refused while the first one waits
+ok     9  after the block: 19.99999674 NORTH, history shows both movements
+ok    10  an address that was used still receives; wallet A removed after the fingerprint
+ok    11  the words of wallet A, typed as a paper address, were emptied into wallet B: 26.99999302 NORTH (fee 0.00000372)
+Traceback (most recent call last):
+  File "~/north-build/emu/t02_wallet.py", line 179, in <module>
+    p.wait("The wallet is ready", 20)
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "~/north-build/emu/emu.py", line 106, in wait
+    raise RuntimeError("%r did not %s within %d s; on screen: %s" % (
+        text, "go away" if gone else "appear", seconds, self.texts()[:40]))
+RuntimeError: 'The wallet is ready' did not appear within 20 s; on screen: ['Ask for the fingerprint when the app opens', 'At the moment the app looks at the first 200 addresses of this wallet. If coins that you know of are missing, for example after the wallet was brought back from its words, let it look at twice as many. A public node is then told twice as many addresses.', 'Look at twice as many', 'If the address numbers of this wallet have run ahead (a node that did not show the truth can cause that), they can be worked out again from what the current node shows.', 'Work out the address numbers again', 'Remove the wallet from this phone', 'Check the whole paper', 'Type the words from your paper. The app says whether they are the words of the wallet in this phone. Nothing is stored and nothing is changed.', 'Recovery words', 'Check the words', 'Polarka', 'Refresh', 'Lock', 'Overview', 'Receive', 'Send', 'History', 'More']
+exit 1

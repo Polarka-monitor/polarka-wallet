@@ -4,7 +4,7 @@ A wallet for TrueNorth (NORTH) on Android. It keeps its keys in the phone, signs
 Core node what the addresses hold. There is no server of the wallet's own, no account and no analytics.
 
 **State: test build 0.5.1, not released.** The wallet has been checked by its author and, in five looks, by an
-independent reviewer that had not seen the code being written (`review/independent-review-0.3.1`,
+independent reviewer, an AI model that had not seen the code being written (`review/independent-review-0.3.1`,
 `review/independent-review-0.4.0`, `review/independent-review-0.4.2` and `review/independent-review-0.5.1`;
 `review/changes-0.5.1.md` says what the last version changed). All of that was AI-assisted; a review
 by an independent human expert is still recommended. Until then it is for small amounts.
@@ -70,10 +70,10 @@ and only one of the two can ever be in a block.
   words on its own. They are never shown again after the wallet is made, never logged, never sent.
 - Words that are typed (to bring a wallet back, to check a paper, to look at a paper address) are held in the
   field they are typed into and are not written into the saved state of the screen. They go when they have
-  done their work, when the page is left, and when the app is opened again after a minute or more in the
+  done their work, when the page is left, and when the app is opened again after more than a minute in the
   background; a message that names a mistyped word goes with them. One case is different: the words of a
   paper address that has been looked at stay in the app's memory, also on other pages, until the address is
-  emptied, the look is dropped, or the app is opened again after a minute or more in the background.
+  emptied, the look is dropped, or the app is opened again after more than a minute in the background.
 - The node setup and the wallet's public information are sealed with a second Keystore key. The app is excluded
   from backups; nothing travels to a cloud or to another phone.
 - Screens cannot be captured; no other app may draw over the wallet; from Android 14 on, the screens with words

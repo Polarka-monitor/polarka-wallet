@@ -148,3 +148,55 @@ left would be stricter, but it must wait for a payment that is under way, as `lo
   `core/src/test/kotlin/north/core/Retest4CoreTest.kt`), `tools/`, `logs/`. Nothing outside `audit-0.5.1/`.
 
 Status: FINAL
+
+## After the fixes (6ec7a4c)
+
+Scope: `git diff 98a2b77 6ec7a4c` only, 14 November 13:17-13:23, by reading: the main sources, the strings, README,
+both guides, changes-0.5.1.md, review/independent-review-0.5.1/README.md and what was changed in the tests. One run
+of two classes. Everything above this section is the report as it was handed over; nothing in it was changed.
+
+Result: all five points are closed as described. Nothing new was opened. Two small remarks, neither a finding.
+
+1. R4-01: closed. `keepWords` is entered on the main thread only, by `restoreWallet` and `confirmNewWallet` and
+   nothing else; the flag is set before anything is started and taken back at both ends of the one store
+   (`WalletModel.kt:516-517`, `:533`, `:539`); both buttons are off meanwhile (`Tabs.kt:489`, `MainActivity.kt:327`).
+   I found no way to a second store. The one lock for all names (`Store.kt:287`, `:316`, `:324`) does no harm: every
+   use of a store is on a background thread (all of them in WalletModel are inside `withContext(io)`, the watch job
+   has its own thread), and nothing else is locked inside it, so nothing can stand still for good and the screen
+   cannot freeze; at worst another store waits while a key is made. That it holds for the whole app and not for one
+   holder is right: the watch job makes holders of its own. Two things to know, not to mend: `walletBusy` ends when
+   the phone's dialog ends, as `sending` always has; and "New wallet" does not look at it, so with a store under way
+   from the other button the screen of new words can come up and go again when the dialog is answered. No second
+   store can start there ("Save" is off), so nothing is at risk; turning "New wallet" off meanwhile would be tidier.
+   The lock cannot be tried off a phone; it is right by reading. A quick double tap on a real phone stays the check.
+2. R4-02: the new sentence (README.md:71-76) is true. A paper address that was looked at keeps its words across
+   pages; they go when it is emptied, when the look is dropped, and when the app is opened again after more than a
+   minute away, also for a wallet that does not lock. They also go in two cases the sentence does not name, both
+   on the safe side: a look that fails, and a payment from it whose outcome is not known. The test turned round is
+   fair: it holds what the README now says.
+3. N4-1: I see no harm in the message staying while the field has text. When it is written it names nothing that
+   the field does not show, and it lies under the same protection. Later it can name a word that has been put right
+   or replaced since, until the button is tapped again or the field is emptied: an old hint, as any form has, and
+   it goes with the page and with the minute away. Your reason is the better one; taking it away at the first
+   keystroke would cost more than it gives.
+4. N4-2, N4-3: nothing is untrue. "After a minute or more" is, to the letter, after more than a minute
+   (`WalletModel.kt:183`). "One wrong word in 256, of 12 words one in 16" is right. `problem_words_fit` and
+   `backup_other` say what is so, in English and in Czech; "the paper was copied wrongly" holds for a paper of this
+   kind of words, which is what a user of this wallet has. One remark on a sentence of the same diff: both guides
+   now say "checked by its author and by an independent reviewer, both with the help of AI". The reviewer is an AI
+   model, as review/independent-review-0.5.1/README.md says plainly; a reader of the guide can take it for a person
+   who used AI. "By an independent AI reviewer" would say it.
+5. Nothing new. `restoreEdited`, `paperEdited(empty)` and `backupEdited(empty)` do what the table says
+   (`WalletModel.kt:937-948`). `paperEdited` now has two forms that mean different things; a matter of names only.
+
+Checked besides: the SHA-256 of my two test files are the ones your README names; `Retest4CoreTest.kt` in the suite
+is my file byte for byte; in `Retest4Test.kt` the first and third test are mine, the second is turned round as you
+say, and the comments were changed.
+
+Run (run6, at 6ec7a4c, my clone): `Retest4Test` 3 pass ("the owner was asked 1 time(s), keys made under the one name:
+1, wallet stored: true, shown as its problem: null; the stored words can be opened: true"; "after the field was
+emptied by hand the message is still there: false"); `WordsHelpTest` 5 pass. Not run: everything else, lint, the
+package, emulators. My clone is at 6ec7a4c with nothing untracked; my own two test files lie beside it as
+`audit-0.5.1/Retest4Test.yours.kt` and `Retest4CoreTest.yours.kt`.
+
+Status: FINAL (with the section after the fixes)

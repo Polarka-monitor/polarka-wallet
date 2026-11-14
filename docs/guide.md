@@ -1,7 +1,7 @@
 # Polarka Wallet: a short guide
 
-Polarka Wallet is a test build. It has been checked by its author and by an independent reviewer, both with
-the help of AI, but not yet by an independent human expert.
+Polarka Wallet is a test build. It has been checked by its author, with the help of AI, and by an independent
+AI reviewer, but not yet by an independent human expert.
 Keep only small amounts in it. Larger savings belong on paper (a cold address).
 
 ## Before you install
@@ -78,7 +78,7 @@ a word that is not a recovery word is named with its place ("5 (wordx)" is the f
 words is counted, and words that are all on the list but do not fit each other mean that at least one of
 them is not the right word, or that the order is not right. If you typed exactly what the paper says, the
 paper was copied wrongly. What you typed goes when you leave the page, and when you come back to the app
-after a minute or more away.
+after more than a minute away.
 
 Rarely a wrong word still gives valid words: of 24 words, about one wrong word in 256 does, of 12 words one
 in 16. The app then brings back another, empty wallet. If a wallet that should hold coins comes back empty,

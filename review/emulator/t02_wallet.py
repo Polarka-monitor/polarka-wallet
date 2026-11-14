@@ -176,6 +176,7 @@ step("the words of wallet A, typed as a paper address, were emptied into wallet 
 # ------------------------------------------------------------------ restore
 flows.remove_wallet_04(p)
 said = flows.restore_wallet_with_a_slip(p, words_b)
+top(p)          # the notice stands at the top of the page, and the words were typed further down
 p.wait("The wallet is ready", 20)
 p.tap("OK", exact=True)
 fresh_look(6)

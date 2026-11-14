@@ -1,0 +1,11 @@
+Android 12, polarka-wallet-0.5.0.apk, then polarka-wallet-0.5.1.apk over it
+Traceback (most recent call last):
+  File "~/north-build/emu/t05_upgrade.py", line 80, in <module>
+    txid = old.send(p, st["bench_address"], "5")
+  File "~/north-build/emu/flows.py", line 318, in send
+    p.tap("Recipient address")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "~/north-build/emu/emu.py", line 120, in tap
+    raise RuntimeError("nothing to tap for %r; on screen: %s" % (text, self.texts()[:40]))
+RuntimeError: nothing to tap for 'Recipient address'; on screen: ['Allow Polarka Wallet to take pictures and record video?', 'WHILE USING THE APP', 'ONLY THIS TIME', 'DON’T ALLOW']
+exit 1
