@@ -152,8 +152,10 @@ While such a payment has no coin among those the server lists, the wallet makes 
   waiting the app says so, on the Overview and where the next payment is confirmed.
 - When one look at the node has two things to say about payments, one notice is shown. The Overview and the
   History show both payments.
-- Version 0.3.1 was tried on one real phone (Android 16). The versions since then were tried on emulators
-  with Android 12, 14 and 16; `review/emulator/README.md` says what was run for each of them.
+- Version 0.3.1 was tried on one real phone (Android 16), and 0.6.0 was installed there over 0.5.1: the
+  wallet was there and worked with its owner's node. The versions since 0.3.1 were tried on emulators with
+  Android 12, 14 and 16; `review/emulator/README.md` says what was run for each of them. No payment has been
+  made through a wallet server on a real phone yet.
 
 ## Code
 

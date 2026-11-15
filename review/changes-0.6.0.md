@@ -116,6 +116,9 @@ the author of Northbound as issues 7 and 8 of his repository.
   it. `emulator/README.md` says what was run, and why the package was built twice.
 - The stand-in was compared with the public Northbound server by reading (`standin/README.md`). From the
   emulators the public server was asked for the height of the chain and nothing else.
-- Not checked: a real phone, and a payment through the real server. The race between the clock and the
+- On 15 November 2026 the package was installed on one real phone (Android 16) over 0.5.1, with a wallet
+  in it, by the phone's owner: the wallet was there and worked with its owner's node.
+- Not checked: a payment through a wallet server on a real phone, and any payment through the real server.
+  The race between the clock and the
   reader of an answer in `ServerClient.once` has no test of its own. Android's own classes for a connection
   were not looked at when a connection is closed from another thread.
