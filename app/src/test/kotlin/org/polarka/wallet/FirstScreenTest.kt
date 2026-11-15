@@ -4,6 +4,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -18,6 +19,8 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.net.InetAddress
+import java.net.ServerSocket
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -87,5 +90,31 @@ class FirstScreenTest {
         screen.waitUntil(10_000) { model.state.offered != null }
         assertEquals(Setup("https://server.example.org", "", "", Chain.MAIN, emptyList(), server = true), model.state.offered)
         assertNull(setups.value)
+    }
+
+    private fun said(text: String) = screen.onAllNodes(hasText(text, substring = true)).fetchSemanticsNodes().isNotEmpty()
+
+    @Test
+    fun aSetupThatIsSavedOpensTheOverviewWhateverPageTheLastOneWasRemovedOn() {
+        // Nobody is at this address. The pages are there all the same once a setup is saved.
+        val nobody = ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { it.localPort }
+        setups.value = Setup("https://127.0.0.1:$nobody", "", "", Chain.MAIN, emptyList(), server = true)
+        val model = Robolectric.buildActivity(MainActivity::class.java).setup().get().model
+        screen.waitUntil(30_000) { shown("tab-MORE") }
+        // the banner of a test build stands on the Overview and on the first screen, and on no other page
+        assertTrue(said("Test build"))
+        assertFalse(said("checked three times"), "the banner still counts the checks")
+        screen.onNodeWithTag("tab-MORE").performClick()
+        screen.waitUntil(30_000) { !said("Test build") }
+
+        // the setup is removed there, and another one is saved from the first screen
+        model.forgetSetup(AuditOwner())
+        screen.waitUntil(30_000) { !shown("tab-MORE") && shown("server-go") }
+        assertNull(setups.value)
+        assertTrue(model.offerServer("https://127.0.0.1:$nobody"))
+        model.acceptOffer(false)
+        screen.waitUntil(30_000) { shown("tab-MORE") }
+        screen.waitForIdle()
+        assertTrue(said("Test build"), "after a setup was saved the app shows the page on which the last one was removed")
     }
 }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="banner_title">Zkušební verze %1$s</string>
-    <string name="banner_text">Peněženka prošla trojí kontrolou, zatím ne kontrolou nezávislého lidského odborníka. Používejte ji jen s malými částkami.</string>
+    <string name="banner_text">Peněženka prošla opakovanou kontrolou s pomocí umělé inteligence, zatím ne kontrolou nezávislého lidského odborníka. Používejte ji jen s malými částkami.</string>
 
     <string name="refresh">Obnovit</string>
     <string name="cancel">Zrušit</string>

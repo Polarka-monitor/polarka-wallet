@@ -4,7 +4,7 @@
     <string name="brand" translatable="false">Polarka</string>
 
     <string name="banner_title">Test build %1$s</string>
-    <string name="banner_text">This wallet has been checked three times, but not yet by an independent human expert. Use it with small amounts only.</string>
+    <string name="banner_text">This wallet has been checked several times with the help of AI, but not yet by an independent human expert. Use it with small amounts only.</string>
 
     <string name="refresh">Refresh</string>
     <string name="cancel">Cancel</string>

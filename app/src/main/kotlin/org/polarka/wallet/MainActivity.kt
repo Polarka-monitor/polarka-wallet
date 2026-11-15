@@ -118,6 +118,10 @@ private fun Screens(model: WalletModel, owner: Owner) {
     val state = model.state
     var section by rememberSaveable { mutableStateOf(Section.OVERVIEW) }
     val inside = state.loaded && !state.locked && state.setup != null && state.newWords == null
+    // A phone without a setup shows the first screen. When a setup is saved after that, the pages begin with
+    // the Overview, and not with the page on which the last setup was removed.
+    val unset = state.loaded && state.setup == null
+    LaunchedEffect(unset) { if (unset) section = Section.OVERVIEW }
     Scaffold(
         topBar = {
             TopAppBar(
