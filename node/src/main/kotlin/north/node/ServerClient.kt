@@ -18,27 +18,29 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
 
-/** The coins on some addresses, as the server's index shows them at block [tip]. */
-data class ServerCoins(val tip: Int, val tipHash: String, val utxos: List<Utxo>)
+/**
+ * The coins on some addresses, as the server's index shows them at block [tip]. [revision] is the server's
+ * number for its picture of the waiting transactions at that moment; a server that does not number them gives
+ * none. Two answers with the same block and the same number were read from the same picture.
+ */
+data class ServerCoins(val tip: Int, val tipHash: String, val utxos: List<Utxo>, val revision: Long? = null)
 
 /** Which of the addresses that were asked about have ever been paid to, in a block or by a transaction that waits for one. */
-data class ServerActivity(val tip: Int, val tipHash: String, val used: Set<String>)
+data class ServerActivity(val tip: Int, val tipHash: String, val used: Set<String>, val revision: Long? = null)
 
 /**
  * One transaction as the server sums it up against the addresses it was asked about.
  *
- * [receivedSat] is what its outputs pay to those addresses. With no input from them it is an incoming payment
- * and [receivedAt] names the first address paid. With every input from them, [sentSat] is what goes elsewhere
- * and [feeSat] is known. With inputs of both kinds, [sentSat] is the own input less what came back, never
- * below zero, and the fee is not known. A transaction that waits for a block has no [height].
+ * [netSat] is what its outputs pay to those addresses less what its inputs take from them. Above zero the
+ * addresses gained, below zero they lost, and whatever of the fee they paid is in it. The lines that requests
+ * with other addresses give for the same transaction add up. [feeSat] is the fee of the whole transaction,
+ * whoever paid it. A block reward has none, and by that it is known. A transaction that waits for a block has
+ * no [height].
  */
-data class ServerMove(
-    val txid: String, val receivedAt: String?, val sentTo: String?, val receivedSat: Long, val sentSat: Long, val feeSat: Long?,
-    val height: Int?, val confirmations: Int, val time: Long?,
-)
+data class ServerMove(val txid: String, val netSat: Long, val feeSat: Long?, val height: Int?, val confirmations: Int, val time: Long?)
 
 /** [complete] is false when the history was longer than was asked for; the newest lines are there. */
-data class ServerHistory(val tip: Int, val tipHash: String, val moves: List<ServerMove>, val complete: Boolean)
+data class ServerHistory(val tip: Int, val tipHash: String, val moves: List<ServerMove>, val complete: Boolean, val revision: Long? = null)
 
 data class ServerFee(val satPerVb: Long, val targetBlocks: Int)
 
@@ -57,10 +59,12 @@ data class ServerVerdict(val allowed: Boolean, val reason: String?)
  * can exist, ids look like ids, lists and answers have a largest size, a coin's depth must fit its block,
  * and an index that is not at its node's tip is not believed. An error is a [NodeError] with the HTTP status.
  *
- * The server answers at most a hundred addresses in one request. Coins and activity are asked for in parts
- * and put together, which is exact; all parts must come from the same block, or the answer is refused with
- * [MOVED]. History cannot be put together from parts (each line is summed up against the addresses of its
- * own request), so [history] takes at most a hundred addresses.
+ * The server answers at most a hundred addresses in one request, and it lists coins a page at a time. Coins
+ * and activity are asked for in parts and pages and put together. That is exact when every answer was read
+ * from the same picture: the same block and the same waiting transactions. Activity that was read across a
+ * change is refused with [MOVED]; coins are read again from the start, as the server asks for. [history]
+ * takes at most a hundred addresses. Who has more asks in parts and adds up the lines of one transaction:
+ * each says what the transaction did to the addresses of its own request.
  *
  * A server that asks to slow down (429) or is busy (503) is waited for and asked again, for [maxWaitMs] at most.
  *
@@ -277,11 +281,14 @@ class ServerClient(
 
     private fun id(text: String): String = if (NodeClient.isId(text)) text else throw NodeError(200, null, "the server sent something that is not an id")
 
+    /** The picture an answer was read from: the block, and the server's number for what was waiting then. */
+    private data class Moment(val height: Int, val hash: String, val revision: Long?)
+
     /**
-     * The block the answer was read at. An index that is not ready, does not know the waiting transactions,
+     * The picture the answer was read from. An index that is not ready, does not know the waiting transactions,
      * or is not at the tip its own node reports, is refused: what it shows may be out of date.
      */
-    private fun moment(answer: JsonObject): Pair<Int, String> {
+    private fun moment(answer: JsonObject): Moment {
         val index = answer["index"] as? JsonObject ?: throw unknown("index")
         val height = index.wholeOrNull("indexed_height", MAX_HEIGHT)?.toInt()
         val hash = index.textOrNull("indexed_hash", 64)?.let { id(it) }
@@ -289,11 +296,11 @@ class ServerClient(
         val nodeHash = index.textOrNull("observed_node_hash", 64)?.let { id(it) }
         val current = index.flag("ready") && index.flag("pending_available") && height != null && hash != null && height == nodeHeight && hash == nodeHash
         if (!current) throw NodeError(503, null, "the server's index is not up to date")
-        return height!! to hash!!
+        return Moment(height!!, hash!!, index.wholeOrNull("pending_revision", Long.MAX_VALUE))
     }
 
-    private fun same(before: Pair<Int, String>?, now: Pair<Int, String>): Pair<Int, String> {
-        if (before != null && before != now) throw NodeError(200, MOVED, "a block arrived between two parts of one question to the server")
+    private fun same(before: Moment?, now: Moment): Moment {
+        if (before != null && before != now) throw NodeError(200, MOVED, "the server's picture of the chain changed between two parts of one question")
         return now
     }
 
@@ -329,7 +336,7 @@ class ServerClient(
     /** Which of these addresses were ever paid to. Any number of addresses; the answer is for one block. */
     fun activity(addresses: List<String>): ServerActivity {
         val used = HashSet<String>()
-        var at: Pair<Int, String>? = null
+        var at: Moment? = null
         for (part in parts(addresses)) {
             val answer = call("/v1/addresses/activity", naming(part))
             at = same(at, moment(answer))
@@ -340,77 +347,114 @@ class ServerClient(
                 used.add(address)
             }
         }
-        return ServerActivity(at!!.first, at.second, used)
+        return ServerActivity(at!!.height, at.hash, used, at.revision)
     }
 
     /**
      * The coins on these addresses that are in a block and that nothing spends, not even a transaction that
-     * waits for a block. Any number of addresses; the answer is for one block. Whose the scripts are is for
-     * the caller to check: the server is trusted for what exists, not for what belongs to the wallet.
+     * waits for a block. Any number of addresses. The server lists them a page at a time, and every page of
+     * every part has to come from the same picture. When the server says that its index changed (409), or a
+     * page shows another block or other waiting transactions than the page before, everything read so far is
+     * thrown away and the reading starts again: half a list is never taken for a balance. More than [most]
+     * coins are not read ([TOO_MANY]). Whose the scripts are is for the caller to check: the server is trusted
+     * for what exists, not for what belongs to the wallet.
      */
-    fun utxos(addresses: List<String>): ServerCoins {
-        val coins = ArrayList<Utxo>()
-        val seen = HashSet<String>()
-        var at: Pair<Int, String>? = null
-        for (part in parts(addresses)) {
-            val answer = call("/v1/utxos", naming(part))
-            val now = moment(answer)
-            at = same(at, now)
-            for (e in answer.list("utxos", MAX_UTXOS)) {
-                val u = e as? JsonObject ?: throw unknown("utxos")
-                val txid = id(u.text("transaction_id", 64))
-                val vout = u.whole("output_index", NodeClient.MAX_VOUT)
-                if (!seen.add("$txid:$vout")) throw NodeError(200, null, "the server listed the same output twice")
-                val script = u.text("script_pubkey", 200)
-                if (script.isEmpty() || !script.all { it in '0'..'9' || it in 'a'..'f' }) throw unknown("script_pubkey")
-                val height = u.whole("block_height", MAX_HEIGHT).toInt()
-                val deep = u.whole("confirmations", MAX_HEIGHT + 1)
-                if (height > now.first || deep != (now.first - height + 1).toLong()) {
-                    throw NodeError(200, null, "the server sent a coin whose depth does not fit its block")
+    fun utxos(addresses: List<String>, most: Int = MAX_COINS): ServerCoins {
+        val asked = parts(addresses)
+        require(most > 0) { "nothing to read" }
+        var restarts = 0
+        while (true) {
+            val coins = ArrayList<Utxo>()
+            val seen = HashSet<String>()
+            var at: Moment? = null
+            var changed = false
+            reading@ for (part in asked) {
+                var cursor: String? = null
+                while (true) {
+                    val answer = try {
+                        call("/v1/utxos", naming(part, if (cursor == null) emptyMap() else mapOf("cursor" to JsonPrimitive(cursor))))
+                    } catch (e: NodeError) {
+                        if (e.httpStatus != 409) throw e
+                        changed = true
+                        break@reading
+                    }
+                    val now = moment(answer)
+                    if (at != null && at != now) {
+                        changed = true
+                        break@reading
+                    }
+                    at = now
+                    val page = answer.list("utxos", MAX_UTXOS)
+                    for (e in page) {
+                        val u = e as? JsonObject ?: throw unknown("utxos")
+                        val txid = id(u.text("transaction_id", 64))
+                        val vout = u.whole("output_index", NodeClient.MAX_VOUT)
+                        if (!seen.add("$txid:$vout")) throw NodeError(200, null, "the server listed the same output twice")
+                        val script = u.text("script_pubkey", 200)
+                        if (script.isEmpty() || !script.all { it in '0'..'9' || it in 'a'..'f' }) throw unknown("script_pubkey")
+                        val height = u.whole("block_height", MAX_HEIGHT).toInt()
+                        val deep = u.whole("confirmations", MAX_HEIGHT + 1)
+                        if (height > now.height || deep != (now.height - height + 1).toLong()) {
+                            throw NodeError(200, null, "the server sent a coin whose depth does not fit its block")
+                        }
+                        coins.add(Utxo(txid, vout, u.whole("amount", NodeClient.MAX_SAT), height, u.flag("coinbase"), script))
+                    }
+                    if (coins.size > most) throw NodeError(200, TOO_MANY, "the addresses hold more than $most coins")
+                    cursor = answer.textOrNull("next_cursor", MAX_CURSOR) ?: break
+                    if (page.isEmpty()) throw unknown("next_cursor")        // a page with nothing on it and another one after it would never end
                 }
-                coins.add(Utxo(txid, vout, u.whole("amount", NodeClient.MAX_SAT), height, u.flag("coinbase"), script))
             }
+            if (!changed) {
+                try {
+                    NodeClient.total(coins.map { it.amountSat })        // together they must be an amount that can exist
+                } catch (e: NodeError) {
+                    throw NodeError(200, null, "the server sent amounts that cannot exist together")
+                }
+                return ServerCoins(at!!.height, at.hash, coins, at.revision)
+            }
+            if (++restarts > MAX_RESTARTS) throw NodeError(409, null, "the server's coins kept changing while they were read")
         }
-        try {
-            NodeClient.total(coins.map { it.amountSat })        // together they must be an amount that can exist
-        } catch (e: NodeError) {
-            throw NodeError(200, null, "the server sent amounts that cannot exist together")
-        }
-        return ServerCoins(at!!.first, at.second, coins)
     }
 
-    private fun move(t: JsonObject, tip: Int, named: Set<String>): ServerMove {
+    /** A whole number that may be below zero, written as a number, and no further from zero than [max]. */
+    private fun JsonObject.signed(name: String, max: Long): Long {
+        val p = this[name] as? JsonPrimitive ?: throw unknown(name)
+        val digits = p.content.removePrefix("-")
+        if (p.isString || digits.isEmpty() || digits.length > 19 || !digits.all { it in '0'..'9' }) throw unknown(name)
+        val size = digits.toLongOrNull() ?: throw unknown(name)
+        if (size > max) throw NodeError(200, null, "the server sent a number that cannot exist ($name)")
+        return if (p.content.startsWith("-")) -size else size
+    }
+
+    private fun move(t: JsonObject, tip: Int): ServerMove {
         val txid = id(t.text("transaction_id", 64))
-        val receivedAt = t.textOrNull("received_at", MAX_ADDRESS)
-        if (receivedAt != null && receivedAt !in named) throw NodeError(200, null, "the server named an address it was not asked about")
-        val sentTo = t.textOrNull("sent_to", MAX_ADDRESS)?.let { NodeClient.clean(it, MAX_ADDRESS) }
         val height = t.wholeOrNull("block_height", MAX_HEIGHT)?.toInt()
         val deep = t.whole("confirmations", MAX_HEIGHT + 1)
         val fits = if (height == null) deep == 0L else height <= tip && deep == (tip - height + 1).toLong()
         if (!fits) throw NodeError(200, null, "the server sent a transaction whose depth does not fit its block")
-        return ServerMove(
-            txid, receivedAt, sentTo, t.whole("received_amount", NodeClient.MAX_SAT), t.whole("sent_amount", NodeClient.MAX_SAT),
-            t.wholeOrNull("fee", NodeClient.MAX_SAT), height, deep.toInt(), t.wholeOrNull("timestamp", MAX_TIME),
-        )
+        val net = t.signed("net_amount", NodeClient.MAX_SAT)
+        val fee = t.wholeOrNull("network_fee", NodeClient.MAX_SAT)
+        // Only a block reward has no fee. It takes nothing from anybody, and it is never waiting for a block.
+        if (fee == null && (net < 0 || height == null)) throw NodeError(200, null, "the server sent a block reward that cannot exist")
+        return ServerMove(txid, net, fee, height, deep.toInt(), t.wholeOrNull("timestamp", MAX_TIME))
     }
 
     /**
      * The history of these addresses, newest first, the waiting transactions before the ones in blocks. At
-     * most a hundred addresses, because each line is summed up against the addresses of the request it came
-     * from. It is read page by page; when a block or a waiting transaction arrives in between, the server
-     * says so and the reading starts again, so that all lines belong to one moment. At most [most] lines are
-     * read (rounded up to a page).
+     * most a hundred addresses: each line says what its transaction did to the addresses of this request,
+     * and who has more adds up the lines of several requests. It is read page by page; when a block or a
+     * waiting transaction arrives in between, the server says so and the reading starts again, so that all
+     * lines belong to one moment. At most [most] lines are read (rounded up to a page).
      */
     fun history(addresses: List<String>, most: Int = 2000): ServerHistory {
         val asked = parts(addresses)
-        require(asked.size == 1) { "history is exact for at most $MAX_ADDRESSES addresses in one request" }
+        require(asked.size == 1) { "one request for history takes at most $MAX_ADDRESSES addresses" }
         require(most > 0) { "nothing to read" }
-        val named = asked[0].toSet()
         var restarts = 0
         while (true) {
             val moves = ArrayList<ServerMove>()
             val seen = HashSet<String>()
-            var at: Pair<Int, String>? = null
+            var at: Moment? = null
             var cursor: String? = null
             var changed = false
             var complete = true
@@ -433,7 +477,7 @@ class ServerClient(
                 at = now
                 val page = answer.list("transactions", PAGE)
                 for (e in page) {
-                    val line = move(e as? JsonObject ?: throw unknown("transactions"), now.first, named)
+                    val line = move(e as? JsonObject ?: throw unknown("transactions"), now.height)
                     if (!seen.add(line.txid)) throw NodeError(200, null, "the server listed the same transaction twice")
                     moves.add(line)
                 }
@@ -445,7 +489,7 @@ class ServerClient(
                     break
                 }
             }
-            if (!changed) return ServerHistory(at!!.first, at.second, moves, complete)
+            if (!changed) return ServerHistory(at!!.height, at.hash, moves, complete, at.revision)
             if (++restarts > MAX_RESTARTS) throw NodeError(409, null, "the server's history kept changing while it was read")
         }
     }
@@ -477,8 +521,10 @@ class ServerClient(
         const val MAX_ADDRESS = 100
         /** Lines of history asked for at a time; the server gives at most this many. */
         const val PAGE = 200
-        /** The server refuses to list more coins than this for one request. */
+        /** The most coins the server puts on one page. */
         const val MAX_UTXOS = 10_000
+        /** The most coins read for one question, over all its pages. */
+        const val MAX_COINS = 20_000
         const val MAX_HEX = 800_000
         const val MAX_CURSOR = 1024
         const val MAX_HEIGHT = 500_000_000L
@@ -490,8 +536,10 @@ class ServerClient(
         /** The longest one question may take as a whole. An answer of the largest size still fits over a slow line. */
         const val DEADLINE_MS = 90_000L
         const val MAX_ANSWER_BYTES = 8 * 1024 * 1024
-        /** [NodeError.code] when the parts of one answer were read at different blocks. Asking again helps. */
+        /** [NodeError.code] when the parts of one answer were not read from the same picture of the chain. Asking again helps. */
         const val MOVED = -2
+        /** [NodeError.code] when the addresses hold more coins than are read for one question. */
+        const val TOO_MANY = -3
         private val LOCKS = ConcurrentHashMap<String, ReentrantLock>()
         /** Closes connections whose time is over. One thread for all clients, and it does not keep a program alive. */
         private val WATCH = ScheduledThreadPoolExecutor(1) { work -> Thread(work, "server-deadline").apply { isDaemon = true } }

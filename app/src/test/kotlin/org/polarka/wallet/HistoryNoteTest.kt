@@ -20,9 +20,10 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * 0.6. Through a wallet server the history of a wallet with more than a hundred addresses can lack movements
- * (see ServerEngine). The look says so, and the History page has to pass that on: a list that looks complete
- * and is not would be worse than a list that says what it is.
+ * 0.6. Through a wallet server the history can lack movements: when it is longer than the app reads in one
+ * look, or when the server's lines for one movement do not fit together (see ServerEngine). The look says so,
+ * and the History page has to pass that on: a list that looks complete and is not would be worse than a list
+ * that says what it is.
  */
 @RunWith(RobolectricTestRunner::class)
 class HistoryNoteTest {
@@ -46,8 +47,10 @@ class HistoryNoteTest {
         assertTrue(shown("history-not-whole"))
         val note = screen.onNodeWithTag("history-not-whole").fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)?.joinToString("") { it.text }.orEmpty()
         assertTrue("Some movements are missing from the history" in note && "The balance and the coins are shown in full" in note, note)
-        // every reason for it is named (the sixth look of the reviewer, L4): the note comes up for more than a wallet of many addresses
-        assertTrue("more than a hundred addresses" in note && "coins of somebody else among its own" in note && "longer than the app reads" in note, note)
+        // Every reason for it is named (the sixth look of the reviewer, L4). Since 0.6.1 the server's lines add up over any
+        // number of addresses, and two reasons are left: a history that is too long, and lines that do not fit together.
+        assertTrue("longer than the app reads" in note && "do not fit together" in note, note)
+        assertFalse("more than a hundred addresses" in note || "coins of somebody else" in note, note)
     }
 
     @Test

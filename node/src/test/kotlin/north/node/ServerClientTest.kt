@@ -19,8 +19,9 @@ import kotlin.test.assertTrue
 /**
  * The client for a wallet server with the Northbound API, version 1. A small server that is not one answers
  * here; it shows what the client sends and what it makes of answers that are right, wrong, late or untrue.
- * The shapes are those of the server's own sources (shared/src/lib.rs at v0.1.0-rc.5, and the limit on
- * requests of commit 846e444).
+ * The shapes are those of the server's own sources (shared/src/lib.rs at v0.1.0-rc.5, the limit on requests
+ * of commit 846e444, and the pages of coins and the signed history lines of the commits d72a5e1, e3376a1 and
+ * 66fa1d9 of 15 November 2026).
  */
 class ServerClientTest {
     private class Reply(val status: Int, val body: String, val headers: Map<String, String> = emptyMap())
@@ -89,21 +90,25 @@ class ServerClientTest {
     private fun txid(n: Int) = "%064x".format(n)
     private fun address(n: Int) = "rnorth1z" + n.toString().padStart(40, 'q')
 
-    /** The index as the server reports it; by default at its node's tip. */
-    private fun index(height: Int = 100, hash: String = h1, ready: Boolean = true, nodeHeight: Int? = height, nodeHash: String? = hash, waiting: Boolean = true): String =
+    /** The index as the server reports it; by default at its node's tip, and with a number for its picture of the waiting transactions. */
+    private fun index(
+        height: Int = 100, hash: String = h1, ready: Boolean = true, nodeHeight: Int? = height, nodeHash: String? = hash, waiting: Boolean = true,
+        revision: Int? = 7,
+    ): String =
         "{\"ready\":$ready,\"indexed_height\":$height,\"indexed_hash\":\"$hash\",\"observed_node_height\":${nodeHeight ?: "null"}," +
             "\"observed_node_hash\":${nodeHash?.let { "\"$it\"" } ?: "null"},\"last_node_contact\":1763000000,\"pending_available\":$waiting," +
-            "\"pending_observed_at\":1763000000,\"max_age_seconds\":60}"
+            "\"pending_observed_at\":1763000000,${revision?.let { "\"pending_revision\":$it," } ?: ""}\"max_age_seconds\":60}"
 
     private fun coin(n: Int, amount: String = "100000000", height: Int = 90, deep: Int = 11, more: String = ""): String =
         "{\"transaction_id\":\"${txid(n)}\",\"output_index\":0,\"amount\":$amount,\"script_pubkey\":\"5220${"ab".repeat(32)}\"," +
             "\"block_height\":$height,\"confirmations\":$deep,\"coinbase\":false$more}"
 
-    private fun coins(list: String, index: String = index()) = Reply(200, "{\"utxos\":[$list],\"index\":$index}")
+    private fun coins(list: String, index: String = index(), cursor: String? = null) =
+        Reply(200, "{\"utxos\":[$list],\"next_cursor\":${cursor?.let { "\"$it\"" } ?: "null"},\"index\":$index}")
 
-    private fun line(n: Int, height: Int? = 90, deep: Int = 11, receivedAt: String? = null): String =
-        "{\"transaction_id\":\"${txid(n)}\",\"received_at\":${receivedAt?.let { "\"$it\"" } ?: "null"},\"sent_to\":null,\"received_amount\":5," +
-            "\"sent_amount\":0,\"fee\":null,\"block_height\":${height ?: "null"},\"confirmations\":$deep,\"timestamp\":1763000000}"
+    /** A line of history: what the transaction did to the addresses asked about, and the fee of the whole transaction. */
+    private fun line(n: Int, height: Int? = 90, deep: Int = 11, net: String = "5", fee: String = "1000"): String =
+        "{\"transaction_id\":\"${txid(n)}\",\"net_amount\":$net,\"network_fee\":$fee,\"block_height\":${height ?: "null"},\"confirmations\":$deep,\"timestamp\":1763000000}"
 
     private fun page(list: String, cursor: String? = null, index: String = index()) =
         Reply(200, "{\"transactions\":[$list],\"next_cursor\":${cursor?.let { "\"$it\"" } ?: "null"},\"index\":$index}")
@@ -147,13 +152,114 @@ class ServerClientTest {
     }
 
     @Test
-    fun partsReadAtDifferentBlocksAreNotPutTogether() {
-        Fake { count, _ -> coins(coin(count), index(height = 99 + count, hash = if (count == 1) h1 else h2)) }.use { fake ->
-            val error = refused { ServerClient(fake.url).utxos((1..150).map { address(it) }) }
-            assertEquals(ServerClient.MOVED, error.code)
+    fun partsReadFromDifferentPicturesAreNotPutTogether() {
+        // coins: a block between the two parts starts the reading again, and what was read before is not kept
+        Fake { count, _ ->
+            when (count) {
+                1 -> coins(coin(1))
+                2 -> coins(coin(2), index(height = 101, hash = h2))
+                3 -> coins(coin(3, deep = 12), index(height = 101, hash = h2))
+                else -> coins(coin(4, deep = 12), index(height = 101, hash = h2))
+            }
+        }.use { fake ->
+            val found = ServerClient(fake.url).utxos((1..150).map { address(it) })
+            assertEquals(listOf(txid(3), txid(4)), found.utxos.map { it.txid })
+            assertEquals(101 to h2, found.tip to found.tipHash)
+            assertEquals(4, fake.seen.size)
         }
+        // the same block with other transactions waiting is another picture as well
+        Fake { count, _ -> coins(coin(count), index(revision = if (count == 1) 7 else if (count == 2) 8 else 9)) }.use { fake ->
+            val found = ServerClient(fake.url).utxos((1..150).map { address(it) })
+            assertEquals(listOf(txid(3), txid(4)), found.utxos.map { it.txid })
+            assertEquals(9L, found.revision)
+        }
+        // a chain that never holds still is given up after the first reading and two more
+        Fake { count, _ -> coins(coin(count, height = 90, deep = 10 + count), index(height = 99 + count, hash = if (count % 2 == 1) h1 else h2)) }.use { fake ->
+            assertEquals(409, refused { ServerClient(fake.url).utxos((1..150).map { address(it) }) }.httpStatus)
+            assertEquals(6, fake.seen.size)
+        }
+        // activity is read once: parts from different pictures are refused, and the one who asked asks again
         Fake { count, _ -> Reply(200, "{\"used_addresses\":[],\"index\":${index(hash = if (count == 1) h1 else h2)}}") }.use { fake ->
             assertEquals(ServerClient.MOVED, refused { ServerClient(fake.url).activity((1..150).map { address(it) }) }.code)
+        }
+        Fake { count, _ -> Reply(200, "{\"used_addresses\":[],\"index\":${index(revision = count)}}") }.use { fake ->
+            assertEquals(ServerClient.MOVED, refused { ServerClient(fake.url).activity((1..150).map { address(it) }) }.code)
+        }
+        // a server that does not number its pictures is compared by the block alone
+        Fake { count, _ -> coins(coin(count), index(revision = null)) }.use { fake ->
+            val found = ServerClient(fake.url).utxos((1..150).map { address(it) })
+            assertEquals(2, found.utxos.size)
+            assertNull(found.revision)
+        }
+    }
+
+    @Test
+    fun coinsComeInPagesAndAreReadToTheLastOne() {
+        Fake { count, _ ->
+            when (count) {
+                1 -> coins(coin(1) + "," + coin(2), cursor = "aa")
+                2 -> coins(coin(3), cursor = "bb")
+                3 -> coins(coin(4))
+                else -> coins(coin(5))
+            }
+        }.use { fake ->
+            val found = ServerClient(fake.url).utxos((1..150).map { address(it) })
+            assertEquals((1..5).map { txid(it) }, found.utxos.map { it.txid })
+            assertEquals(7L, found.revision)
+            val sent = fake.seen.map { Json.parseToJsonElement(it.body).jsonObject }
+            // the first page of each part is asked for without a cursor, every further one with the cursor of the page before
+            assertEquals(listOf(null, "aa", "bb", null), sent.map { it["cursor"]?.jsonPrimitive?.content })
+            assertEquals(listOf(100, 100, 100, 50), sent.map { it["addresses"]!!.jsonArray.size })
+            // how many coins go on a page is left to the server
+            assertTrue(sent.none { "limit" in it })
+        }
+        // the server says that its index changed (409), or a page comes from another picture: all pages are read again
+        val changes = listOf(
+            Reply(409, "{\"message\":\"The index changed; restart pagination.\"}"),
+            coins(coin(9, deep = 12), index(height = 101, hash = h2)),
+            coins(coin(9), index(revision = 8)),
+        )
+        for (change in changes) {
+            Fake { count, _ ->
+                when (count) {
+                    1 -> coins(coin(1) + "," + coin(2), cursor = "aa")
+                    2 -> change
+                    3 -> coins(coin(2) + "," + coin(3), cursor = "cc")
+                    else -> coins(coin(4))
+                }
+            }.use { fake ->
+                val found = ServerClient(fake.url).utxos(listOf(address(1)))
+                assertEquals(listOf(txid(2), txid(3), txid(4)), found.utxos.map { it.txid })      // coin 1 was read before the change and is not kept
+                assertEquals(listOf(null, "aa", null, "cc"), fake.seen.map { Json.parseToJsonElement(it.body).jsonObject["cursor"]?.jsonPrimitive?.content })
+            }
+        }
+        Fake { count, _ -> if (count % 2 == 1) coins(coin(count), cursor = "aa") else Reply(409, "{\"message\":\"again\"}") }.use { fake ->
+            assertEquals(409, refused { ServerClient(fake.url).utxos(listOf(address(1))) }.httpStatus)
+            assertEquals(6, fake.seen.size)                                      // the first reading and two more
+        }
+        // more coins than are read for one question
+        Fake { count, _ -> coins(coin(2 * count) + "," + coin(2 * count + 1), cursor = "aa") }.use { fake ->
+            assertEquals(ServerClient.TOO_MANY, refused { ServerClient(fake.url).utxos(listOf(address(1)), most = 5) }.code)
+            assertEquals(3, fake.seen.size)
+        }
+        Fake { count, _ -> coins(coin(2 * count) + "," + coin(2 * count + 1), cursor = if (count < 3) "aa" else null) }.use { fake ->
+            assertEquals(6, ServerClient(fake.url).utxos(listOf(address(1)), most = 6).utxos.size)       // exactly as many as are read
+        }
+        val wrong = mapOf(
+            "a further page after an empty one" to coins("", cursor = "aa"),
+            "a cursor that is too long" to coins(coin(1), cursor = "a".repeat(1025)),
+            "a cursor that is not text" to Reply(200, "{\"utxos\":[${coin(1)}],\"next_cursor\":5,\"index\":${index()}}"),
+        )
+        for ((what, reply) in wrong) {
+            Fake { _, _ -> reply }.use { fake -> assertEquals(200, refused { ServerClient(fake.url).utxos(listOf(address(1))) }.httpStatus, what) }
+        }
+        // the same coin on two pages
+        Fake { count, _ -> if (count == 1) coins(coin(1), cursor = "aa") else coins(coin(1)) }.use { fake ->
+            assertEquals(200, refused { ServerClient(fake.url).utxos(listOf(address(1))) }.httpStatus)
+        }
+        // an answer of the earlier form, without a word about further pages, is one page and the last
+        Fake { _, _ -> Reply(200, "{\"utxos\":[${coin(1)}],\"index\":${index(revision = null)}}") }.use { fake ->
+            assertEquals(1, ServerClient(fake.url).utxos(listOf(address(1))).utxos.size)
         }
     }
 
@@ -219,23 +325,28 @@ class ServerClientTest {
         val mine = listOf(address(1), address(2))
         Fake { count, _ ->
             when (count) {
-                1 -> page(line(1, height = null, deep = 0) + "," + line(2, receivedAt = address(2)), cursor = "aa")
+                1 -> page(line(1, height = null, deep = 0, net = "-7") + "," + line(2, fee = "null"), cursor = "aa")
                 else -> page(line(3, height = 80, deep = 21))
             }
         }.use { fake ->
             val history = ServerClient(fake.url).history(mine)
             assertEquals(listOf(txid(1), txid(2), txid(3)), history.moves.map { it.txid })
-            assertEquals(ServerMove(txid(1), null, null, 5, 0, null, null, 0, 1763000000), history.moves[0])     // waiting for a block
-            assertEquals(address(2), history.moves[1].receivedAt)
+            assertEquals(ServerMove(txid(1), -7, 1000, null, 0, 1763000000), history.moves[0])      // waiting for a block, and a loss
+            assertEquals(ServerMove(txid(2), 5, null, 90, 11, 1763000000), history.moves[1])        // a block reward: it has no fee
             assertTrue(history.complete)
             assertEquals(100, history.tip)
+            assertEquals(7L, history.revision)
             val sent = fake.seen.map { Json.parseToJsonElement(it.body).jsonObject }
             assertEquals(listOf("200", "200"), sent.map { it["limit"]!!.jsonPrimitive.content })
             assertEquals(listOf(null, "aa"), sent.map { it["cursor"]?.jsonPrimitive?.content })
             assertEquals(mine, sent[0]["addresses"]!!.jsonArray.map { it.jsonPrimitive.content })
         }
-        // the server says that its index changed (409), or the second page comes from another block: everything is read again
-        for (change in listOf(Reply(409, "{\"message\":\"The index changed; restart history pagination.\"}"), page(line(9, height = 81, deep = 21), index = index(height = 101, hash = h2)))) {
+        // the server says that its index changed (409), or the second page comes from another block or from other waiting transactions: everything is read again
+        val changes = listOf(
+            Reply(409, "{\"message\":\"The index changed; restart pagination.\"}"), page(line(9, height = 81, deep = 21), index = index(height = 101, hash = h2)),
+            page(line(9), index = index(revision = 8)),
+        )
+        for (change in changes) {
             Fake { count, _ ->
                 when (count) {
                     1 -> page(line(1), cursor = "aa")
@@ -261,7 +372,19 @@ class ServerClientTest {
             assertFalse(history.complete)
         }
         val wrong = mapOf(
-            "an address that was not asked about" to page(line(1, receivedAt = address(9))),
+            "a line of the earlier form" to page("{\"transaction_id\":\"${txid(1)}\",\"received_at\":null,\"sent_to\":null,\"received_amount\":5,\"sent_amount\":0,\"fee\":null,\"block_height\":90,\"confirmations\":11,\"timestamp\":1763000000}"),
+            "an amount written as text" to page(line(1, net = "\"5\"")),
+            "an amount with a fraction" to page(line(1, net = "5.5")),
+            "an amount with an exponent" to page(line(1, net = "1e3")),
+            "an amount with a plus before it" to page(line(1, net = "+5")),
+            "no amount" to page(line(1, net = "null")),
+            "a gain that cannot exist" to page(line(1, net = "200000000000000001")),
+            "a loss that cannot exist" to page(line(1, net = "-200000000000000001")),
+            "a fee below zero" to page(line(1, fee = "-1")),
+            "a fee that cannot exist" to page(line(1, fee = "200000000000000001")),
+            "a fee written as text" to page(line(1, fee = "\"1\"")),
+            "a block reward that takes away" to page(line(1, net = "-5", fee = "null")),
+            "a block reward that waits for a block" to page(line(1, height = null, deep = 0, fee = "null")),
             "the same transaction twice" to page(line(1) + "," + line(1)),
             "a waiting transaction with a depth" to page(line(1, height = null, deep = 3)),
             "a depth that does not fit the block" to page(line(1, height = 90, deep = 10)),
@@ -270,6 +393,10 @@ class ServerClientTest {
         )
         for ((what, reply) in wrong) {
             Fake { _, _ -> reply }.use { fake -> assertEquals(200, refused { ServerClient(fake.url).history(mine) }.httpStatus, what) }
+        }
+        // the largest gain and the largest loss that can exist, and a line that leaves the addresses as they were
+        Fake { _, _ -> page(line(1, net = "-200000000000000000") + "," + line(2, net = "200000000000000000") + "," + line(3, net = "0", fee = "0")) }.use { fake ->
+            assertEquals(listOf(-200000000000000000, 200000000000000000, 0), ServerClient(fake.url).history(mine).moves.map { it.netSat })
         }
         assertFailsWith<IllegalArgumentException> { ServerClient("http://127.0.0.1:9").history((1..101).map { address(it) }) }
     }

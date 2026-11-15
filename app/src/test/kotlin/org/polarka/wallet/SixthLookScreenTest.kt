@@ -548,6 +548,7 @@ class SixthLookScreenTest {
                     assertEquals(Problem.Kind.UNSURE, model.state.sendProblem?.kind)
                     val made = model.state.pending.single()
                     assertTrue(made.unsure && made.atMillis > 0)
+                    assertTrue(made.inputSat > made.sentSat + made.feeSat, "what the payment put in is written down with it: $made")
                     Thread.sleep(50)                    // every look from here on is later than the payment
                     model.goneAfterMillis = 0           // from here on a payment is called gone as soon as two looks do not find it
 
@@ -555,7 +556,7 @@ class SixthLookScreenTest {
                     looked(model)
                     looked(model)
                     assertTrue(model.state.pending.isEmpty(), "still open: ${model.state.pending}")
-                    assertEquals(listOf(Dropped(made.txid, made.sentSat, made.feeSat, made.inputs, made.atMillis)), model.state.dropped)
+                    assertEquals(listOf(Dropped(made.txid, made.sentSat, made.feeSat, made.inputs, made.atMillis, made.inputSat)), model.state.dropped)
 
                     // the server passes it on after all: it waits for a block again, and its time is still the first one
                     node.cli("sendrawtransaction", handed.get())

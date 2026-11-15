@@ -26,15 +26,17 @@ import north.node.Utxo
  *
  * What is different from a node:
  * - A coin that a waiting transaction spends is not in the server's list at all, and what a waiting
- *   transaction pays is not in it yet. What is on its way is counted apart ([Snapshot.arrivingSat]).
- * - The history comes summed up by the server, each line against the addresses of one request, and a request
- *   takes a hundred addresses. A wallet with more is asked about in parts, fifty keys of each branch to a
- *   part, and the lines that the parts give for one transaction are put together. That is exact while all
- *   the inputs of a transaction sit in one part. When they sit in more, what the wallet put in still shows
- *   and the fee does not. When a part got back at least as much as it put in, its line does not say what it
- *   put in: such a transaction is left out, and the history says that it is not whole
- *   ([Snapshot.historyWhole]).
- * - Whether a transaction in the history was a block reward is known only while its coin is unspent.
+ *   transaction pays is not in it yet. What is on its way is counted apart ([Snapshot.arrivingSat]): for a
+ *   payment from somebody else what the server sums it up to, and for a payment of the wallet's own what it
+ *   gives back, worked out from what the wallet wrote down that it put in ([Pending.inputSat]).
+ * - The history comes summed up by the server. Each line says what a transaction did to the addresses of one
+ *   request: what it paid to them less what it took from them. A request takes a hundred addresses, so a
+ *   wallet with more is asked about in parts, fifty keys of each branch to a part, and the lines that the
+ *   parts give for one transaction are added up, which is exact. What the lines do not say is how a movement
+ *   is made up: a payment shows as what the wallet lost by it, and the fee of the whole transaction stands
+ *   beside it when the wallet lost at least that much. A history that is longer than the app reads says that
+ *   it is not whole ([Snapshot.historyWhole]).
+ * - A block reward is known by having no fee.
  * - The server does not say which transaction spent a coin, and a coin that is missing from its list proves
  *   nothing: the server may be behind its node, or may not show the truth. Nothing is concluded from a
  *   missing coin. A payment of the wallet's counts as beaten only when the server shows, in a block, another
@@ -53,7 +55,8 @@ import north.node.Utxo
  *   question of the hand-over on the server has the whole signed transaction, and it could keep it whatever
  *   it answers. A payment is therefore never forgotten on the server's word ([ownersNode]).
  *
- * Everything in one look has to come from the same block. If a block arrives in between, the look is made again.
+ * Everything in one look has to come from the same picture of the chain: the same block and, with a server
+ * that numbers them, the same waiting transactions. If that changes in between, the look is made again.
  */
 class ServerEngine(
     private val chain: Chain, private val watched: List<String>, private val server: ServerClient,
@@ -76,7 +79,7 @@ class ServerEngine(
     private class Told(val txid: String, val height: Int, val lines: MutableList<ServerMove> = ArrayList())
 
     private class Histories(
-        val tip: Int, val tips: Set<String>,
+        val tip: Int, val tips: Set<String>,            // the pictures of the chain that the parts were read from
         val inBlocks: List<Told>,
         val waiting: Map<String, List<ServerMove>>,     // the lines of the transactions that wait for a block
         val whole: Boolean,                             // every part gave all its lines
@@ -124,19 +127,22 @@ class ServerEngine(
     private fun key(coin: Unspent): String = coin.txid + ":" + coin.vout
 
     /**
-     * A server that will not take what the wallet asks (HTTP 400). One refusal is told apart by the server's
-     * own words: more coins on the addresses than it lists in one answer. Every other one is about the
-     * addresses themselves: the server works for another network than the setup names, which is what it says
-     * of addresses it does not know, or it is not a server of this kind. That is said as one thing, with the
+     * What the engine makes of two answers of the server. More coins on the addresses than are read for one
+     * question is said as that. A server that will not take what the wallet asks (HTTP 400) is about the
+     * addresses themselves: it works for another network than the setup names, which is what it says of
+     * addresses it does not know, or it is not a server of this kind. That is said as one thing, with the
      * server's words.
      */
     private inline fun <T> asked(what: () -> T): T = try {
         what()
     } catch (e: NodeError) {
+        if (e.code == ServerClient.TOO_MANY) throw EngineError(Problem.Kind.TOO_MANY_COINS, ServerClient.MAX_COINS.toString())
         if (e.httpStatus != 400) throw e
-        val said = e.message.orEmpty()
-        throw EngineError(if ("output limit" in said.lowercase()) Problem.Kind.TOO_MANY_COINS else Problem.Kind.OTHER_CHAIN, said)
+        throw EngineError(Problem.Kind.OTHER_CHAIN, e.message.orEmpty())
     }
+
+    /** One picture of the chain: a block and, when the server numbers them, its waiting transactions. */
+    private fun at(tipHash: String, revision: Long?): String = if (revision == null) tipHash else "$tipHash/$revision"
 
     private fun scriptFor(address: String): ByteArray =
         try { Qrh.scriptForAddress(chain, address.trim()) } catch (e: Exception) { throw EngineError(Problem.Kind.BAD_ADDRESS) }
@@ -158,6 +164,19 @@ class ServerEngine(
     }
 
     /**
+     * What some lines sum up to: the lines that the parts of the addresses gave for one transaction. Each is
+     * what the transaction paid to the addresses of its part less what it took from them.
+     */
+    private fun sumOf(lines: List<ServerMove>): Long {
+        var sum = 0L
+        for (line in lines) {
+            sum += line.netSat          // every line is within the bounds of an amount, so the sum cannot run over
+            if (sum > NodeClient.MAX_SAT || sum < -NodeClient.MAX_SAT) throw NodeError(200, null, "the server sent amounts that cannot exist together")
+        }
+        return sum
+    }
+
+    /**
      * The server's history of some addresses, asked for part by part. A transaction that touches several
      * parts has a line from each of them, each summed up against the addresses of its own part.
      */
@@ -170,7 +189,7 @@ class ServerEngine(
         val floors = HashMap<Int, Int>()        // for a part that did not give all its lines: the height of the oldest one it gave
         parts.forEachIndexed { number, part ->
             val history = server.history(part, most)
-            tips.add(history.tipHash)
+            tips.add(at(history.tipHash, history.revision))
             tip = if (tip < 0) history.tip else minOf(tip, history.tip)
             var lowest = Int.MAX_VALUE
             for (line in history.moves) {
@@ -186,7 +205,7 @@ class ServerEngine(
             if (!history.complete) floors[number] = lowest
         }
         // A part that stopped before its end says nothing about a transaction at or below the block it
-        // stopped in. Without its line the others would be misread: change that came back would show as a gain.
+        // stopped in. Without its line the sum would be wrong: change that came back would show as a gain.
         val unsure = HashSet<String>()
         for (one in inBlocks.values) {
             val listed = listedBy.getValue(one.txid)
@@ -197,30 +216,43 @@ class ServerEngine(
 
     /**
      * A transaction in a block as the wallet's own kind of line, from the lines that the parts of the
-     * addresses gave for it. Null when the lines do not say what the wallet put in.
+     * addresses gave for it. Together they say what the transaction did to the wallet. Null when the lines
+     * cannot be true together.
      */
-    private fun movement(one: Told, rewards: Set<String>): Movement? {
-        if (one.lines.any { it.height != one.height }) return null         // answers of two moments
-        val time = one.lines.first().time ?: 0
-        val received = plus(*one.lines.map { it.receivedSat }.toLongArray())
-        val all = one.lines.filter { it.feeSat != null }                               // every input was this part's
-        val some = one.lines.filter { it.feeSat == null && it.receivedAt == null }     // some inputs were, others not
+    private fun movement(one: Told): Movement? {
+        val first = one.lines.first()
+        if (one.lines.any { it.height != one.height || it.feeSat != first.feeSat }) return null       // answers of two moments, or of two minds
+        val time = first.time ?: 0
+        val gain = sumOf(one.lines)
+        val fee = first.feeSat
         return when {
-            // no input was the wallet's: a payment or a block reward that came in
-            all.isEmpty() && some.isEmpty() -> Movement(one.txid, one.height, time, one.txid in rewards, received, 0, null)
-            // every input sat in one part: what the wallet put in is what went past that part, the fee, and what came back to it
-            all.size == 1 && some.isEmpty() -> {
-                val line = all.single()
-                val fee = all.mapNotNull { it.feeSat }.single()
-                Movement(one.txid, one.height, time, false, received, plus(line.sentSat, fee, line.receivedSat), fee)
-            }
-            // lines that cannot be true together
-            all.isNotEmpty() -> null
-            // a part that got back at least as much as it put in does not say how much it put in
-            some.any { it.sentSat == 0L } -> null
-            // inputs in several parts, or inputs that are not the wallet's: each part put in what shows as sent and what came back to it
-            else -> Movement(one.txid, one.height, time, false, received, plus(*some.map { plus(it.sentSat, it.receivedSat) }.toLongArray()), null)
+            // a block reward has no fee and takes from nobody
+            fee == null -> if (gain >= 0) Movement(one.txid, one.height, time, true, gain, 0, null) else null
+            // the wallet has more than before: a payment that came in
+            gain >= 0 -> Movement(one.txid, one.height, time, false, gain, 0, null)
+            // The wallet has less than before. The fee is that of the whole transaction; it stands beside the
+            // loss when the wallet lost at least that much, and so can have paid it.
+            else -> Movement(one.txid, one.height, time, false, 0, -gain, fee.takeIf { it <= -gain })
         }
+    }
+
+    /**
+     * What the waiting transactions are about to bring to the wallet. A payment from somebody else brings
+     * what the server sums it up to. A payment of the wallet's own shows there as a loss, and its coins are
+     * gone from the server's list at once: what it gives back is what the wallet wrote down that it put in,
+     * less that loss. For a payment of the wallet's that has no such note, nothing is counted.
+     */
+    private fun arriving(wallet: WalletInfo, waiting: Map<String, List<ServerMove>>): Long {
+        val put = HashMap<String, Long>()
+        for (payment in wallet.pending) put[payment.txid] = payment.inputSat
+        for (payment in wallet.dropped) put[payment.txid] = payment.inputSat
+        var sum = 0L
+        for ((txid, lines) in waiting) {
+            val gain = sumOf(lines)
+            val known = put[txid] ?: 0
+            sum = plus(sum, if (gain >= 0) gain else if (known > 0) maxOf(0, known + gain) else 0)
+        }
+        return sum
     }
 
     /**
@@ -243,8 +275,8 @@ class ServerEngine(
         // a transaction that made one of the wallet's coins is in a block, whatever the history reaches back to
         val made = coins.map { it.txid }.toSet()
         val own = (wallet.pending.map { it.txid } + wallet.dropped.map { it.txid }).toSet()
-        // a waiting transaction that spends from the wallet and is none of its payments: made elsewhere with the same words
-        val stranger = waiting.any { (txid, lines) -> txid !in own && lines.any { it.receivedAt == null } }
+        // a waiting transaction that takes from the wallet and is none of its payments: made elsewhere with the same words
+        val stranger = waiting.any { (txid, lines) -> txid !in own && lines.any { it.netSat < 0 } }
         val busy = HashSet<String>()                // the coins of the wallet's own payments that wait for a block
         val unknown = ArrayList<Set<String>>()      // the coins of the payments that are in no block and that the server does not know
         fun check(txid: String, inputs: Set<String>, waits: MutableSet<String>) {
@@ -268,8 +300,8 @@ class ServerEngine(
     }
 
     /** The transactions in blocks as the wallet's kind of lines, newest first; null for one that cannot be told. */
-    private fun movements(told: Histories, rewards: Set<String>): List<Movement?> =
-        told.inBlocks.map { if (it.txid in told.unsure) null else movement(it, rewards) }
+    private fun movements(told: Histories): List<Movement?> =
+        told.inBlocks.map { if (it.txid in told.unsure) null else movement(it) }
 
     /** Oldest first, as a node's history is kept. */
     private fun ordered(lines: List<Movement?>): List<Movement> =
@@ -295,23 +327,22 @@ class ServerEngine(
         if (wallet != null && watch != null) {
             val keys = keysOf(watch, window)
             val activity = server.activity(keys.addresses)
-            tips.add(activity.tipHash)
+            tips.add(at(activity.tipHash, activity.revision))
             for (address in activity.used) {
                 val (branch, index) = keys.places.getValue(address)
                 if (branch == 0) nextReceive = maxOf(nextReceive, index + 1) else nextChange = maxOf(nextChange, index + 1)
             }
             val found = server.utxos(keys.addresses)
-            tips.add(found.tipHash)
+            tips.add(at(found.tipHash, found.revision))
             tip = found.tip
             tipHash = found.tipHash
             coins = placed(found.utxos, keys)
-            val rewards = found.utxos.filter { it.coinbase }.map { it.txid }.toSet()
             val told = histories(keys.parts)
             tips.addAll(told.tips)
-            val lines = movements(told, rewards)
+            val lines = movements(told)
             whole = told.whole && lines.none { it == null }
             moves = ordered(lines)
-            arriving = plus(*told.waiting.values.flatten().map { it.receivedSat }.toLongArray())
+            arriving = arriving(wallet, told.waiting)
             judge(wallet, coins, told.inBlocks.map { it.txid }.toSet(), told.waiting, held, back, tied, spentBy)
         }
 
@@ -320,7 +351,7 @@ class ServerEngine(
         if (watched.isNotEmpty()) {
             val scripts = watched.map { Format.hex(Qrh.scriptForAddress(chain, it)) }.toSet()
             val found = server.utxos(watched)
-            tips.add(found.tipHash)
+            tips.add(at(found.tipHash, found.revision))
             if (tip < 0) {
                 tip = found.tip
                 tipHash = found.tipHash
@@ -328,10 +359,9 @@ class ServerEngine(
             if (found.utxos.any { it.script !in scripts }) throw EngineError(Problem.Kind.FOREIGN_OUTPUTS)
             watchedCoins = Balance(found.tip, found.utxos)
             watchedCoins.totalSat                                   // refused here if the sum cannot exist
-            val rewards = found.utxos.filter { it.coinbase }.map { it.txid }.toSet()
             val told = histories(watched.chunked(ServerClient.MAX_ADDRESSES))
             tips.addAll(told.tips)
-            watchedMoves = ordered(movements(told, rewards))
+            watchedMoves = ordered(movements(told))
         }
         if (tip < 0) tip = server.tipHeight()
 
@@ -344,9 +374,9 @@ class ServerEngine(
     }
 
     /**
-     * One look at the chain for the wallet and the watched addresses. When its parts were read at different
-     * blocks it is made again; if blocks keep arriving, the last look is returned and says that it is not
-     * steady, so that nothing is judged from it.
+     * One look at the chain for the wallet and the watched addresses. When its parts were not read from the
+     * same picture of the chain it is made again; if the chain keeps changing, the last look is returned and
+     * says that it is not steady, so that nothing is judged from it.
      */
     @Synchronized
     override fun fetch(wallet: WalletInfo?): Snapshot {
@@ -367,9 +397,10 @@ class ServerEngine(
     }
 
     /**
-     * What arrived after block [afterHeight] on the wallet's receiving addresses and on the watched addresses.
-     * Change that returns from the wallet's own payments is not counted, nor is what the wallet pays to
-     * itself. Returns the height that every answer had reached, and what arrived up to that height.
+     * What the wallet and the watched addresses gained in blocks after [afterHeight]: every transaction that
+     * left them with more than they had. A payment of the wallet's own is a loss, its change included, and
+     * what the wallet pays to itself costs it the fee: neither is told. Returns the height that every answer
+     * had reached, and what arrived up to that height.
      */
     override fun incomingSince(wallet: WalletInfo?, afterHeight: Int): Pair<Int, List<Incoming>> = asked { since(wallet, afterHeight) }
 
@@ -378,29 +409,18 @@ class ServerEngine(
         if (afterHeight < 0 || afterHeight >= top) return top to emptyList()
         val result = ArrayList<Incoming>()
         var tip = -1
-        fun arrived(addresses: List<String>, parts: List<List<String>>, own: Boolean, counts: (String) -> Boolean) {
+        fun arrived(parts: List<List<String>>, own: Boolean) {
             val told = histories(parts)
             tip = if (tip < 0) told.tip else minOf(tip, told.tip)
-            val fresh = ArrayList<Pair<Told, Long>>()
             for (one in told.inBlocks) {
                 if (one.height <= afterHeight || one.txid in told.unsure) continue
-                if (one.lines.any { it.receivedAt == null }) continue      // a part of these addresses put something in
-                val amount = plus(*one.lines.filter { it.receivedAt?.let(counts) == true }.map { it.receivedSat }.toLongArray())
-                if (amount > 0) fresh.add(one to amount)
-            }
-            if (fresh.isEmpty()) return
-            // a block reward is known as one only while its coin is unspent, which a fresh one is
-            val rewards = server.utxos(addresses).utxos.filter { it.coinbase }.map { it.txid }.toSet()
-            for ((one, amount) in fresh) {
-                result.add(Incoming(Movement(one.txid, one.height, one.lines.first().time ?: 0, one.txid in rewards, amount, 0, null), own))
+                val move = movement(one) ?: continue
+                if (move.netSat > 0) result.add(Incoming(move, own))
             }
         }
         val watch = wallet?.watchKey()
-        if (wallet != null && watch != null) {
-            val keys = keysOf(watch, allowed(wallet))
-            arrived(keys.addresses, keys.parts, true) { keys.places[it]?.first == 0 }
-        }
-        if (watched.isNotEmpty()) arrived(watched, watched.chunked(ServerClient.MAX_ADDRESSES), false) { true }
+        if (wallet != null && watch != null) arrived(keysOf(watch, allowed(wallet)).parts, true)
+        if (watched.isNotEmpty()) arrived(watched.chunked(ServerClient.MAX_ADDRESSES), false)
         if (tip < 0) tip = top
         // The answers may be of different heights. What is above the lowest of them is told the next time, so that nothing is told twice.
         return tip to result.filter { it.move.height <= tip }.sortedBy { it.move.height }

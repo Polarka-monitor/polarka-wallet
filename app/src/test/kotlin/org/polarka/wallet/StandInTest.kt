@@ -74,7 +74,7 @@ class StandInTest {
                 var history = client.history(listOf(w00, w10))
                 assertEquals(listOf(2, 1), history.moves.map { it.height })
                 assertEquals(listOf(101, 102), history.moves.map { it.confirmations })
-                assertTrue(history.moves.all { it.receivedAt == w00 && it.receivedSat == reward && it.sentSat == 0L && it.feeSat == null && it.sentTo == null })
+                assertTrue(history.moves.all { it.netSat == reward && it.feeSat == null })              // a block reward has no fee
 
                 // a payment of 100 coins; the rest comes back to the first change address
                 val plan = Planner.pay(coinsOf(client, wallet), script(other.address(0, 0)), 100 * coin, 2, wallet.script(1, 0))
@@ -91,17 +91,19 @@ class StandInTest {
                 assertEquals(listOf(reward), waiting.utxos.map { it.amountSat })
                 assertTrue(waiting.utxos.none { it.txid == plan.inputs[0].txid })
                 assertEquals(setOf(w00, w10), client.activity(listOf(w00, w10, w11)).used)      // the change address counts as used at once
-                // asked about all the wallet's addresses: what went elsewhere, the fee, and what came back
+                // asked about all the wallet's addresses: the wallet loses what went elsewhere and the fee
                 history = client.history(listOf(w00, w10))
                 assertEquals(3, history.moves.size)
-                assertEquals(ServerMove(signed.txid, null, other.address(0, 0), change, 100 * coin, plan.feeSat, null, 0, history.moves[0].time), history.moves[0])
-                // asked about the paying address alone: the change counts as sent away
+                assertEquals(ServerMove(signed.txid, -(100 * coin + plan.feeSat), plan.feeSat, null, 0, history.moves[0].time), history.moves[0])
+                // asked about the paying address alone: it loses the whole coin
                 val alone = client.history(listOf(w00)).moves[0]
-                assertEquals(ServerMove(signed.txid, null, other.address(0, 0), 0, 100 * coin + change, plan.feeSat, null, 0, alone.time), alone)
-                // asked about the change address alone: an incoming payment
+                assertEquals(ServerMove(signed.txid, -reward, plan.feeSat, null, 0, alone.time), alone)
+                // asked about the change address alone: it gains the change, and the fee beside it is still that of the whole transaction
                 val back = client.history(listOf(w10)).moves.single()
-                assertEquals(ServerMove(signed.txid, w10, null, change, 0, null, null, 0, back.time), back)
-                assertEquals(100 * coin, client.history(listOf(other.address(0, 0))).moves.single().receivedSat)
+                assertEquals(ServerMove(signed.txid, change, plan.feeSat, null, 0, back.time), back)
+                // the lines of the two requests add up to the line of the one
+                assertEquals(history.moves[0].netSat, alone.netSat + back.netSat)
+                assertEquals(100 * coin, client.history(listOf(other.address(0, 0))).moves.single().netSat)
 
                 node.mine(1, miner)                                                 // tip 103
                 history = client.history(listOf(w00, w10))
@@ -116,16 +118,17 @@ class StandInTest {
                 val rest = reward + change - 10 * coin - second.feeSat
                 assertEquals(second.txid, client.broadcast(second.hex))
                 node.mine(1, miner)                                                 // tip 104
-                // asked about all three addresses: the payment as it is
+                // asked about all three addresses: the wallet loses what went elsewhere and the fee
                 val full = client.history(listOf(w00, w10, w11)).moves[0]
-                assertEquals(ServerMove(second.txid, null, other.address(0, 1), rest, 10 * coin, second.feeSat, 104, 1, full.time), full)
-                // asked about w00 alone: one input is its own, one is not. What it put in shows as sent; the fee is not known.
+                assertEquals(ServerMove(second.txid, -(10 * coin + second.feeSat), second.feeSat, 104, 1, full.time), full)
+                // asked about w00 alone: one input is its own, one is not, and it loses what it put in
                 val part = client.history(listOf(w00)).moves[0]
-                assertEquals(ServerMove(second.txid, null, null, 0, reward, null, 104, 1, part.time), part)
-                // asked about the two change addresses: they receive more than they put in, nothing shows as sent,
-                // and what they put in cannot be told from the answer. This is why a history is not put together from parts.
+                assertEquals(ServerMove(second.txid, -reward, second.feeSat, 104, 1, part.time), part)
+                // asked about the two change addresses: they get more than they put in, and the line says by how much.
+                // With the line for w00 it adds up to the whole, which is why a history can be put together from parts.
                 val mixed = client.history(listOf(w10, w11)).moves[0]
-                assertEquals(ServerMove(second.txid, null, null, rest, 0, null, 104, 1, mixed.time), mixed)
+                assertEquals(ServerMove(second.txid, rest - change, second.feeSat, 104, 1, mixed.time), mixed)
+                assertEquals(full.netSat, part.netSat + mixed.netSat)
 
                 // the change of the first payment again, which the second payment has spent: asked to check, the server passes the node's refusal on ...
                 val unspent = listOf(Unspent(second.txid, 1, rest, 1, 1, 104, false))       // the rest of the second payment, on w11
@@ -181,6 +184,23 @@ class StandInTest {
                 assertTrue(long.complete)
                 assertEquals(long.moves.map { it.height!! }.sortedDescending(), long.moves.map { it.height })
                 assertEquals(225, long.tip)
+
+                // coins come a page at a time: with fifty to a page the client reads five pages and has them all, in the same order
+                val whole = client.utxos(listOf(miner))
+                server.set("{\"page\":50}")
+                val paged = client.utxos(listOf(miner))
+                assertEquals(223, paged.utxos.size)
+                assertEquals(whole.utxos, paged.utxos)
+                // a cursor of coins holds for one moment of the index, as a cursor of history does
+                val some = server.post("/v1/utxos", "{\"addresses\":[\"$miner\"]}")
+                assertEquals(200, some.first)
+                val further = Json.parseToJsonElement(some.second).jsonObject["next_cursor"]!!.jsonPrimitive.content
+                val following = "{\"addresses\":[\"$miner\"],\"cursor\":\"$further\"}"
+                assertEquals(200, server.post("/v1/utxos", following).first)
+                node.mine(1, miner)                                                 // tip 226
+                assertEquals(409, server.post("/v1/utxos", following).first)
+                assertEquals(224, client.utxos(listOf(miner)).utxos.size)
+                server.set("{\"page\":0}")
 
                 // another branch wins: the stand-in follows its node
                 val before = client.utxos(listOf(miner))

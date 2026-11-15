@@ -1,12 +1,17 @@
 # The Northbound wallet server, as this wallet reads it
 
 Northbound (github.com/nova9/northbound) is an independent wallet for TrueNorth with a server that stands in
-front of a TrueNorth Core node and keeps an index of addresses. Its author has said that the paths and shapes
-of version 1 will stay as they are. This note says what `ServerClient` (module `node`) takes for granted about
-such a server, and where that comes from.
+front of a TrueNorth Core node and keeps an index of addresses. This note says what `ServerClient` (module
+`node`) takes for granted about such a server, and where that comes from.
 
-It was written from the server's sources at the tag v0.1.0-rc.5 and commit 846e444. The server's code was read,
-not built or run. Five read-only requests to the public server on 14 November 2026 came back in these shapes.
+It was written from the server's sources: first at the tag v0.1.0-rc.5 and commit 846e444, and again at commit
+07523b6 of 15 November 2026. The server's code was read, not built or run. Read-only requests to the public
+server on 14 and 15 November 2026 came back in these shapes.
+
+The paths of version 1 have stayed as they were. The shapes have not. On 15 November 2026 the lines of history
+changed and coins began to come in pages (commits d72a5e1, e3376a1 and 66fa1d9), and nothing in an answer says
+which shapes a server speaks. Polarka Wallet 0.6.0 read the earlier shapes and refuses the new history as an
+answer in an unknown form; 0.6.1 reads the shapes below, and refuses the earlier history in the same way.
 
 ## Calls
 
@@ -15,7 +20,7 @@ not built or run. Five read-only requests to the public server on 14 November 20
 | `GET /v1/chain/tip` | | `{"height"}` |
 | `GET /v1/fees/estimate` | | `{"atomic_units_per_vbyte","target_blocks"}` |
 | `POST /v1/addresses/activity` | `{"addresses":[...]}` | `{"used_addresses":[...],"index"}` |
-| `POST /v1/utxos` | `{"addresses":[...]}` | `{"utxos":[...],"index"}` |
+| `POST /v1/utxos` | `{"addresses":[...],"cursor","limit"}` | `{"utxos":[...],"next_cursor","index"}` |
 | `POST /v1/transactions` | `{"addresses":[...],"cursor","limit"}` | `{"transactions":[...],"next_cursor","index"}` |
 | `POST /v1/transactions/validate` | `{"transaction_hex"}` | `{"allowed","rejection_reason"}` |
 | `POST /v1/transactions/broadcast` | `{"transaction_hex"}` | `{"transaction_id"}` |
@@ -23,30 +28,33 @@ not built or run. Five read-only requests to the public server on 14 November 20
 
 Amounts are whole numbers of base units. An error has the body `{"message"}`.
 
-Commit a531965 adds `GET /v2/fees/estimate`, which gives the rate for 1,000 virtual bytes
-(`atomic_units_per_kvbyte`) and so does not round it up to a whole unit per byte. The client does not use it:
-the wallet takes no fee estimate from a server and offers its three fixed rates. When this note was first
-written, in the afternoon of 14 November 2026, the public server did not have that call; in the evening of
-the same day it answered 1,002 for 1,000 virtual bytes, where `/v1/fees/estimate` answered 2 for one byte.
+`GET /v2/fees/estimate` gives the rate for 1,000 virtual bytes (`atomic_units_per_kvbyte`) and so does not
+round it up to a whole unit per byte. The client does not use it: the wallet takes no fee estimate from a
+server and offers its three fixed rates.
 
 ## What the answers mean
 
 - **Coins** (`utxos`): outputs that are in a block and that nothing spends. An output that a transaction waiting
   for a block spends is not listed, and an output of a waiting transaction is not listed either. Each coin has
   `transaction_id`, `output_index`, `amount`, `script_pubkey`, `block_height`, `confirmations` (the index height
-  less the block height, plus one) and `coinbase`.
+  less the block height, plus one) and `coinbase`. They come a page at a time, ordered by block, id and output
+  number: a thousand to a page unless the request names a `limit` (1 to 10,000). `next_cursor` leads to the
+  next page and is null on the last. A cursor holds for the block and the picture of the waiting transactions
+  it was made at; used later, it is answered 409, and every page has to be read again. The client names no
+  limit and takes the size of page the server gives.
 - **Activity**: an address counts as used when an output pays to it, in a block or in a waiting transaction.
 - **History**: newest first, the waiting transactions before those in blocks. Every line is summed up against
-  the addresses of its own request. `received_amount` is what the outputs pay to them. With no input from them
-  the line is an incoming payment and `received_at` names the first address paid. With every input from them,
-  `sent_amount` is what goes elsewhere and `fee` is given. With inputs of both kinds, `sent_amount` is the own
-  input less what came back, not below zero, and `fee` is missing. A waiting transaction has no `block_height`
-  and 0 confirmations. `limit` is 1 to 200. When a block or a waiting transaction arrives between two pages the
-  server answers 409 and the reading has to start again.
+  the addresses of its own request: `net_amount` is what the transaction's outputs pay to them less what its
+  inputs take from them, a whole number that can be below zero. `network_fee` is the fee of the whole
+  transaction, whoever paid it, and null for a block reward. A waiting transaction has no `block_height` and
+  0 confirmations; its `timestamp` is when the server first saw it. `limit` is 1 to 200. When a block or a
+  waiting transaction arrives between two pages the server answers 409 and the reading has to start again.
 - **Index** (`index`, with every answer read from the index): `ready`, `indexed_height`, `indexed_hash`,
-  `observed_node_height`, `observed_node_hash`, `pending_available` and three fields about age. The client takes
-  an answer only when the index is ready, knows the waiting transactions, and is at the height and hash its
-  node reports. This is the rule the Northbound wallet applies itself.
+  `observed_node_height`, `observed_node_hash`, `pending_available`, `pending_revision` and three fields about
+  age. The client takes an answer only when the index is ready, knows the waiting transactions, and is at the
+  height and hash its node reports. This is the rule the Northbound wallet applies itself. `pending_revision`
+  goes up whenever the index takes a new picture of the waiting transactions, which it does when they or the
+  block change. Two answers with the same block and the same number were read from the same picture.
 - **Validate** asks the node whether it would take the transaction (`testmempoolaccept`). The server sees the
   whole signed transaction at that point. The fee is not returned.
 - **Broadcast** passes the transaction on (`sendrawtransaction`). Every error of the node comes back as 502:
@@ -56,19 +64,29 @@ the same day it answered 1,002 for 1,000 virtual bytes, where `/v1/fees/estimate
 
 ## Limits
 
-- At most 100 addresses in one request (400 otherwise), a body of 1 MB, and 10,000 coins in one answer: a
-  request that would list more is refused with 400 and the words "request exceeds the 10,000 output limit".
+- At most 100 addresses in one request (400 otherwise) and a body of 1 MB. The server sets no bound on the
+  coins of an address over all pages. The client reads at most 20,000 coins for one question
+  (`ServerClient.MAX_COINS`) and says so when there are more.
 - Since commit 846e444, 100 requests a second for all clients of one server together; above that 429 with
   `Retry-After: 1`. Requests that were refused do not reach the index or the node.
-- 503 when the index is busy, still catching up, or older than its allowed age.
+- 503 when the index is busy, still catching up, taking a new picture of the waiting transactions, or older
+  than its allowed age.
 
 ## What follows for a wallet
 
 - Coins and activity can be asked for in parts of a hundred addresses and put together exactly, provided all
-  parts were read at the same block. `ServerClient` refuses a mixed answer.
-- A history cannot be put together from parts: a payment whose inputs are in one request and whose change is
-  in another comes back as two lines that are each true only for their own addresses, and in one case the
-  amount cannot be recovered. A wallet has an exact history only while all its addresses fit one request.
+  parts and all pages were read from the same picture: the same block and the same `pending_revision`.
+  `ServerClient` reads coins again from the start when that changes in between (three readings at most), and
+  refuses activity that was read across a change. Half a list of coins is never taken for a balance.
+- A history can be put together from parts: the lines that several requests give for one transaction add up
+  to what the transaction did to all their addresses. A wallet with more than a hundred addresses has an exact
+  history that way.
+- A line does not say how a movement is made up: what was received and what was spent, who was paid, and what
+  of the fee the addresses bore. The wallet shows a payment as what it lost by it, with the fee of the whole
+  transaction beside it when it lost at least that much. A block reward is known by having no fee.
+- For a waiting payment of the wallet's own the line is a loss, and the coins it spends are gone from the list
+  at once. What such a payment gives back, the change, is not in any answer. The wallet writes down what its
+  payment put in when it makes it, and works the change out from that and from the server's line.
 - A lie about the amount of a coin does not make the wallet overpay a fee. The signature covers the amounts of
   all the outputs it spends (the BIP-341 signature hash), so a transaction built on a wrong amount is not valid.
 - The server learns every address it is asked about and where the questions come from. It can show a wrong
@@ -84,3 +102,6 @@ the same day it answered 1,002 for 1,000 virtual bytes, where `/v1/fees/estimate
   another payment of the same wallet that spends one of its coins.
 - No answer is waited for without end. Every question has a time limit as a whole (`ServerClient.DEADLINE_MS`),
   beside the limits for a connection and for a single read.
+- Nothing in an answer names the version of the shapes. A client learns of a change by failing to read an
+  answer, as 0.6.0 did. The author of the server was asked on 15 November 2026 whether a change could be made
+  visible to a client (github.com/nova9/northbound, issue 5).

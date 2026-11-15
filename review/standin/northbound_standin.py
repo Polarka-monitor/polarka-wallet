@@ -2,9 +2,9 @@
 """A stand-in for a Northbound wallet server (API version 1), for tests.
 
 It takes the same requests and answers in the same shapes as the server of github.com/nova9/northbound, from
-a TrueNorth Core node. It was written from that server's sources (tag v0.1.0-rc.5 and the commits 846e444 and
-a531965). None of that code is used or run here, and where this program and the real server differ the real
-server is right.
+a TrueNorth Core node. It was written from that server's sources (tag v0.1.0-rc.5 and the commits up to
+07523b6 of 15 November 2026, which brought coins in pages and history lines as signed amounts). None of that
+code is used or run here, and where this program and the real server differ the real server is right.
 
 It keeps no database: every answer is worked out from the node's blocks and waiting transactions as they
 are at that moment. It listens on 127.0.0.1 only, trusts its node, and is not meant to serve anybody.
@@ -21,6 +21,8 @@ Beside the API it takes POST /__standin/set with a JSON object:
                     take the transaction (WHY), broadcast answers the node's error, the node is asked neither
                     time, and the transaction is kept. "" turns it off
   {"hide": true}    the coins that a kept transaction spends are left out of /v1/utxos
+  {"page": N}       /v1/utxos gives N coins to a page when the request names no limit (0: a thousand, as the
+                    real server does)
 The answer names every switch, and under "kept" the transactions that a server which said no was shown. The
 real server has no such switches. The last two play a server that is not honest, which the real one is not
 known to be: a wallet has to stay safe with one all the same.
@@ -38,12 +40,15 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 COIN = 100_000_000
 MAX_ADDRESSES = 100
-MAX_UTXOS = 10_000
+UTXO_PAGE = 1_000                 # coins on a page when the request names no limit
+MAX_UTXO_PAGE = 10_000
+MAX_CURSOR = 1_024
 MAX_BODY = 1_000_000
 MAX_HEX = 800_000
 MAX_AGE_SECONDS = 30
 NO_BLOCK = (1 << 63) - 1          # where the real server sorts a waiting transaction: above every block
 NODE_ERROR = "The blockchain node is unavailable or returned an invalid response."
+CHANGED = "The index changed; restart pagination."
 
 
 class Answer(Exception):
@@ -165,17 +170,46 @@ def parsed(tx):
     return {"txid": tx["txid"], "coinbase": coinbase, "inputs": inputs, "outputs": outputs}
 
 
-def read_cursor(text):
-    if len(text) > 1024:
-        raise Answer(400, "history cursor is too long")
+def whole(value, low, high):
+    """True for a whole number in a range. JSON's true and false are not numbers here."""
+    return isinstance(value, int) and not isinstance(value, bool) and low <= value <= high
+
+
+def cursor_of(text, what, numbers, ids):
+    """
+    A cursor as the real server reads it: hexadecimal text of a JSON object. What does not parse into the
+    fields it must have is "invalid"; fields that parse and cannot be are "invalid ... fields".
+    """
+    if len(text) > MAX_CURSOR:
+        raise Answer(400, "%s cursor is too long" % what)
     try:
+        if len(text) % 2 or any(c not in "0123456789abcdefABCDEF" for c in text):
+            raise ValueError("not hexadecimal")
         cursor = json.loads(bytes.fromhex(text).decode())
-        whole = isinstance(cursor["pending_revision"], int) and isinstance(cursor["height"], int)
-        fields = whole and cursor["height"] >= 0 and is_id(cursor["txid"]) and is_id(cursor["tip_hash"])
+        typed = isinstance(cursor, dict) and all(whole(cursor[name], low, high) for name, (low, high) in numbers.items()) \
+            and all(isinstance(cursor[name], str) for name in ids)
     except Exception:
-        raise Answer(400, "invalid history cursor")
-    if not fields:
+        typed = False
+    if not typed:
+        raise Answer(400, "invalid %s cursor" % what)
+    return cursor
+
+
+def read_cursor(text):
+    """The cursor of a page of history: two signed numbers of 64 bits, and two ids."""
+    span = (-(1 << 63), (1 << 63) - 1)
+    cursor = cursor_of(text, "history", {"pending_revision": span, "height": span}, ("txid", "tip_hash"))
+    if cursor["height"] < 0 or not is_id(cursor["txid"]) or not is_id(cursor["tip_hash"]):
         raise Answer(400, "invalid history cursor fields")
+    return cursor
+
+
+def read_coin_cursor(text):
+    """The cursor of a page of coins: the last coin of the page before, and the moment it was read at."""
+    numbers = {"pending_revision": (0, (1 << 64) - 1), "block_height": (0, (1 << 64) - 1), "output_index": (0, (1 << 32) - 1)}
+    cursor = cursor_of(text, "UTXO", numbers, ("transaction_id", "tip_hash"))
+    if cursor["block_height"] > NO_BLOCK or not is_id(cursor["transaction_id"]) or not is_id(cursor["tip_hash"]):
+        raise Answer(400, "invalid UTXO cursor fields")
     return cursor
 
 
@@ -209,15 +243,24 @@ class Picture:
         return {
             "ready": ready, "indexed_height": self.height, "indexed_hash": self.tip_hash, "observed_node_height": self.height,
             "observed_node_hash": self.tip_hash, "last_node_contact": self.now, "pending_available": ready,
-            "pending_observed_at": self.now, "max_age_seconds": MAX_AGE_SECONDS,
+            "pending_observed_at": self.now, "pending_revision": self.revision, "max_age_seconds": MAX_AGE_SECONDS,
         }
 
     def output(self, key):
         found = self.chain.outputs.get(key)
         return (found[0], found[1]) if found else self.w_outputs.get(key)
 
-    def coins(self, scripts):
-        """Outputs in blocks that nothing spends, not even a waiting transaction. Ordered by height, id and number."""
+    def coins(self, scripts, cursor, limit, hidden=()):
+        """
+        Outputs in blocks that nothing spends, not even a waiting transaction, a page at a time: ordered by
+        height, id and number, at most [limit] of them, and a cursor when there are more. A cursor holds for
+        the block and the picture of the waiting transactions it was made at, and for nothing later.
+        """
+        after = None
+        if cursor is not None:
+            after = read_coin_cursor(cursor)
+            if after["tip_hash"] != self.tip_hash or after["pending_revision"] != self.revision:
+                raise Answer(409, CHANGED)
         rows = []
         for _, script in scripts:
             for key in self.chain.by_script.get(script, ()):
@@ -225,16 +268,24 @@ class Picture:
                 # left out as the node's own set of unspent outputs leaves them out: the first block, data outputs, oversized scripts
                 if height == 0 or script.startswith("6a") or len(script) > 20_000:
                     continue
-                if key in self.chain.spends or key in self.w_spends:
+                if key in self.chain.spends or key in self.w_spends or key in hidden:
                     continue
                 rows.append((height, key[0], key[1], amount, script))
         rows.sort()
-        if len(rows) > MAX_UTXOS:
-            raise Answer(400, "request exceeds the 10,000 output limit")
+        if after is not None:
+            last = (after["block_height"], after["transaction_id"].lower(), after["output_index"])
+            rows = [row for row in rows if row[:3] > last]
+        page = rows[:limit]
+        next_cursor = None
+        if len(rows) > limit:
+            height, txid, n = page[-1][:3]
+            last = {"tip_hash": self.tip_hash, "pending_revision": self.revision, "block_height": height,
+                    "transaction_id": txid, "output_index": n}
+            next_cursor = json.dumps(last, separators=(",", ":")).encode().hex()
         return [{
             "transaction_id": txid, "output_index": n, "amount": amount, "script_pubkey": script, "block_height": height,
             "confirmations": self.height - height + 1, "coinbase": self.chain.where[txid][2],
-        } for height, txid, n, amount, script in rows]
+        } for height, txid, n, amount, script in page], next_cursor
 
     def used(self, scripts):
         return sorted(address for address, script in scripts if script in self.chain.by_script or script in self.w_by_script)
@@ -242,14 +293,14 @@ class Picture:
     def known(self, txid):
         return txid in self.chain.where or txid in self.w_where
 
-    def history(self, scripts, cursor, limit, address_of):
+    def history(self, scripts, cursor, limit):
         """The transactions that pay to the scripts or spend from them: the waiting ones first, then by height downwards, then by id."""
-        mine = {script: address for address, script in scripts}
+        mine = {script for _, script in scripts}
         after = None
         if cursor is not None:
             after = read_cursor(cursor)
             if after["tip_hash"] != self.tip_hash or after["pending_revision"] != self.revision:
-                raise Answer(409, "The index changed; restart history pagination.")
+                raise Answer(409, CHANGED)
         touched = set()
         for script in mine:
             for key in list(self.chain.by_script.get(script, ())) + list(self.w_by_script.get(script, ())):
@@ -267,7 +318,7 @@ class Picture:
         if after is not None:
             rows = [row for row in rows if row[0] < after["height"] or (row[0] == after["height"] and row[1] > after["txid"])]
         page = rows[:limit]
-        lines = [self.line(txid, None if height == NO_BLOCK else height, stamp, mine, address_of) for height, txid, stamp in page]
+        lines = [self.line(txid, None if height == NO_BLOCK else height, stamp, mine) for height, txid, stamp in page]
         next_cursor = None
         if len(rows) > limit:
             height, txid, _ = page[-1]
@@ -275,49 +326,32 @@ class Picture:
             next_cursor = json.dumps(last, separators=(",", ":")).encode().hex()
         return lines, next_cursor
 
-    def line(self, txid, height, stamp, mine, address_of):
-        """One transaction summed up against the scripts that were asked about, the way the real server does it."""
+    def line(self, txid, height, stamp, mine):
+        """
+        One transaction summed up against the scripts that were asked about, the way the real server does it:
+        what its outputs pay to them less what its inputs take from them, and the fee of the whole transaction,
+        whoever paid it. A block reward has no fee.
+        """
         in_block = txid in self.chain.where
         count = self.chain.count[txid] if in_block else self.w_count[txid]
         inputs = self.chain.inputs[txid] if in_block else self.w_inputs[txid]
-        received = elsewhere = paid_out = 0
-        received_at = sent_to = None
+        received = paid_out = paid_in = own_in = 0
         for n in range(count):
             amount, script = self.output((txid, n))
             paid_out += amount
             if script in mine:
                 received += amount
-                if received_at is None:
-                    received_at = mine[script]
-            else:
-                elsewhere += amount
-                if sent_to is None:
-                    sent_to = address_of(script)
-        paid_in = own_in = 0
-        all_own, any_own = True, False
         for key in inputs:
             spent = self.output(key)
             if spent is None:
-                continue
+                raise RuntimeError("an input of %s is not among the outputs read" % txid)
             paid_in += spent[0]
             if spent[1] in mine:
                 own_in += spent[0]
-                any_own = True
-            else:
-                all_own = False
-        fee, sent = None, 0
-        if any_own:
-            received_at = None
-            if all_own:
-                sent, fee = elsewhere, paid_in - paid_out
-            else:
-                # inputs of both kinds: the whole payment and the fee cannot be put down to these addresses
-                sent, sent_to = max(0, own_in - received), None
-        else:
-            sent_to = None
+        reward = in_block and self.chain.where[txid][2]
         return {
-            "transaction_id": txid, "received_at": received_at, "sent_to": sent_to, "received_amount": received, "sent_amount": sent,
-            "fee": fee, "block_height": height, "confirmations": 0 if height is None else self.height - height + 1, "timestamp": stamp,
+            "transaction_id": txid, "net_amount": received - own_in, "network_fee": None if reward else paid_in - paid_out,
+            "block_height": height, "confirmations": 0 if height is None else self.height - height + 1, "timestamp": stamp,
         }
 
 
@@ -398,13 +432,13 @@ class App:
         self.node = node
         self.index = Index(node)
         self.lock = threading.Lock()        # one request at a time: this is a test double, not a server
-        self.addresses = {}                 # script -> its address, or None
         self.network = None                 # "main" or "regtest", as the node names it
         self.stale = False
         self.busy = 0
         self.hold = False
         self.refuse = ""                    # a reason: every transaction is refused with it, and kept
         self.hide = False
+        self.page = 0                       # coins on a page of /v1/utxos when the request names no limit; 0: as the real server
         self.kept = []                      # what a server that said no was shown, as hexadecimal text
         self.kept_coins = set()             # (txid, n) of every coin those transactions spend
         self.posts = {
@@ -422,8 +456,9 @@ class App:
                 self.hold = bool(wanted.get("hold", self.hold))
                 self.refuse = str(wanted.get("refuse", self.refuse) or "")
                 self.hide = bool(wanted.get("hide", self.hide))
+                self.page = int(wanted.get("page", self.page))
                 return 200, {"stale": self.stale, "busy": self.busy, "hold": self.hold, "refuse": self.refuse,
-                             "hide": self.hide, "kept": self.kept}
+                             "hide": self.hide, "page": self.page, "kept": self.kept}
             if path.startswith(("/v1/", "/v2/")) and self.busy > 0:
                 # the real server counts every request against its limit, valid or not, and leaves /ready out
                 self.busy -= 1
@@ -457,14 +492,6 @@ class App:
         if max(rates) == 0:
             raise NodeDown("the node gave a fee rate of zero")
         return max(rates)
-
-    def address_of(self, script):
-        if script not in self.addresses:
-            try:
-                self.addresses[script] = self.node.call("decodescript", script).get("address")
-            except Refused:
-                self.addresses[script] = None
-        return self.addresses[script]
 
     def scripts(self, body):
         """The addresses of a request as (address, script), each script once. The node itself says what an address is."""
@@ -500,27 +527,33 @@ class App:
         picture = self.picture()
         return {"used_addresses": picture.used(scripts), "index": picture.status()}
 
-    def utxos(self, body):
-        scripts = self.scripts(body)
-        picture = self.picture()
-        coins = picture.coins(scripts)
-        if self.hide:
-            coins = [c for c in coins if (c["transaction_id"], c["output_index"]) not in self.kept_coins]
-        return {"utxos": coins, "index": picture.status()}
-
-    def transactions(self, body):
-        scripts = self.scripts(body)
+    def paging(self, body, usual):
+        """The cursor and the limit of a request as the real server reads them: a text or nothing, and a whole number of sixteen bits or nothing."""
         cursor, limit = body.get("cursor"), body.get("limit")
         if cursor is not None and not isinstance(cursor, str):
             raise Answer(422, BAD_JSON)
         if limit is None:
-            limit = 100
-        if isinstance(limit, bool) or not isinstance(limit, int) or not 0 <= limit <= 65535:
+            limit = usual
+        if not whole(limit, 0, 65535):
             raise Answer(422, BAD_JSON)
+        return cursor, limit
+
+    def utxos(self, body):
+        cursor, limit = self.paging(body, self.page or UTXO_PAGE)
+        scripts = self.scripts(body)
+        picture = self.picture()
+        if not 1 <= limit <= MAX_UTXO_PAGE:
+            raise Answer(400, "UTXO limit must be between 1 and 10,000")
+        coins, next_cursor = picture.coins(scripts, cursor, limit, self.kept_coins if self.hide else ())
+        return {"utxos": coins, "next_cursor": next_cursor, "index": picture.status()}
+
+    def transactions(self, body):
+        cursor, limit = self.paging(body, 100)
+        scripts = self.scripts(body)
         picture = self.picture()
         if not 1 <= limit <= 200:
             raise Answer(400, "history limit must be between 1 and 200")
-        lines, next_cursor = picture.history(scripts, cursor, limit, self.address_of)
+        lines, next_cursor = picture.history(scripts, cursor, limit)
         return {"transactions": lines, "next_cursor": next_cursor, "index": picture.status()}
 
     def signed(self, body):

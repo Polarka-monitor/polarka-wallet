@@ -159,7 +159,7 @@ class ServerScreenTest {
                     screen.onNodeWithTag("tab-MINING").performClick()
                     waitFor("mining-no-network")
                     assertTrue("does not tell the hash rate" in textOf("mining-no-network"))
-                    assertTrue(said("a reward is known as one only while its coin is unspent"))
+                    assertTrue(said("the rewards are counted from the history that the app reads"))
                 }
             }
         }

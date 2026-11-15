@@ -423,18 +423,35 @@ class SixthLookTest {
         }
     }
 
-    /** L2. The one refusal of the server that is not about the addresses is said as what it is. */
+    /** L2. More coins than the app reads through a server are said as that, and not as a server of another kind. */
     @Test
-    fun moreCoinsThanAServerListsAreCalledThat() {
+    fun moreCoinsThanAreReadThroughAServerAreCalledThat() {
         bench().use { b ->
             val wallet = walletInThePhone()
             b.node.mine(1, wallet.address(0, 0))
             setups.value = b.setup()
-            b.relay.instead = { path, _ -> if (path == "/v1/utxos") 400 to "{\"message\":\"request exceeds the 10,000 output limit\"}" else null }
+            // A server that lists coins without end, ten thousand to a page, which is the most a page may hold. The app
+            // stops at the page that takes it past what it reads, and shows no half of a list as a balance.
+            val real = Json.parseToJsonElement(b.server.post("/v1/utxos", "{\"addresses\":[\"${wallet.address(0, 0)}\"]}").second).jsonObject
+            val index = real["index"]!!.jsonObject
+            val tip = index["indexed_height"]!!.jsonPrimitive.content
+            val script = real["utxos"]!!.jsonArray[0].jsonObject["script_pubkey"]!!.jsonPrimitive.content
+            val pages = java.util.concurrent.atomic.AtomicInteger()
+            b.relay.instead = { path, _ ->
+                if (path != "/v1/utxos") null else {
+                    val page = pages.getAndIncrement()
+                    val coins = (1..ServerClient.MAX_UTXOS).joinToString(",") {
+                        "{\"transaction_id\":\"" + "%064x".format(page * ServerClient.MAX_UTXOS + it) + "\",\"output_index\":0,\"amount\":1," +
+                            "\"script_pubkey\":\"$script\",\"block_height\":$tip,\"confirmations\":1,\"coinbase\":false}"
+                    }
+                    200 to "{\"utxos\":[$coins],\"next_cursor\":\"aa\",\"index\":$index}"
+                }
+            }
             val model = opened()
-            assertEquals(Problem(Problem.Kind.TOO_MANY_COINS, "request exceeds the 10,000 output limit"), model.state.problem)
+            assertEquals(Problem(Problem.Kind.TOO_MANY_COINS, ServerClient.MAX_COINS.toString()), model.state.problem)
             assertNull(model.state.snapshot)
-            // every other refusal of what the wallet asks is about the addresses: a server of another network, or of another kind
+            assertEquals(3, pages.get(), "two pages hold as many coins as are read, and the third goes past that")
+            // every refusal of what the wallet asks is about the addresses: a server of another network, or of another kind
             b.relay.instead = { path, _ -> if (path == "/v1/utxos") 400 to "{\"message\":\"invalid address or checksum\"}" else null }
             looked(model)
             assertEquals(Problem(Problem.Kind.OTHER_CHAIN, "invalid address or checksum"), model.state.problem)

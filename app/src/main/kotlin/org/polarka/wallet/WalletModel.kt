@@ -421,12 +421,12 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         val still = ArrayList<Dropped>()
         // A payment keeps the time at which it was made, here and when it comes back: how long it has waited
         // is counted from then, whatever a node or a server said about it in between.
-        for (d in wallet.dropped + lost.map { Dropped(it.txid, it.sentSat, it.feeSat, it.inputs, it.atMillis) }) {
+        for (d in wallet.dropped + lost.map { Dropped(it.txid, it.sentSat, it.feeSat, it.inputs, it.atMillis, it.inputSat) }) {
             when {
                 inBlock(d.txid, d.inputs) -> arrived = d
                 beaten(d.txid, d.inputs) -> Unit
                 d.txid in seen.back && waiting.size < WalletInfo.MAX_PENDING -> {
-                    waiting = waiting + Pending(d.txid, d.sentSat, d.feeSat, d.inputs, unsure = false, atMillis = d.atMillis)
+                    waiting = waiting + Pending(d.txid, d.sentSat, d.feeSat, d.inputs, unsure = false, atMillis = d.atMillis, inputSat = d.inputSat)
                     returned = d
                     again = true            // the next look shows its coins as tied up again
                 }
@@ -783,6 +783,7 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
             val record = Pending(
                 signed.txid, if (draft.everything) plan.payments[0].amountSat else plan.sentSat, plan.feeSat,
                 plan.inputs.map { it.txid + ":" + it.vout }.toSet(), unsure = true, atMillis = System.currentTimeMillis(),
+                inputSat = plan.inputs.sumOf { it.amountSat },
             )
             val before = state.wallet ?: wallet
             // The change key moves on for the next payment, but never further than a wallet brought back from its
@@ -826,7 +827,7 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
                         it.dropped.size >= WalletInfo.MAX_DROPPED -> it
                         else -> {
                             kept = true
-                            it.copy(pending = waiting, dropped = it.dropped + Dropped(record.txid, record.sentSat, record.feeSat, record.inputs, record.atMillis))
+                            it.copy(pending = waiting, dropped = it.dropped + Dropped(record.txid, record.sentSat, record.feeSat, record.inputs, record.atMillis, record.inputSat))
                         }
                     }
                 })

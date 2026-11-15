@@ -4,13 +4,17 @@ A wallet for TrueNorth (NORTH) on Android. It keeps its keys in the phone, signs
 server or a TrueNorth Core node what its addresses hold. The project runs no server of its own. There is no
 account and no analytics.
 
-**State: test build 0.6.0, a pre-release.** The wallet has been checked by its author and, in six looks, by an
+**State: test build 0.6.1, a pre-release.** The wallet has been checked by its author and, in six looks, by an
 independent reviewer, an AI model that had not seen the code being written (`review/independent-review-0.3.1`,
 `review/independent-review-0.4.0`, `review/independent-review-0.4.2`, `review/independent-review-0.5.1` and
-`review/independent-review-0.6.0`; `review/changes-0.6.0.md` says what the last version changed). The sixth
-look found that a wallet server could have made the wallet pay the same thing twice. That was put right
-before this build, and the reviewer looked at the fixes. All of that was AI-assisted; a review
-by an independent human expert is still recommended. Until then it is for small amounts.
+`review/independent-review-0.6.0`). The sixth look found that a wallet server could have made the wallet pay
+the same thing twice. That was put right before 0.6.0, and the reviewer looked at the fixes. All of that was
+AI-assisted; a review by an independent human expert is still recommended. Until then it is for small amounts.
+
+0.6.1 follows a change of the public Northbound server. On 15 November 2026 that server began to answer in
+other shapes, and 0.6.0 can no longer show a wallet that has any history through it. 0.6.1 reads the new
+answers (`review/changes-0.6.1.md`). Its changes were checked by their author; the independent reviewer has
+not looked at them.
 It is an independent community project and not a product of the TrueNorth developers.
 
 ## Getting the package
@@ -87,16 +91,19 @@ refuses the wallet's addresses, and the app then says so.
 
 Through a wallet server some things are known less well than through a node:
 
-- The history comes summed up by the server, each line against the addresses of one request, and a request
-  takes a hundred addresses. A wallet that has used more than fifty keys of a kind is asked about in parts.
-  A payment whose coins all sit in one part is shown exactly. One whose coins sit in several parts is shown
-  without its fee. One of which a part got back at least as much as it put in cannot be told from the
-  server's lines: it is left out, and the History page says that the history is not whole. The balance and
-  the coins are complete in every case.
-- A block reward is known as one only while its coin is unspent.
+- The history comes summed up by the server: for every movement, what the wallet's addresses have more or
+  less by it. A payment shows as what the wallet lost, with the fee of the whole transaction beside it. Who
+  was paid, and what was received and spent within one transaction, is not shown. A request takes a hundred
+  addresses, so a wallet that has used more than fifty keys of a kind is asked about in parts, and what the
+  parts say adds up exactly. A history longer than the app reads in one look (2,000 movements for each
+  part) says on the History page that it is not whole. The balance and the coins are complete in every case.
+- A block reward is known by having no fee. Where coins of somebody else were spent in the same transaction
+  as the wallet's, the fee shown beside the payment is still that of the whole transaction.
 - The server says whether it knows a transaction, not whether that is in a block. A payment that the server
   knows and the history does not list is taken to wait for a block.
 - An amount on its way to the wallet in a transaction that waits for a block is shown apart from the balance.
+  For a payment of the wallet's own that is its change, which the app works out from what it wrote down when
+  the payment was made. A payment made with 0.6.0 or earlier has no such note; its change shows with its block.
 - There is no hash rate of the network, so the mining page shows no share and no expected blocks.
 
 The wallet does not check the proof of work behind the blocks a node or a server shows. One that lies can
@@ -144,9 +151,12 @@ While such a payment has no coin among those the server lists, the wallet makes 
 
 - A payment that has not reached a block yet is not shown to its receiver; it appears with the first block.
 - One account, P2QRH addresses only, no fee estimate from the node or the server (three fixed fee rates).
-- A wallet server lists at most 10,000 coins in one answer and refuses a request beyond that; the app then
-  shows the server's words and no balance. A wallet that is mined to has to join its coins before it gets
-  there, or use a node.
+- Through a wallet server the app reads at most 20,000 coins for a wallet. With more it says so and shows no
+  balance. A wallet that is mined to has to join its coins before it gets there, or use a node.
+- A wallet server can change the shape of its answers, and nothing in an answer says that it has. The app
+  then refuses what it cannot read and shows nothing, as 0.6.0 does since 15 November 2026 with the public
+  Northbound server, until a version that reads the new answers is installed. A node of one's own does not
+  change under the wallet in that way.
 - With a wallet server the wallet depends on that one server: while it is out of service nothing is shown
   and nothing can be sent. The coins are not touched by that, and the wallet can be connected elsewhere.
 - The price of a coin is typed in by hand; nothing is looked up.

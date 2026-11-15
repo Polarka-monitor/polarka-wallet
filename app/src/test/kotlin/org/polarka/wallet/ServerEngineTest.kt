@@ -89,14 +89,21 @@ class ServerEngineTest {
             val signed = plan.sign(wallet)
             val change = reward - 100 * coin - plan.feeSat
             assertEquals(signed.txid, b.client.broadcast(signed.hex))
-            info = info.copy(changeIndex = 1, pending = listOf(
-                Pending(signed.txid, plan.sentSat, plan.feeSat, plan.inputs.map { key(it) }.toSet(), atMillis = System.currentTimeMillis()),
-            ))
+            val noted = Pending(
+                signed.txid, plan.sentSat, plan.feeSat, plan.inputs.map { key(it) }.toSet(), atMillis = System.currentTimeMillis(),
+                inputSat = plan.inputs.sumOf { it.amountSat },
+            )
+            info = info.copy(changeIndex = 1, pending = listOf(noted))
             seen = engine.fetch(info)
             assertEquals(setOf(signed.txid), seen.held)
             assertTrue(seen.inWaiting.isEmpty() && seen.spentBy.isEmpty() && seen.back.isEmpty())
             assertEquals(reward, seen.walletSat)
+            // the server shows the payment as a loss; what it gives back is what the wallet wrote down that it put in, less that loss
             assertEquals(change, seen.arrivingSat)
+            // a payment written down by a version of the app that did not note what it put in: nothing is claimed about its change
+            assertEquals(0L, engine.fetch(info.copy(pending = listOf(noted.copy(inputSat = 0)))).arrivingSat)
+            // the same payment made elsewhere with the same words: this phone knows nothing of it, and nothing is claimed either
+            assertEquals(0L, engine.fetch(info.copy(pending = emptyList())).arrivingSat)
             assertEquals(2, seen.moves.size)
             assertEquals(1 to 1, seen.nextReceive to seen.nextChange)       // the change address is in use at once
 
@@ -106,13 +113,13 @@ class ServerEngineTest {
             assertTrue(seen.held.isEmpty())
             assertEquals(0L, seen.arrivingSat)
             val last = seen.moves.last()
-            assertEquals(Movement(signed.txid, 103, last.time, false, change, reward, plan.feeSat), last)
+            assertEquals(Movement(signed.txid, 103, last.time, false, 0, 100 * coin + plan.feeSat, plan.feeSat), last)
             assertEquals(-(100 * coin + plan.feeSat), last.netSat)
             assertEquals(plan.inputs.map { key(it) }.associateWith { signed.txid }, seen.spentBy)
             assertEquals(seen.walletSat, seen.moves.sumOf { it.netSat })
             assertEquals(setOf(0 to 0, 1 to 0), seen.coins.map { it.branch to it.index }.toSet())
-            // the reward that was spent is no longer known as a reward: the server's history does not say what a transaction was
-            assertEquals(1, seen.moves.count { it.coinbase })
+            // the reward that was spent is still known as a reward: it is the one kind of transaction without a fee
+            assertEquals(2, seen.moves.count { it.coinbase })
 
             // everything goes and nothing comes back: the payment leaves the wallet no coin, and the history alone says that it is in a block
             val sweep = Planner.sweep(seen.coins.filter { it.spendableAt(seen.tip) }, script(other.address(0, 1)), 2)
@@ -330,7 +337,7 @@ class ServerEngineTest {
             assertEquals(back.txid, b.client.broadcast(back.hex))
             b.node.mine(1, miner)                                               // 104: a payment to the wallet
 
-            // somebody pays to one of the wallet's change addresses: not what the owner is told about as arrived
+            // somebody pays to one of the wallet's change addresses: the wallet has more by it, and that is told like any payment
             val rest = 10 * coin - 3 * coin - back.feeSat
             val odd = Planner.pay(listOf(Unspent(back.txid, 1, rest, 1, 0, 104, false)), script(wallet.address(1, 3)), coin, 2, other.script(1, 1)).sign(other)
             assertEquals(odd.txid, b.client.broadcast(odd.hex))
@@ -338,9 +345,14 @@ class ServerEngineTest {
 
             val (tip, arrived) = engine.incomingSince(info, 101)
             assertEquals(105, tip)
-            assertEquals(listOf(Triple(102, true, true), Triple(103, false, false), Triple(104, false, true)), arrived.map { Triple(it.move.height, it.move.coinbase, it.own) })
-            assertEquals(listOf(10 * coin, 3 * coin), arrived.drop(1).map { it.move.receivedSat })
-            assertEquals(listOf(104), engine.incomingSince(info, 103).second.map { it.move.height })
+            assertEquals(
+                listOf(Triple(102, true, true), Triple(103, false, false), Triple(104, false, true), Triple(105, false, true)),
+                arrived.map { Triple(it.move.height, it.move.coinbase, it.own) },
+            )
+            assertEquals(listOf(10 * coin, 3 * coin, coin), arrived.drop(1).map { it.move.receivedSat })
+            // the wallet's own payment in block 103 is a loss to it, its change included, and is not among them
+            assertTrue(arrived.none { it.own && it.move.height == 103 })
+            assertEquals(listOf(104, 105), engine.incomingSince(info, 103).second.map { it.move.height })
             assertEquals(105 to emptyList(), engine.incomingSince(info, 105))
         }
     }
@@ -462,8 +474,8 @@ class ServerEngineTest {
             val reward = seen.coins[0].amountSat
             fun on(branch: Int, index: Int) = seen.coins.single { it.branch == branch && it.index == index }
 
-            // The inputs in the first part, the change to the second: the first part's line has the fee, the
-            // second part's says what came back.
+            // The inputs in the first part, the change to the second: the first part lost the coin, the second
+            // gained the change, and together the wallet lost what went elsewhere and the fee.
             val first = Planner.pay(listOf(on(0, 0)), script(other.address(0, 0)), 100 * coin, 2, wallet.script(1, 55))
             val firstSigned = first.sign(wallet)
             val firstChange = reward - 100 * coin - first.feeSat
@@ -471,9 +483,9 @@ class ServerEngineTest {
             b.node.mine(1, miner)                                               // tip 105
             info = info.copy(changeIndex = 56)
             seen = engine.fetch(info)
-            assertEquals(Movement(firstSigned.txid, 105, seen.moves.last().time, false, firstChange, reward, first.feeSat), seen.moves.last())
+            assertEquals(Movement(firstSigned.txid, 105, seen.moves.last().time, false, 0, 100 * coin + first.feeSat, first.feeSat), seen.moves.last())
 
-            // An input in each part: what the wallet put in still shows, the fee does not.
+            // An input in each part: the losses of the two parts add up, and the fee stands beside the sum.
             val second = Planner.pay(listOf(on(0, 1), on(0, 55)), script(other.address(0, 1)), 600 * coin, 2, wallet.script(1, 56))
             val secondSigned = second.sign(wallet)
             assertEquals(2, second.inputs.size)
@@ -482,28 +494,31 @@ class ServerEngineTest {
             b.node.mine(1, miner)                                               // tip 106
             info = info.copy(changeIndex = 57)
             seen = engine.fetch(info)
-            assertEquals(Movement(secondSigned.txid, 106, seen.moves.last().time, false, secondChange, 2 * reward, null), seen.moves.last())
+            assertEquals(Movement(secondSigned.txid, 106, seen.moves.last().time, false, 0, 600 * coin + second.feeSat, second.feeSat), seen.moves.last())
             assertTrue(seen.historyWhole)
             assertEquals(seen.walletSat, seen.moves.sumOf { it.netSat })
 
-            // An input in each part again, and the second part gets back more than it put in: its line does not
-            // say what it put in, and the transaction is left out of the history.
+            // An input in each part again, and the second part gets back more than it put in: its line is a gain,
+            // the first part's a loss, and the sum is what the wallet lost. (The server's earlier lines could not
+            // say this, and such a transaction used to be left out of the history.)
             val third = Planner.split(listOf(on(0, 2), on(1, 55)), script(other.address(0, 2)), 10 * coin, 2, wallet.script(1, 57))
             val thirdSigned = third.sign(wallet)
             val rest = reward + firstChange - 10 * coin - third.feeSat
             assertEquals(thirdSigned.txid, b.client.broadcast(thirdSigned.hex))
-            info = info.copy(changeIndex = 58, pending = listOf(Pending(thirdSigned.txid, third.sentSat, third.feeSat, third.inputs.map { key(it) }.toSet())))
+            info = info.copy(changeIndex = 58, pending = listOf(
+                Pending(thirdSigned.txid, third.sentSat, third.feeSat, third.inputs.map { key(it) }.toSet(), inputSat = third.inputs.sumOf { it.amountSat }),
+            ))
             seen = engine.fetch(info)
             assertEquals(setOf(thirdSigned.txid), seen.held)
             assertEquals(rest, seen.arrivingSat)
             b.node.mine(1, miner)                                               // tip 107
             seen = engine.fetch(info)
-            assertTrue(seen.moves.none { it.txid == thirdSigned.txid })
-            assertFalse(seen.historyWhole)
-            // that the payment is in a block is known all the same, and the coins are right whatever the history says
+            assertEquals(Movement(thirdSigned.txid, 107, seen.moves.last().time, false, 0, 10 * coin + third.feeSat, third.feeSat), seen.moves.last())
+            assertTrue(seen.historyWhole)
             assertEquals(third.inputs.map { key(it) }.associateWith { thirdSigned.txid }, seen.spentBy)
             assertTrue(seen.held.isEmpty())
             assertEquals(secondChange + rest, seen.walletSat)
+            assertEquals(seen.walletSat, seen.moves.sumOf { it.netSat })
 
             // The wallet pays itself, from the second part to a receiving key of the first, and somebody else pays a key of the second.
             val own = Planner.pay(listOf(on(1, 56)), script(wallet.address(0, 3)), 5 * coin, 2, wallet.script(1, 58))
@@ -555,7 +570,7 @@ class ServerEngineTest {
             // history is not whole, and every line that was read is told as it is: the payment by both parts.
             seen = engine.fetch(info)
             assertFalse(seen.historyWhole)
-            assertEquals(Movement(signed.txid, 102, seen.moves.first().time, false, change, reward, plan.feeSat), seen.moves.first())
+            assertEquals(Movement(signed.txid, 102, seen.moves.first().time, false, 0, 100 * coin + plan.feeSat, plan.feeSat), seen.moves.first())
             assertEquals(coin, seen.moves.single { it.txid == gift.txid }.netSat)
             assertEquals(ServerClient.PAGE + 1, seen.moves.size)
 

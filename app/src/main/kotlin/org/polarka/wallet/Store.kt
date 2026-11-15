@@ -124,9 +124,14 @@ class SealedFileStore(file: File, keys: KeyHolder) : SetupStore {
  * A payment that left this phone and is not in a block yet. It is written down before the transaction is
  * handed to the node, so that the app knows about it even if it is closed, or if the node's answer is lost.
  * [unsure] is true until the node has been seen to hold the transaction. [inputs] are the coins it spends
- * ("txid:n"); they are not offered for another payment.
+ * ("txid:n"); they are not offered for another payment. [inputSat] is what those coins held together, written
+ * down when the payment was made: with it, what the payment gives back to the wallet can be told while it
+ * waits. It is 0 when it is not known, as for a payment made by a version of the app that did not write it.
  */
-data class Pending(val txid: String, val sentSat: Long, val feeSat: Long, val inputs: Set<String>, val unsure: Boolean = false, val atMillis: Long = 0) {
+data class Pending(
+    val txid: String, val sentSat: Long, val feeSat: Long, val inputs: Set<String>, val unsure: Boolean = false, val atMillis: Long = 0,
+    val inputSat: Long = 0,
+) {
     /**
      * True when the payment has been shown as waiting for a block for longer than a payment usually waits. A
      * payment made meanwhile does not stand against it, so both could arrive: the owner is told before the
@@ -142,7 +147,7 @@ data class Pending(val txid: String, val sentSat: Long, val feeSat: Long, val in
  * here, and the next payment of the wallet spends one of its coins ([inputs], "txid:n"): then only one of
  * the two can ever be in a block. It leaves this list when a block spends one of its coins.
  */
-data class Dropped(val txid: String, val sentSat: Long, val feeSat: Long, val inputs: Set<String>, val atMillis: Long = 0)
+data class Dropped(val txid: String, val sentSat: Long, val feeSat: Long, val inputs: Set<String>, val atMillis: Long = 0, val inputSat: Long = 0)
 
 /**
  * What the app keeps about its own wallet without any secret: enough to show it, not enough to spend.
@@ -191,6 +196,7 @@ data class WalletInfo(
                     put("inputs", buildJsonArray { p.inputs.forEach { add(JsonPrimitive(it)) } })
                     put("unsure", JsonPrimitive(p.unsure))
                     put("at", JsonPrimitive(p.atMillis))
+                    put("in", JsonPrimitive(p.inputSat))
                 })
             }
         })
@@ -202,6 +208,7 @@ data class WalletInfo(
                     put("fee", JsonPrimitive(d.feeSat))
                     put("inputs", buildJsonArray { d.inputs.forEach { add(JsonPrimitive(it)) } })
                     put("at", JsonPrimitive(d.atMillis))
+                    put("in", JsonPrimitive(d.inputSat))
                 })
             }
         })
@@ -237,15 +244,18 @@ data class WalletInfo(
                 val p = Pending(
                     text("txid"), (w["sent"] as JsonPrimitive).longOrNull ?: -1, (w["fee"] as JsonPrimitive).longOrNull ?: -1, inputs,
                     (w["unsure"] as? JsonPrimitive)?.booleanOrNull ?: false, (w["at"] as? JsonPrimitive)?.longOrNull ?: 0,
+                    // a file written by an earlier version does not say what the coins of a payment held
+                    if (w["in"] == null) 0 else (w["in"] as? JsonPrimitive)?.takeIf { !it.isString }?.longOrNull ?: -1,
                 )
                 require(NodeClient.isId(p.txid) && p.sentSat in 0..NodeClient.MAX_SAT && p.feeSat in 0..NodeClient.MAX_SAT) { "a waiting payment is damaged" }
+                require(p.inputSat in 0..NodeClient.MAX_SAT) { "a waiting payment is damaged" }
                 require(inputs.isNotEmpty() && inputs.all { NodeClient.isId(it.substringBefore(':')) && it.substringAfter(':', "").toLongOrNull() in 0..NodeClient.MAX_VOUT }) { "a waiting payment is damaged" }
                 p
             }
             val waiting = payments("pending")
             require(waiting.size <= MAX_PENDING) { "too many waiting payments" }
             // a file written by an earlier version has no such list
-            val gone = payments("dropped").map { Dropped(it.txid, it.sentSat, it.feeSat, it.inputs, it.atMillis) }
+            val gone = payments("dropped").map { Dropped(it.txid, it.sentSat, it.feeSat, it.inputs, it.atMillis, it.inputSat) }
             require(gone.size <= MAX_DROPPED) { "too many payments that did not go through" }
             return info.copy(pending = waiting, dropped = gone)
         }
