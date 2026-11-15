@@ -592,4 +592,106 @@ class ServerEngineTest {
             assertEquals(setOf(change, coin), seen.coins.filter { !it.coinbase }.map { it.amountSat }.toSet())
         }
     }
+
+    @Test
+    fun theFeeStandsBesideALossOnlyWhenTheWalletCanHavePaidIt() {
+        bench().use { b ->
+            val wallet = fresh()
+            val miner = fresh().address(0, 0)
+            val info = WalletInfo(Chain.REGTEST, wallet.watchKey().xpub, lockOnOpen = false)
+            b.node.mine(1, wallet.address(0, 0))
+            b.node.mine(100, miner)                                             // tip 101
+            ServerRelay(b.server.url).use { relay ->
+                val engine = ServerEngine(Chain.REGTEST, emptyList(), ServerClient(relay.url, maxWaitMs = 0))
+                val before = engine.fetch(info)
+                val plan = Planner.pay(before.coins, script(fresh().address(0, 0)), 100 * coin, 2, wallet.script(1, 0))
+                val signed = plan.sign(wallet)
+                assertEquals(signed.txid, b.client.broadcast(signed.hex))
+                b.node.mine(1, miner)                                           // tip 102
+                val lost = 100 * coin + plan.feeSat
+                // as the server says it: the wallet lost what it paid and the fee, and the fee is the transaction's
+                var last = engine.fetch(info).moves.last()
+                assertEquals(Movement(signed.txid, 102, last.time, false, 0, lost, plan.feeSat), last)
+                // The server names the fee of the whole transaction. Where coins of somebody else were spent as well, that
+                // can be more than the wallet lost: the wallet cannot have paid all of it, and no fee is shown beside the loss.
+                fun feeSaid(fee: Long) {
+                    relay.rewrite = { path, answer ->
+                        if (path == "/v1/transactions") answer.replace("\"network_fee\":${plan.feeSat}", "\"network_fee\":$fee") else answer
+                    }
+                }
+                feeSaid(lost + 1)
+                last = engine.fetch(info).moves.last()
+                assertEquals(Movement(signed.txid, 102, last.time, false, 0, lost, null), last)
+                // a fee of exactly what the wallet lost can have been the wallet's: a payment of the wallet to itself is such a one
+                feeSaid(lost)
+                assertEquals(lost, engine.fetch(info).moves.last().feeSat)
+            }
+        }
+    }
+
+    @Test
+    fun linesOfTwoPartsThatDoNotFitTogetherAreNotShownAsAMovement() {
+        bench().use { b ->
+            val wallet = fresh()
+            val miner = fresh().address(0, 0)
+            // keys 0 to 49 of both branches are one part of the addresses, keys 50 to 59 the other
+            val info = WalletInfo(Chain.REGTEST, wallet.watchKey().xpub, lockOnOpen = false, changeIndex = 56, lookTo = 60)
+            b.node.mine(1, wallet.address(0, 0))
+            b.node.mine(100, miner)                                             // tip 101
+            ServerRelay(b.server.url).use { relay ->
+                val engine = ServerEngine(Chain.REGTEST, emptyList(), ServerClient(relay.url, maxWaitMs = 0))
+                val before = engine.fetch(info)
+                // a payment from the first part of the addresses, with its change to a key of the second
+                val plan = Planner.pay(before.coins, script(fresh().address(0, 0)), 100 * coin, 2, wallet.script(1, 55))
+                val signed = plan.sign(wallet)
+                assertEquals(signed.txid, b.client.broadcast(signed.hex))
+                b.node.mine(1, miner)                                           // tip 102
+                var seen = engine.fetch(info)
+                assertTrue(seen.historyWhole)
+                assertEquals(-(100 * coin + plan.feeSat), seen.moves.last().netSat)
+                // The second part names another fee for the same transaction than the first. One of the two lines is not
+                // true: the movement is not shown, and the history says that it is not whole. The coins are what they are.
+                relay.paths.clear()
+                relay.rewrite = { path, answer ->
+                    val second = path == "/v1/transactions" && synchronized(relay.paths) { relay.paths.count { it == path } } % 2 == 0
+                    if (second) answer.replace("\"network_fee\":${plan.feeSat}", "\"network_fee\":${plan.feeSat + 1}") else answer
+                }
+                seen = engine.fetch(info)
+                assertTrue(seen.moves.none { it.txid == signed.txid })
+                assertFalse(seen.historyWhole)
+                assertEquals(before.walletSat - 100 * coin - plan.feeSat, seen.walletSat)
+            }
+        }
+    }
+
+    @Test
+    fun aTransactionThatArrivesDuringALookMakesItBeMadeAgain() {
+        bench().use { b ->
+            val wallet = fresh()
+            val other = fresh()
+            val miner = fresh().address(0, 0)
+            val info = WalletInfo(Chain.REGTEST, wallet.watchKey().xpub, lockOnOpen = false)
+            b.node.mine(1, wallet.address(0, 0))
+            b.node.mine(1, other.address(0, 0))
+            b.node.mine(101, miner)                                             // tip 103
+            val theirs = ServerEngine(Chain.REGTEST, emptyList(), b.client)
+                .fetch(WalletInfo(Chain.REGTEST, other.watchKey().xpub, lockOnOpen = false)).coins
+            val gift = Planner.pay(theirs, script(wallet.address(0, 1)), 3 * coin, 2, other.script(1, 0)).sign(other)
+            ServerRelay(b.server.url).use { relay ->
+                val engine = ServerEngine(Chain.REGTEST, emptyList(), ServerClient(relay.url, maxWaitMs = 0))
+                // Somebody pays the wallet right after the first answer of a look. No block arrives, and the answers are
+                // still not of one moment: the first names the keys in use without that payment, the others know of it.
+                // The server numbers its waiting transactions, the number has changed, and the look is made again.
+                relay.after = { path, count -> if (path == "/v1/addresses/activity" && count == 1) b.client.broadcast(gift.hex) }
+                val seen = engine.fetch(info)
+                assertTrue(seen.steady)
+                assertEquals(103, seen.tip)
+                val look = listOf("/v1/addresses/activity", "/v1/utxos", "/v1/transactions")
+                assertEquals(look + look, relay.paths)
+                // of one piece: the payment is on its way, and the key it pays to counts as in use
+                assertEquals(3 * coin, seen.arrivingSat)
+                assertEquals(2, seen.nextReceive)
+            }
+        }
+    }
 }

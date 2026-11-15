@@ -1,0 +1,26 @@
+== 2026-11-15 21:12:00, sources at 96d78d5, changed in the working tree: M app/src/test/kotlin/org/polarka/wallet/ServerEngineTest.kt, ?? review/evidence-0.6.1/
+M1   only the first page of coins is read                                                     caught by coinsComeInPagesAndAreReadToTheLastOne
+M2   after a 409 the coins read so far are taken for the list                                 caught by coinsComeInPagesAndAreReadToTheLastOne
+M3   pages of coins from two pictures are put together                                        caught by coinsComeInPagesAndAreReadToTheLastOne, partsReadFromDifferentPicturesAreNotPutTogether
+M4   the server's number for its waiting transactions is not looked at                        caught by partsReadFromDifferentPicturesAreNotPutTogether, coinsComeInPagesAndAreReadToTheLastOne
+M5   a block reward that takes coins away, or waits for a block, is taken                     caught by historyIsReadPageByPageAndStartsAgainWhenTheIndexChanges
+M6   an amount written as text is taken                                                       caught by historyIsReadPageByPageAndStartsAgainWhenTheIndexChanges
+M7   a gain or a loss that cannot exist is taken                                              caught by historyIsReadPageByPageAndStartsAgainWhenTheIndexChanges
+M8   coins are read without end                                                               caught by coinsComeInPagesAndAreReadToTheLastOne
+M9   pages of history from two pictures are put together                                      caught by historyIsReadPageByPageAndStartsAgainWhenTheIndexChanges
+E1   of the lines for one transaction only the first is counted                               caught by transactionsWhoseKeysSitInTwoPartsOfTheAddresses
+E2   the fee of the whole transaction is shown beside every loss                              caught by theFeeStandsBesideALossOnlyWhenTheWalletCanHavePaidIt
+E3   lines for one transaction that name different fees are added up all the same             caught by linesOfTwoPartsThatDoNotFitTogetherAreNotShownAsAMovement
+E4   what a waiting payment of the wallet's own gives back is not counted                     caught by coinsHistoryAndAWaitingPaymentAsANodeWouldShowThem
+E5   a waiting transaction made elsewhere with the same words is not seen to take from the wallet caught by aPaymentThatDidNotGoThroughOneWhoseCoinWentElsewhereAndOneThatCameBack
+E7   a transaction that a part cut short may have a line for is told from the other part's line alone caught by aPartOfTheAddressesWhoseHistoryIsCutShort
+E6   a payment of the wallet's own is told as something that arrived                          caught by whatArrivedSinceABlock
+E8   a look across a change of the waiting transactions counts as one moment                  caught by aTransactionThatArrivesDuringALookMakesItBeMadeAgain
+E9   more coins than are read are called a server of another kind                             caught by moreCoinsThanAreReadThroughAServerAreCalledThat
+E10  a block reward is not known as one                                                       caught by coinsHistoryAndAWaitingPaymentAsANodeWouldShowThem
+S1   what a payment put in is not written to the wallet's file                                caught by theNoteComesBackFromTheWalletsFile
+S2   a note of what a payment put in that cannot be is read from the file                     caught by aNoteThatCannotBeIsRefused
+W1   a payment is written down without what it put in                                         caught by aPaymentThatComesBackFromThoseThatDidNotGoThroughKeepsItsTime
+W2   a payment that comes back from those that did not go through loses the note of what it put in caught by aPaymentThatComesBackFromThoseThatDidNotGoThroughKeepsItsTime
+sources after the runs: as they were
+done 21:20:59

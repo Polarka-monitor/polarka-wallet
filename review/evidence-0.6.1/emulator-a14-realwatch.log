@@ -1,0 +1,8 @@
+Android 14, polarka-wallet-0.6.1.apk, the public server and one watched address
+ok     1  a setup file that names https://api.northboundwallet.org and one address to watch was saved: the server answers, and the app has made its first look
+note      look 1: the app shows 33829.09039810; the server listed (25240, 3353, '33829.09039810') before and (25240, 3353, '33829.09039810') after
+ok     2  the app shows 33829.09039810 NORTH for the watched address: the sum of the 3353 coins that the server lists for it at block 25240, which this machine read over 4 pages
+ok     3  the history lists movements of the watched address (on the screen: block reward)
+ok     4  the setup was removed again and the app taken off; there was no wallet in the phone and nothing was sent
+REAL SERVER, A WATCHED ADDRESS: ALL 4 STEPS PASSED on Android 14
+exit 0

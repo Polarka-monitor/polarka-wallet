@@ -1,0 +1,22 @@
+Android 14, polarka-wallet-0.6.1.apk, connection: server
+ok     1  installed and started; the first screen offers the wallet server of the Northbound project, says whose it is and what it sees, and below it a node of one's own
+ok     2  self-test passed: this Android derives and signs like the published vectors
+ok     3  another server address typed over the one filled in, checked before saving and saved: the server answers over TLS
+ok     4  a wallet of 12 words made with it: the server works for another network than the wallet, and the app says so in words; wallet and setup removed again
+ok     5  a setup file that names a wallet server imported and saved; it holds nothing secret, so the file is left alone; the server answers over TLS
+ok     6  wallet A made: 12 words shown once, three asked back, sealed with the fingerprint
+ok     7  the whole paper checked against the wallet without the fingerprint: its 12 words match, valid words of another wallet do not
+ok     8  25 NORTH that wait for a block are shown as on their way, apart from what can be spent
+ok     9  received 25 NORTH; the wallet moved on to a fresh address
+ok    10  sent 5 NORTH with the fingerprint; the app was closed and still knows the waiting payment
+ok    11  a second payment on the same coin is refused while the first one waits
+ok    12  after the block: 19.99999674 NORTH, history shows both movements
+ok    13  an address that was used still receives; wallet A removed after the fingerprint
+ok    14  the words of wallet A, typed as a paper address, were emptied into wallet B: 26.99999302 NORTH (fee 0.00000372)
+ok    15  wallet B removed and brought back from its 12 words, after a slip in the last word was named (12 (chimneyx)) and put right: the coins are found again
+ok    16  a server that asks three times to slow down is waited for and asked again: the look succeeds without a word
+ok    17  a server that stays behind its node is called busy once the app has waited for it; when it has caught up, the balance is back
+ok    18  the mining page says what a wallet server does not tell
+note      the wallet asked the server 69 times over 2 connections
+ALL 18 STEPS PASSED on Android 14 (wallet server)
+exit 0

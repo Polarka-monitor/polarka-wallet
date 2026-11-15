@@ -1,0 +1,8 @@
+PROBE tip: 25181
+PROBE coins of one address: 17 (rewards 17), tip 25181, revision 1375, 374 ms
+PROBE history of one address: 400 lines, complete false, rewards 196, gains 0, losses 204, waiting 1, 1637 ms
+PROBE a loss: net -50176000479, fee 402, height null
+PROBE look at one address: steady true, tip 25181, coins 17, held 852992001437, movements 399, rewards among them 196, 1315 ms
+PROBE arrived in the last 30 blocks: 2 (rewards 2), up to 25181, 1331 ms
+PROBE the sums of another address: coins 207 holding 10598400066659, history 4000 lines (complete false, waiting 0) adding up to 4556800001941, same picture true, 20235 ms
+PROBE look at 3 addresses: steady true, coins 3568, movements 199, 5974 ms

@@ -1,0 +1,39 @@
+Android 14, polarka-wallet-0.6.0.apk with a server that answers in the new shapes, then polarka-wallet-0.6.1.apk over it
+ok     1  version 0.6.0 and a wallet server that answers in the new shapes: the server answers, and a new wallet without any history is shown
+--- screen what version 0.6.0 shows of a wallet with history
+  -E-- TextView       (85, 349, 337, 402) Test build 0.6.0
+  -E-- TextView       (85, 407, 995, 533) This wallet has been checked several times with the help of AI, but not yet by an independent human expert. Use it with small amounts only.
+  -E-- TextView       (95, 628, 985, 817) The server answered with an error: the server sent an answer in an unknown form (received_amount)
+  -E-- TextView       (53, 917, 135, 970) Total
+  -E-- TextView       (53, 981, 528, 1117) 0.00000000 NORTH
+  -E-- TextView       (255, 1191, 396, 1244) Receive
+  -E-- TextView       (783, 1191, 875, 1244) Send
+  -E-- TextView       (95, 1360, 416, 1413) Wallet in this phone
+  -E-- TextView       (95, 1434, 313, 1487) Can be spent
+  -E-- TextView       (788, 1434, 985, 1487) 0.00000000
+  -E-- TextView       (95, 1603, 202, 1656) Server
+  -E-- TextView       (137, 1677, 586, 1719) The server answers, block 120
+  -E-- TextView       (95, 1740, 232, 1793) Address
+  -E-- TextView       (849, 1740, 985, 1793) 10.0.2.2
+  -E-- TextView       (95, 1814, 235, 1867) Network
+  -E-- TextView       (867, 1814, 985, 1867) regtest
+  -E-- TextView       (95, 1888, 301, 1941) Block height
+  -E-- TextView       (922, 1888, 985, 1941) 120
+  -E-- TextView       (95, 1962, 240, 2015) Asked at
+  -E-- TextView       (841, 1962, 985, 2015) 21:16:14
+  -E-- TextView       (137, 175, 306, 249) Polarka
+  -E-- View           (849, 181, 912, 244) Refresh
+  -E-- View           (975, 181, 1038, 244) Lock
+  -E-- TextView       (61, 2193, 188, 2256) Overview
+  -E-- TextView       (278, 2193, 386, 2256) Receive
+  -E-- TextView       (504, 2193, 574, 2256) Send
+  -E-- TextView       (698, 2193, 796, 2256) History
+  -E-- TextView       (920, 2193, 990, 2256) More
+---
+ok     2  25 NORTH paid to the wallet: version 0.6.0 says that the server answered with an error, an answer in an unknown form, and shows none of the coins
+ok     3  version 0.6.1 installed over it: the same wallet opens after the fingerprint and shows its 25 NORTH and the payment in its history
+ok     4  a payment of 5 NORTH made with version 0.6.1 waits for a block: its coin is gone from the server's list, and its change of 19.99999674 NORTH shows as on its way
+ok     5  after the block: 19.99999674 NORTH can be spent, nothing is on its way, and the history has both movements
+ok     6  four more payments of 1 NORTH, and a server that lists three coins to a page: the wallet's five coins are read from two pages, 23.99999674 NORTH
+A SERVER THAT CHANGED ITS ANSWERS: ALL 6 STEPS PASSED (0.6.0 -> 0.6.1)
+exit 0

@@ -1,0 +1,12 @@
+address 1: a history of more than 1000 lines, passed over
+address 2: 63 lines in blocks (63 rewards, 0 gains, 0 losses), 0 waiting; they add up to 3225600055120; 63 coins hold 3225600055120: the same
+address 3: 108 lines in blocks (108 rewards, 0 gains, 0 losses), 0 waiting; they add up to 5529600011330; 108 coins hold 5529600011330: the same
+address 4: 101 lines in blocks (101 rewards, 0 gains, 0 losses), 0 waiting; they add up to 5171200011490; 101 coins hold 5171200011490: the same
+address 5: 32 lines in blocks (32 rewards, 0 gains, 0 losses), 0 waiting; they add up to 1638400018920; 32 coins hold 1638400018920: the same
+requests: 13. 4 of 4 addresses checked hold what their history adds up to.
+2026-11-15T19:32:17Z
+address 1: 150 lines in blocks (150 rewards, 0 gains, 0 losses), 0 waiting; they add up to 7680000072430; 150 coins hold 7680000072430: the same
+address 2: 69 lines in blocks (69 rewards, 0 gains, 0 losses), 0 waiting; they add up to 3532800000000; 69 coins hold 3532800000000: the same
+address 3: 350 lines in blocks (350 rewards, 0 gains, 0 losses), 0 waiting; they add up to 17920000160630; 350 coins hold 17920000160630: the same
+requests: 7. 3 of 3 addresses checked hold what their history adds up to.
+2026-11-15T19:32:35Z

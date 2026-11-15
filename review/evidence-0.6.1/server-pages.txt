@@ -1,0 +1,54 @@
+started 2026-11-15T19:19:26Z
+coins: a page of two                                           same       real [200, ["index", "next_cursor", "utxos"], ["amount", "block_height", "coinbase", "confirmations", "output_index", "script_pubkey", "transaction_id"], 2, ["block_height", "output_index", "pending_revision", "tip_hash", "transaction_id"], ["indexed_hash", "indexe
+coins: the page after it                                       same       real [200, ["index", "next_cursor", "utxos"], ["amount", "block_height", "coinbase", "confirmations", "output_index", "script_pubkey", "transaction_id"], 2, ["block_height", "output_index", "pending_revision", "tip_hash", "transaction_id"], ["indexed_hash", "indexe
+coins: no limit named                                          same       real [200, ["index", "next_cursor", "utxos"], ["amount", "block_height", "coinbase", "confirmations", "output_index", "script_pubkey", "transaction_id"], null, null, ["indexed_hash", "indexed_height", "last_node_contact", "max_age_seconds", "observed_node_hash", "o
+coins: cursor given as null                                    same       real [200, ["index", "next_cursor", "utxos"], ["amount", "block_height", "coinbase", "confirmations", "output_index", "script_pubkey", "transaction_id"], 2, ["block_height", "output_index", "pending_revision", "tip_hash", "transaction_id"], ["indexed_hash", "indexe
+coins: limit 0                                                 same       real [400, "UTXO limit must be between 1 and 10,000"]
+coins: limit one above the most                                same       real [400, "UTXO limit must be between 1 and 10,000"]
+coins: limit 65536                                             same       real [422, "Request must contain valid JSON with the required fields."]
+coins: limit below zero                                        same       real [422, "Request must contain valid JSON with the required fields."]
+coins: limit as text                                           same       real [422, "Request must contain valid JSON with the required fields."]
+coins: limit with a fraction                                   same       real [422, "Request must contain valid JSON with the required fields."]
+coins: a cursor that is a number                               same       real [422, "Request must contain valid JSON with the required fields."]
+coins: a cursor that is not hexadecimal                        same       real [400, "invalid UTXO cursor"]
+coins: a cursor of odd length                                  same       real [400, "invalid UTXO cursor"]
+coins: a cursor of 1,026 characters                            same       real [400, "UTXO cursor is too long"]
+coins: a cursor that is a list                                 same       real [400, "invalid UTXO cursor"]
+coins: a cursor without its tip                                same       real [400, "invalid UTXO cursor"]
+coins: a cursor whose revision is text                         same       real [400, "invalid UTXO cursor"]
+coins: a cursor with a height that is text                     same       real [400, "invalid UTXO cursor"]
+coins: a cursor with a height below zero                       same       real [400, "invalid UTXO cursor"]
+coins: a cursor with a tip that is no id                       same       real [400, "invalid UTXO cursor fields"]
+coins: a cursor of another revision                            same       real [409, "The index changed; restart pagination."]
+coins: a cursor of another tip                                 same       real [409, "The index changed; restart pagination."]
+coins: a cursor with a field too many                          same       real [200, ["index", "next_cursor", "utxos"], ["amount", "block_height", "coinbase", "confirmations", "output_index", "script_pubkey", "transaction_id"], 2, ["block_height", "output_index", "pending_revision", "tip_hash", "transaction_id"], ["indexed_hash", "indexe
+history: a page of two                                         same       real [200, ["index", "next_cursor", "transactions"], ["block_height", "confirmations", "net_amount", "network_fee", "timestamp", "transaction_id"], 2, ["height", "pending_revision", "tip_hash", "txid"], ["indexed_hash", "indexed_height", "last_node_contact", "max_a
+history: the page after it                                     same       real [200, ["index", "next_cursor", "transactions"], ["block_height", "confirmations", "net_amount", "network_fee", "timestamp", "transaction_id"], 2, ["height", "pending_revision", "tip_hash", "txid"], ["indexed_hash", "indexed_height", "last_node_contact", "max_a
+history: no limit named                                        same       real [200, ["index", "next_cursor", "transactions"], ["block_height", "confirmations", "net_amount", "network_fee", "timestamp", "transaction_id"], null, ["height", "pending_revision", "tip_hash", "txid"], ["indexed_hash", "indexed_height", "last_node_contact", "ma
+history: cursor given as null                                  same       real [200, ["index", "next_cursor", "transactions"], ["block_height", "confirmations", "net_amount", "network_fee", "timestamp", "transaction_id"], 2, ["height", "pending_revision", "tip_hash", "txid"], ["indexed_hash", "indexed_height", "last_node_contact", "max_a
+history: limit 0                                               same       real [400, "history limit must be between 1 and 200"]
+history: limit one above the most                              same       real [400, "history limit must be between 1 and 200"]
+history: limit 65536                                           same       real [422, "Request must contain valid JSON with the required fields."]
+history: limit below zero                                      same       real [422, "Request must contain valid JSON with the required fields."]
+history: limit as text                                         same       real [422, "Request must contain valid JSON with the required fields."]
+history: limit with a fraction                                 same       real [422, "Request must contain valid JSON with the required fields."]
+history: a cursor that is a number                             same       real [422, "Request must contain valid JSON with the required fields."]
+history: a cursor that is not hexadecimal                      same       real [400, "invalid history cursor"]
+history: a cursor of odd length                                same       real [400, "invalid history cursor"]
+history: a cursor of 1,026 characters                          same       real [400, "history cursor is too long"]
+history: a cursor that is a list                               same       real [400, "invalid history cursor"]
+history: a cursor without its tip                              same       real [400, "invalid history cursor"]
+history: a cursor whose revision is text                       same       real [400, "invalid history cursor"]
+history: a cursor with a height that is text                   same       real [400, "invalid history cursor"]
+history: a cursor with a height below zero                     same       real [400, "invalid history cursor fields"]
+history: a cursor with a tip that is no id                     same       real [400, "invalid history cursor fields"]
+history: a cursor of another revision                          same       real [409, "The index changed; restart pagination."]
+history: a cursor of another tip                               same       real [409, "The index changed; restart pagination."]
+history: a cursor with a field too many                        same       real [200, ["index", "next_cursor", "transactions"], ["block_height", "confirmations", "net_amount", "network_fee", "timestamp", "transaction_id"], 2, ["height", "pending_revision", "tip_hash", "txid"], ["indexed_hash", "indexed_height", "last_node_contact", "max_a
+coins: a cursor with a height of 2 to the 63rd                 same       real [400, "invalid UTXO cursor fields"]
+coins: a cursor with an output number below zero               same       real [400, "invalid UTXO cursor"]
+coins: a cursor with an output number of 2 to the 32nd         same       real [400, "invalid UTXO cursor"]
+coins: a cursor with an id that is no id                       same       real [400, "invalid UTXO cursor fields"]
+history: a cursor with an id that is no id                     same       real [400, "invalid history cursor fields"]
+requests: real server 57, stand-in 57
+51 of 51 alike

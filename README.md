@@ -25,12 +25,12 @@ apps. A later package installs over an earlier one and the wallet stays where it
 
 | | |
 |---|---|
-| File | `polarka-wallet-0.6.0.apk`, built from commit `94b8725` (tag `v0.6.0`) |
-| SHA-256 of the file | `7c0968934f4b08748d30cd1c93f76aade95155e84a7be38a996ebe97925f56c4` |
+| File | `polarka-wallet-0.6.1.apk`, built from commit `96d78d5` (tag `v0.6.1`) |
+| SHA-256 of the file | `7da80705ad9c70ffc1ee4646d5f5d0bac86a707593476ac5214b1c3a420c914b` |
 | SHA-256 of the signer's certificate | `f441275239c880d0855a40525ca2449a2aa4992b4d4c2e63143d36c088ce103b` |
 
-Compare both before installing: `shasum -a 256 polarka-wallet-0.6.0.apk` (or `sha256sum`), and
-`apksigner verify --print-certs polarka-wallet-0.6.0.apk` from the Android build tools. Every later package
+Compare both before installing: `shasum -a 256 polarka-wallet-0.6.1.apk` (or `sha256sum`), and
+`apksigner verify --print-certs polarka-wallet-0.6.1.apk` from the Android build tools. Every later package
 carries the same certificate, and a phone refuses to put a package with another certificate over this one.
 The project publishes the package in this one place: no app store and no website offers it.
 
@@ -187,8 +187,8 @@ While such a payment has no coin among those the server lists, the wallet makes 
   History show both payments.
 - Version 0.3.1 was tried on one real phone (Android 16), and 0.6.0 was installed there over 0.5.1: the
   wallet was there and worked with its owner's node. The versions since 0.3.1 were tried on emulators with
-  Android 12, 14 and 16; `review/emulator/README.md` says what was run for each of them. No payment has been
-  made through a wallet server on a real phone yet.
+  Android 12, 14 and 16; `review/emulator/README.md` says what was run for each of them. 0.6.1 has been on
+  emulators only. No payment has been made through a wallet server on a real phone yet.
 
 ## Code
 
@@ -212,7 +212,7 @@ a real network.
     TN_BIN=/path/to/bin gradle :core:test :node:test :app:testDebugUnitTest :app:lintDebug
     sh review/tests-summary.sh
 
-187 tests. A test that cannot run (no node programs, or no `gateway.py` of polarka-node next to this
+194 tests. A test that cannot run (no node programs, or no `gateway.py` of polarka-node next to this
 repository or named by `POLARKA_GATEWAY`) is reported as skipped; for a release none may be skipped. `polarka-node` is not published, so with this
 repository alone the tests that need it (in `PublicNodeTest` and `RetestModelTest`) are skipped. Every library is pinned by its SHA-256 in `gradle/verification-metadata.xml`:
 the build stops if one differs from the day it was first downloaded. The pins were made by Gradle on that day

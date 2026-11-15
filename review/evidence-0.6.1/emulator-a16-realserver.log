@@ -1,0 +1,6 @@
+Android 16, polarka-wallet-0.6.1.apk, the server named in the app
+ok     1  the first screen fills in https://api.northboundwallet.org, and the check before saving shows it as a wallet server on the main network
+ok     2  this Android accepted the server's certificate and read its answer: block 25238 (this machine was told 25238 before and 25238 after)
+ok     3  the setup was removed again and the app taken off; no wallet was made, so the server was named no address
+REAL SERVER: ALL 3 STEPS PASSED on Android 16
+exit 0

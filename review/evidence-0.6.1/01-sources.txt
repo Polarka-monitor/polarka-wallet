@@ -1,0 +1,14 @@
+== 1. Lines in the wallet's own code that print or log (expected: none)
+none
+
+== 2. Internet addresses written into the wallet's own code (expected: one server and no node. The server is the public Northbound server, which the first screen offers at its author's request; a node comes from the user. Beside it the bare beginning of an address is listed, in a text and where a typed address is completed)
+app/src/main/res/values-cs/strings.xml:31:https://.
+app/src/main/res/values/strings.xml:34:https://.
+app/src/main/kotlin/org/polarka/wallet/Setup.kt:76:https://api.northboundwallet.org
+app/src/main/kotlin/org/polarka/wallet/Setup.kt:101:https://$typed
+app/src/main/kotlin/org/polarka/wallet/Setup.kt:108:https://$typed
+
+== 3. Places where the clipboard is written (expected: addresses, transaction ids and the public descriptor only)
+app/src/main/kotlin/org/polarka/wallet/Tabs.kt:276 label "NORTH address"
+app/src/main/kotlin/org/polarka/wallet/Tabs.kt:328 label "txid"
+app/src/main/kotlin/org/polarka/wallet/Tabs.kt:537 label "descriptor"

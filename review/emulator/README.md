@@ -24,6 +24,8 @@ repeated. Nothing here touches a real network, a real coin or a real key.
 | `t05_upgrade.py` | the package installed over the one before it (0.5.0, or 0.4.1 with `flows_0_4.py`): the same wallet opens, still knows a waiting payment, signs with the words the older package stored, and finds the paper written with the older package right |
 | `t06_real_server.py` | the first screen as it is, with the public Northbound server that it offers: the app connects and shows the height of the real chain. No wallet is made, so the server is told no address; it is asked for its tip and nothing else |
 | `t07_server_says_no.py` | a wallet server that is not honest: it says no to a payment and keeps it, and later hides its coin. The payment is not forgotten, the next one is built on its coin, the node has no room for the kept transaction, and while the coin is hidden nothing is paid |
+| `t08_server_changed.py` | a wallet server that changed the shape of its answers (since 0.6.1): the signed package of 0.6.0 against the stand-in as it answers now, which it cannot read, then the package under test installed over it: the same wallet with its coins and history, the change of a waiting payment, and coins that come in pages |
+| `t09_real_server_watch.py` | the package as installed, given the public Northbound server and one watched address that is public chain data (since 0.6.1): what the app shows for the address is compared with the coins that the server lists for it, read page by page from the computer. No wallet is in the phone and nothing is sent |
 | `probe_server.py`, `probe_says_no.py` | the bench's wallet server asked from the computer, without a phone: the first through TLS as the app asks it, the second the two switches that `t07_server_says_no.py` uses |
 | `matrix.sh` | the seven runs for one emulator, one after the other |
 
@@ -57,13 +59,59 @@ repeated. Nothing here touches a real network, a real coin or a real key.
     python3 t05_upgrade.py emulator-5560 /path/to/the-package-before.apk /path/to/polarka-wallet.apk
     python3 t02_wallet.py emulator-5560 /path/to/polarka-wallet.apk server
     python3 t07_server_says_no.py emulator-5560 /path/to/polarka-wallet.apk
+    python3 t08_server_changed.py emulator-5560 /path/to/polarka-wallet-0.6.0.apk /path/to/polarka-wallet.apk
     python3 t06_real_server.py emulator-5560 /path/to/polarka-wallet.apk       # asks the public server for its tip
+    python3 t09_real_server_watch.py emulator-5560 /path/to/polarka-wallet.apk /path/to/a-file-with-one-address   # reads the public server
+
+`t06_real_server.py` and `t09_real_server_watch.py` are the two runs that touch a real network. They only
+read, and they are not to be repeated often.
 
 `bench.py` needs `TN_BIN` (the folder with the official `truenorthd` and `truenorth-cli`) and finds the gateway
 through `POLARKA_GATEWAY`. The other paths inside the scripts assume the folder layout of the machine they were
 written on (`~/north-build`); change `emu-env.sh`, `emu-start.sh`, `make_ca.sh`, `trust_ca.sh`, `matrix.sh` and
 the first lines of `emu.py` for another one. An emulator that was restarted shows its lock screen and has
 forgotten the test authority: unlock it and run `trust_ca.sh` again.
+
+## What was run for 0.6.1
+
+On 15 November 2026 the signed package of 0.6.1 (SHA-256 `7da80705ad9c70ffc1ee4646d5f5d0bac86a707593476ac5214b1c3a420c914b`,
+built from commit 96d78d5) went through eight runs on Android 12, 14 and 16: the seven of 0.6.0, with
+`t05_upgrade.py` again over the signed package of 0.5.1, and `t08_server_changed.py`. Every run ended with its
+line of success: `ALL 12 STEPS PASSED` with a node of one's own and through the gateway, `LOCK STEPS PASSED: 4`,
+`NOT GONE THROUGH: ALL 6 STEPS PASSED`, `UPGRADE: ALL 5 STEPS PASSED (0.5.1 -> 0.6.1)`, `ALL 18 STEPS PASSED`
+with a wallet server, `A SERVER THAT SAYS NO: ALL 6 STEPS PASSED` and `A SERVER THAT CHANGED ITS ANSWERS: ALL 6
+STEPS PASSED (0.6.0 -> 0.6.1)`. None of the twenty-four had to be repeated. The logs are in `../evidence-0.6.1`.
+
+The wallet server of these runs is the stand-in of `../standin`, which now answers in the shapes that the
+public server has had since 15 November 2026: a line of history is one signed amount with the fee of the
+transaction, and coins come a page at a time. The steps of the seven runs are those of 0.6.0 and did not have
+to be changed. In the run with a wallet server the wallet again asked the server 69 times over 2 connections.
+
+`t08_server_changed.py` is the run for what happened on that day. The signed package of 0.6.0, as it was
+handed out, is connected to the stand-in. A new wallet that has no history is shown. After 25 NORTH were paid
+to it and were in a block, the Overview says "The server answered with an error: the server sent an answer in
+an unknown form (received_amount)", and none of the coins are shown: 0.6.0 cannot read the server, and it
+does not show a part of what it could not read. Then 0.6.1 is installed over it. The same wallet opens after
+the fingerprint, with its 25 NORTH and the payment in its history. A payment of 5 NORTH made with 0.6.1
+waits for a block: its coin is gone from the server's list, and its change of 19.99999674 NORTH shows as on
+its way. After the block the change can be spent and nothing is on its way. Last, the stand-in is told to
+list three coins to a page, four more payments arrive, and the wallet's five coins are read from two pages.
+
+Two runs touched the public Northbound server, both reading only. `t06_real_server.py` ran once on each
+emulator: the app, as installed and with the address it offers, connected to the server and showed the height
+of the main chain (blocks 25235, 25237 and 25238, each the height that the computer was told at the same
+moment). There was no wallet in the phone, so the server was named no address. `t09_real_server_watch.py` ran
+once, on Android 14: the app was given a setup file that names the public server and one address to watch, an
+address that is public chain data and holds several thousand coins. The app showed 33829.09039810 NORTH for
+it. That is the sum of the 3,353 coins that the server listed for the address at
+block 25240, which the computer read over four pages right before and right after the app's look, with the
+same result. The History page listed block rewards of that address. Nothing was sent, and there was no wallet
+in the phone.
+
+Not run on an emulator: what is listed for 0.6.0 below; a payment through the public server; a block or a
+transaction that arrives in the middle of a look; lines of history that do not fit together; and more coins
+than the app reads through a server. The last three have tests in the suite, against the stand-in on a real
+node.
 
 ## What was run for 0.6.0
 
