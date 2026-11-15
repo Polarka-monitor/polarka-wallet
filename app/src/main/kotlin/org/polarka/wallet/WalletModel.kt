@@ -419,12 +419,14 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         var arrived: Dropped? = null
         var returned: Dropped? = null
         val still = ArrayList<Dropped>()
-        for (d in wallet.dropped + lost.map { Dropped(it.txid, it.sentSat, it.feeSat, it.inputs, seen.atMillis) }) {
+        // A payment keeps the time at which it was made, here and when it comes back: how long it has waited
+        // is counted from then, whatever a node or a server said about it in between.
+        for (d in wallet.dropped + lost.map { Dropped(it.txid, it.sentSat, it.feeSat, it.inputs, it.atMillis) }) {
             when {
                 inBlock(d.txid, d.inputs) -> arrived = d
                 beaten(d.txid, d.inputs) -> Unit
                 d.txid in seen.back && waiting.size < WalletInfo.MAX_PENDING -> {
-                    waiting = waiting + Pending(d.txid, d.sentSat, d.feeSat, d.inputs, unsure = false, atMillis = seen.atMillis)
+                    waiting = waiting + Pending(d.txid, d.sentSat, d.feeSat, d.inputs, unsure = false, atMillis = d.atMillis)
                     returned = d
                     again = true            // the next look shows its coins as tied up again
                 }

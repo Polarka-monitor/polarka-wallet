@@ -41,7 +41,7 @@ import kotlin.test.assertTrue
  * The reviewer then looked at the fixes, and what that look left open is here too: what the screens say when
  * there is no room left among the payments that did not go through, the same transaction refused twice, a
  * payment that has waited for a block for over an hour, a refused emptying of a paper address, and a server
- * that never shows a coin again.
+ * that never shows a coin again. And from its third look: a payment keeps the time at which it was made.
  * Skipped when TN_BIN does not name the node's programs or python3 is missing.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -251,7 +251,7 @@ class SixthLookScreenTest {
                     assertEquals(listOf(open), model.state.pending)
                     screen.onNodeWithTag("tab-OVERVIEW").performClick()
                     waitFor("pending-text")
-                    assertTrue("is full (50), so the outcome of this payment stays open" in textOf("pending-text"), textOf("pending-text"))
+                    assertTrue("is full (50). If this payment did not go through either, there is no room for it there" in textOf("pending-text"), textOf("pending-text"))
                     assertFalse("Refresh in a minute" in textOf("pending-text"))
 
                     // no other payment is worked out, and the reason given is the true one
@@ -260,7 +260,7 @@ class SixthLookScreenTest {
                     assertNull(model.state.draft)
                     assertEquals(Problem(Problem.Kind.NO_ROOM), model.state.sendProblem)
                     screen.onNodeWithTag("tab-SEND").performClick()
-                    screen.waitUntil(30_000) { said("it cannot be settled for now: the list of payments that did not go through is full (50)") }
+                    screen.waitUntil(30_000) { said("the list of payments that did not go through is full (50). If a refresh shows the payment as waiting for a block, that is settled") }
 
                     // the owner forgets one entry: the next looks move the open payment into the list, and a payment is worked out again
                     model.forgetDropped(old[0].txid, owner)
@@ -508,6 +508,61 @@ class SixthLookScreenTest {
                     val next = assertNotNull(model.state.draft, "problem: ${model.state.sendProblem}")
                     assertEquals(0, next.against)
                     assertTrue(next.plan.inputs.none { it.txid + ":" + it.vout in refused.inputs })
+                }
+            }
+        }
+    }
+
+    @Test
+    fun aPaymentThatComesBackFromThoseThatDidNotGoThroughKeepsItsTime() {
+        val node = ServerNode.start()
+        node.use {
+            StandIn.start(node).use { server ->
+                ServerRelay(server.url).use { relay ->
+                    val words = Words.generate()
+                    val wallet = Account.fromWords(words, Chain.REGTEST)
+                    wallets.value = WalletInfo(Chain.REGTEST, wallet.watchKey().xpub, lockOnOpen = false)
+                    vault().let { it.store(it.encryptor(), words) }
+                    val shop = fresh().address(0, 0)
+                    node.mine(1, wallet.address(0, 0))
+                    node.mine(100, fresh().address(0, 0))
+                    setups.value = Setup(relay.url, "", "", Chain.REGTEST, emptyList(), server = true)
+                    val model = Robolectric.buildActivity(MainActivity::class.java).setup().get().model
+                    waitFor("wallet-spendable")
+                    idle(model)
+
+                    // The server takes the payment in and answers as if its node were away. It keeps what it was handed.
+                    val handed = java.util.concurrent.atomic.AtomicReference<String>()
+                    relay.instead = { path, body ->
+                        if (path != "/v1/transactions/broadcast") null else {
+                            handed.set(Json.parseToJsonElement(body).jsonObject["transaction_hex"]!!.jsonPrimitive.content)
+                            502 to "{\"message\":\"The blockchain node is unavailable or returned an invalid response.\"}"
+                        }
+                    }
+                    model.prepare(shop, "5", false, 2)
+                    idle(model)
+                    assertNotNull(model.state.draft, "problem: ${model.state.sendProblem}")
+                    model.confirmSend(owner)
+                    idle(model)
+                    honest(relay)
+                    assertEquals(Problem.Kind.UNSURE, model.state.sendProblem?.kind)
+                    val made = model.state.pending.single()
+                    assertTrue(made.unsure && made.atMillis > 0)
+                    Thread.sleep(50)                    // every look from here on is later than the payment
+                    model.goneAfterMillis = 0           // from here on a payment is called gone as soon as two looks do not find it
+
+                    // nobody knows it: after two looks it is one that did not go through, with the time at which it was made
+                    looked(model)
+                    looked(model)
+                    assertTrue(model.state.pending.isEmpty(), "still open: ${model.state.pending}")
+                    assertEquals(listOf(Dropped(made.txid, made.sentSat, made.feeSat, made.inputs, made.atMillis)), model.state.dropped)
+
+                    // the server passes it on after all: it waits for a block again, and its time is still the first one
+                    node.cli("sendrawtransaction", handed.get())
+                    looked(model)
+                    looked(model)
+                    assertTrue(model.state.dropped.isEmpty(), "still among those that did not go through: ${model.state.dropped}")
+                    assertEquals(listOf(made.copy(unsure = false)), model.state.pending)
                 }
             }
         }
