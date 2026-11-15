@@ -87,6 +87,12 @@ If the node or the server does not confirm that it took the payment, the app say
 again then: refresh after a minute, and the app shows whether the payment waits for a block or did not go
 through.
 
+A payment that waits for a block can still arrive, and a payment made meanwhile does not stand against it: if
+you pay the same thing a second time while the first one waits, both can arrive. When a payment has waited for
+over an hour the app says so, on the Overview and where the next payment is confirmed. Find out first what
+became of it. A server or a public node can hold a payment back, so look at the wallet through another server
+or a node of your own before you pay again.
+
 A payment that did not go through stays on the Overview as "Did not go through, could still arrive": the node
 or the server that the app asks does not hold it, but another node might. The same is done with a payment
 that a server or a public node refused, because they have seen it. You can pay again at once. The app builds

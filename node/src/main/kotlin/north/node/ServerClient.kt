@@ -14,8 +14,9 @@ import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.locks.ReentrantLock
 
 /** The coins on some addresses, as the server's index shows them at block [tip]. */
 data class ServerCoins(val tip: Int, val tipHash: String, val utxos: List<Utxo>)
@@ -63,8 +64,8 @@ data class ServerVerdict(val allowed: Boolean, val reason: String?)
  *
  * A server that asks to slow down (429) or is busy (503) is waited for and asked again, for [maxWaitMs] at most.
  *
- * One question, from its beginning to the last byte of its answer and with the waiting for a busy server, takes
- * [deadlineMs] at most. The timeouts of a connection do not see to that: a server that keeps sending a
+ * One question, from the wait for its turn to the last byte of its answer and with the waiting for a busy
+ * server, takes [deadlineMs] at most. The timeouts of a connection do not see to that: a server that keeps sending a
  * little is never late for them. When the time is over the connection is closed and the question fails as
  * one that was not answered in time.
  */
@@ -73,7 +74,7 @@ class ServerClient(
     private val pause: (Long) -> Unit = { Thread.sleep(it) }, private val deadlineMs: Long = DEADLINE_MS,
 ) {
     private val base: String
-    private val lock: Any
+    private val lock: ReentrantLock
 
     init {
         val uri = URI(url.trim())
@@ -86,7 +87,7 @@ class ServerClient(
         require(uri.rawQuery == null && uri.rawFragment == null && uri.rawUserInfo == null) { "the server address must be an address and nothing else" }
         require(uri.rawPath.isNullOrEmpty() || uri.rawPath == "/") { "the server address must not have a path" }
         base = url.trim().trimEnd('/')
-        lock = LOCKS.computeIfAbsent(base) { Any() }
+        lock = LOCKS.computeIfAbsent(base) { ReentrantLock(true) }      // in the order of asking: nobody is passed over
     }
 
     private class Answer(val status: Int, val text: String, val retryAfter: Int?)
@@ -118,16 +119,19 @@ class ServerClient(
         if (withinMs <= 0) throw late()
         var asked = false
         val open = AtomicReference<HttpURLConnection?>()
-        val over = AtomicBoolean(false)
+        // Who ended the question: nobody yet (0), its reader with the whole answer or with a failure (1), or
+        // the clock (2). Only one of them does. So the clock never closes a connection whose answer was read
+        // to its end, which the next question may already be using.
+        val ended = AtomicInteger(0)
         val until = now() + withinMs
         // When the time for the whole question is over, the connection is closed under whatever waits on it. An
         // answer that is being read is given up by its reader as well, between two reads: closing a connection
         // from outside does not end every read at once.
-        val watch = WATCH.schedule({ over.set(true); runCatching { open.get()?.disconnect() } }, withinMs, TimeUnit.MILLISECONDS)
+        val watch = WATCH.schedule({ if (ended.compareAndSet(0, 2)) runCatching { open.get()?.disconnect() } }, withinMs, TimeUnit.MILLISECONDS)
         try {
             val c = URI(base + path).toURL().openConnection() as HttpURLConnection
             open.set(c)
-            if (over.get()) throw java.io.IOException("the time was over before the question was asked")
+            if (ended.get() == 2) throw java.io.IOException("the time was over before the question was asked")
             c.requestMethod = if (body == null) "GET" else "POST"
             c.connectTimeout = timeoutMs
             c.readTimeout = timeoutMs
@@ -144,6 +148,8 @@ class ServerClient(
             val status = c.responseCode
             val text = read(if (status in 200..299) c.inputStream else c.errorStream, until)
             val retry = c.getHeaderField("Retry-After")?.trim()?.toIntOrNull()
+            // the clock was first: the answer came too late to count, and its connection is being closed
+            if (!ended.compareAndSet(0, 1)) throw Late()
             // The answer was read to its end, so the connection is left open for the next question. A look asks
             // several, and with a server far away a new connection costs twice what a question costs.
             return Answer(status, text, retry)
@@ -155,18 +161,19 @@ class ServerClient(
             throw late()
         } catch (e: SocketTimeoutException) {
             open.get()?.disconnect()
-            if (asked || over.get()) throw late()
+            if (asked || ended.get() == 2) throw late()
             throw NodeError(0, null, "the server cannot be reached (${e.javaClass.simpleName})")
         } catch (e: java.io.IOException) {
             open.get()?.disconnect()
-            if (over.get()) throw late()
+            if (ended.get() == 2) throw late()
             throw NodeError(0, null, "the server cannot be reached (${e.javaClass.simpleName})")
         } catch (e: RuntimeException) {
             // a connection that is closed under its reader can fail in ways of its own
-            if (!over.get()) throw e
+            if (ended.get() != 2) throw e
             open.get()?.disconnect()
             throw late()
         } finally {
+            ended.compareAndSet(0, 1)
             watch.cancel(false)
         }
     }
@@ -179,7 +186,20 @@ class ServerClient(
      */
     private fun call(path: String, body: String? = null, withinMs: Long = deadlineMs): JsonObject {
         val until = now() + withinMs
-        return synchronized(lock) { asked(path, body, until) }
+        // The wait for its turn is part of the question's time. Behind a slow question it would otherwise wait
+        // for as long as that one may take, whatever time it was given itself.
+        val mine = try {
+            lock.tryLock(maxOf(0L, withinMs), TimeUnit.MILLISECONDS)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            throw NodeError(0, null, "the server cannot be reached (interrupted)")
+        }
+        if (!mine) throw late()
+        try {
+            return asked(path, body, until)
+        } finally {
+            lock.unlock()
+        }
     }
 
     private fun asked(path: String, body: String?, until: Long): JsonObject {
@@ -472,7 +492,7 @@ class ServerClient(
         const val MAX_ANSWER_BYTES = 8 * 1024 * 1024
         /** [NodeError.code] when the parts of one answer were read at different blocks. Asking again helps. */
         const val MOVED = -2
-        private val LOCKS = ConcurrentHashMap<String, Any>()
+        private val LOCKS = ConcurrentHashMap<String, ReentrantLock>()
         /** Closes connections whose time is over. One thread for all clients, and it does not keep a program alive. */
         private val WATCH = ScheduledThreadPoolExecutor(1) { work -> Thread(work, "server-deadline").apply { isDaemon = true } }
             .apply { removeOnCancelPolicy = true }

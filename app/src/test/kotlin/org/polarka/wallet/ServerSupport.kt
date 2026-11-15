@@ -27,8 +27,23 @@ internal class ServerNode private constructor(private val bin: File) : AutoClose
     val cookie: File get() = File(dir, "regtest/.cookie")
 
     init {
+        // The node answers a second or two after its start. If its process has ended, or two minutes are over,
+        // it is not waited for any longer: the test then fails here and says what the node left behind, and not
+        // at its first use of a node that is not there.
         val end = System.currentTimeMillis() + 120_000
-        while (System.currentTimeMillis() < end && runCatching { cli("getblockcount") }.isFailure) Thread.sleep(300)
+        var failure: Throwable?
+        while (true) {
+            failure = runCatching { cli("getblockcount") }.exceptionOrNull()
+            if (failure == null || !process.isAlive || System.currentTimeMillis() >= end) break
+            Thread.sleep(300)
+        }
+        if (failure != null) {
+            val alive = process.isAlive
+            val log = runCatching { File(dir, "regtest/debug.log").readLines().takeLast(6).joinToString(" | ") }.getOrDefault("it left no log")
+            process.destroyForcibly()
+            dir.deleteRecursively()
+            throw IllegalStateException("the test node on port $port did not come up (its process was ${if (alive) "still running" else "gone"}): ${failure.message}. Its log ends: $log")
+        }
     }
 
     fun cli(vararg args: String): String {
@@ -58,7 +73,18 @@ internal class ServerNode private constructor(private val bin: File) : AutoClose
             if (bin == null || !File(bin, "truenorthd").canExecute()) {
                 throw org.junit.AssumptionViolatedException("set TN_BIN to the folder with the official truenorthd and truenorth-cli")
             }
-            return ServerNode(bin)
+            // The port is chosen a moment before the node takes it, and something else on the machine can take
+            // it in between. A node that did not come up is therefore started again, and that is said aloud.
+            var last: IllegalStateException? = null
+            repeat(3) { attempt ->
+                try {
+                    return ServerNode(bin)
+                } catch (e: IllegalStateException) {
+                    last = e
+                    System.err.println("TEST NODE, attempt ${attempt + 1}: ${e.message}")
+                }
+            }
+            throw last!!
         }
     }
 }

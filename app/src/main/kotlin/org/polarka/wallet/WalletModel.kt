@@ -689,7 +689,7 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         if (wallet.pending.any { it.unsure }) {
             // While it is not known whether a payment went out, no other one is made: it could be a second one for
             // the same thing. A look at the node settles the first one, about a minute after it was handed over.
-            state = state.copy(sendProblem = Problem(Problem.Kind.OUTCOME_OPEN), draft = null)
+            state = state.copy(sendProblem = outcomeOpen(wallet), draft = null)
             return
         }
         state = state.copy(sending = true, sendProblem = null, draft = null, sentTxid = null)
@@ -703,6 +703,14 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
             lockIfWanted()
         }
     }
+
+    /**
+     * Why no payment is made while the outcome of one is open. A look settles that about a minute after the
+     * hand-over, but not while there is no room left among the payments that did not go through: then room
+     * has to be made first, and the owner is told that instead of being promised what will not happen.
+     */
+    private fun outcomeOpen(wallet: WalletInfo) =
+        Problem(if (wallet.dropped.size >= WalletInfo.MAX_DROPPED) Problem.Kind.NO_ROOM else Problem.Kind.OUTCOME_OPEN)
 
     /** How many of the wallet's payments that did not go through this plan stands against: it spends a coin of each of them. */
     private fun standsAgainst(wallet: WalletInfo, plan: Plan): Int {
@@ -732,7 +740,7 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
             return
         }
         if (wallet.pending.any { it.unsure }) {
-            state = state.copy(sendProblem = Problem(Problem.Kind.OUTCOME_OPEN))
+            state = state.copy(sendProblem = outcomeOpen(wallet))
             return
         }
         val coins = draft.plan.inputs.map { it.txid + ":" + it.vout }.toSet()
@@ -801,21 +809,28 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
                 // their no is only their word: whoever was shown a transaction can send it later. The payment
                 // is therefore kept as one that did not go through, so that the next one is built on one of
                 // its coins, and its change key stays used. With no room left among those payments it stays
-                // "outcome not known", which lets no other payment be made until a look has settled it.
+                // "outcome not known", which lets no other payment be made; the owner is told that room has to
+                // be made, and not that a look will settle it.
                 val why = refusal(delivery.exceptionOrNull()!!)
                 var kept = false
                 change({
-                    if (it.dropped.size >= WalletInfo.MAX_DROPPED) it else {
-                        kept = true
-                        it.copy(
-                            pending = it.pending.filter { p -> p.txid != record.txid },
-                            dropped = it.dropped + Dropped(record.txid, record.sentSat, record.feeSat, record.inputs, record.atMillis),
-                        )
+                    val waiting = it.pending.filter { p -> p.txid != record.txid }
+                    when {
+                        // the very same transaction was refused before and is kept already: once is enough
+                        it.dropped.any { d -> d.txid == record.txid } -> {
+                            kept = true
+                            it.copy(pending = waiting)
+                        }
+                        it.dropped.size >= WalletInfo.MAX_DROPPED -> it
+                        else -> {
+                            kept = true
+                            it.copy(pending = waiting, dropped = it.dropped + Dropped(record.txid, record.sentSat, record.feeSat, record.inputs, record.atMillis))
+                        }
                     }
                 })
                 state = state.copy(
                     sending = false, draft = null,
-                    sendProblem = if (kept) Problem(Problem.Kind.REFUSED_KEPT, why.detail) else Problem(Problem.Kind.UNSURE, record.txid),
+                    sendProblem = Problem(if (kept) Problem.Kind.REFUSED_KEPT else Problem.Kind.REFUSED_NO_ROOM, why.detail),
                 )
             } else if (delivery.getOrThrow()) {
                 change({ it.copy(pending = it.pending.map { p -> if (p.txid == record.txid) p.copy(unsure = false) else p }) })
@@ -910,7 +925,7 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
             }
             val delivery = withContext(io) { runCatching { engine.deliver(signed) } }
             when {
-                delivery.isFailure -> state = state.copy(paperBusy = false, paperProblem = refusal(delivery.exceptionOrNull()!!))
+                delivery.isFailure -> state = state.copy(paperBusy = false, paperProblem = paperRefusal(refusal(delivery.exceptionOrNull()!!), engine.ownersNode))
                 delivery.getOrThrow() -> {
                     val more = draft.plan.leftBehind > 0
                     paperSpent = paperSpent + draft.plan.inputs.map { it.txid + ":" + it.vout }
@@ -1025,3 +1040,12 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
 
 /** How many words that are not on the list are named in one message. */
 private const val NAMED_STRANGERS = 6
+
+/**
+ * What a refused emptying of a paper address is called. Only the owner's own node is believed that nothing
+ * went out. A wallet server or a public node has seen the whole transaction and could pass it on while the
+ * coins of the paper address are unspent; there is no list in which such a transaction could be kept (the
+ * words are not stored), so the owner is told what follows from it.
+ */
+internal fun paperRefusal(why: Problem, ownersNode: Boolean): Problem =
+    if (!ownersNode && why.kind == Problem.Kind.REJECTED) Problem(Problem.Kind.PAPER_REFUSED, why.detail) else why

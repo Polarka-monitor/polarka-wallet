@@ -233,6 +233,9 @@ fun problemText(problem: Problem): String = when (problem.kind) {
     Problem.Kind.OUTCOME_OPEN -> stringResource(R.string.problem_outcome_open)
     Problem.Kind.REFUSED_KEPT -> stringResource(pick(R.string.problem_refused_kept, R.string.problem_refused_kept_server), problem.detail)
     Problem.Kind.TOO_MANY_COINS -> stringResource(R.string.problem_too_many_coins, problem.detail)
+    Problem.Kind.REFUSED_NO_ROOM -> stringResource(pick(R.string.problem_refused_no_room, R.string.problem_refused_no_room_server), problem.detail, WalletInfo.MAX_DROPPED)
+    Problem.Kind.NO_ROOM -> stringResource(R.string.problem_no_room, WalletInfo.MAX_DROPPED)
+    Problem.Kind.PAPER_REFUSED -> stringResource(pick(R.string.problem_paper_refused, R.string.problem_paper_refused_server), problem.detail)
 }
 
 /** What is wrong with typed recovery words. The model passes it on in a short form (WalletModel.wordsDetail). */

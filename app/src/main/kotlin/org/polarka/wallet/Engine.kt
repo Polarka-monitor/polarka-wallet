@@ -33,6 +33,12 @@ data class Problem(val kind: Kind, val detail: String = "") {
         REFUSED_KEPT,
         /** More coins on the wallet's addresses than a wallet server lists in one answer. */
         TOO_MANY_COINS,
+        /** As [REFUSED_KEPT], but there is no room left among the payments that did not go through: the payment stays with its outcome open. */
+        REFUSED_NO_ROOM,
+        /** The outcome of a payment is open and no look can settle it, because there is no room left among the payments that did not go through. */
+        NO_ROOM,
+        /** Somebody who is not the owner's node refused the emptying of a paper address after seeing the whole transaction. */
+        PAPER_REFUSED,
     }
 
     companion object {

@@ -34,6 +34,12 @@ regtest node of their own. `StandInTest` tells one wallet's story through it.
 | `{"stale": true}` | the index says it is not up to date: what is read from the index is answered 503, `/ready` too; what comes straight from the node still answers |
 | `{"busy": N}` | the next N requests are answered 429 with `Retry-After: 1`, as the real server does above its limit of requests |
 | `{"hold": true}` | a transaction handed over for broadcast is not passed on; the answer is the node's error, 502 |
+| `{"refuse": "WHY"}` | the server says no and keeps what it was shown: validation answers that the node does not take the transaction (WHY), broadcast answers the node's error, the node is asked neither time; `""` turns it off |
+| `{"hide": true}` | the coins that a kept transaction spends are left out of `/v1/utxos` |
+
+The answer names every switch, and under `kept` the transactions that a server which said no was shown. The
+last two switches play a server that is not honest. The real server is not known to be one; a wallet has to
+stay safe with one all the same, and `review/emulator/t07_server_says_no.py` shows on a phone that it does.
 
 ## How it was compared with the real server
 

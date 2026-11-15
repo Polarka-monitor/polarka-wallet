@@ -126,7 +126,14 @@ class SealedFileStore(file: File, keys: KeyHolder) : SetupStore {
  * [unsure] is true until the node has been seen to hold the transaction. [inputs] are the coins it spends
  * ("txid:n"); they are not offered for another payment.
  */
-data class Pending(val txid: String, val sentSat: Long, val feeSat: Long, val inputs: Set<String>, val unsure: Boolean = false, val atMillis: Long = 0)
+data class Pending(val txid: String, val sentSat: Long, val feeSat: Long, val inputs: Set<String>, val unsure: Boolean = false, val atMillis: Long = 0) {
+    /**
+     * True when the payment has been shown as waiting for a block for longer than a payment usually waits. A
+     * payment made meanwhile does not stand against it, so both could arrive: the owner is told before the
+     * same thing is paid a second time. Nothing is claimed about a payment whose time is not known.
+     */
+    fun waitsLong(now: Long): Boolean = !unsure && atMillis > 0 && now - atMillis >= WalletInfo.LONG_WAIT_MILLIS
+}
 
 /**
  * A payment that left this phone, that the node then stopped holding (or never took) and that is in no
@@ -206,6 +213,8 @@ data class WalletInfo(
         const val MAX_PENDING = 200
         /** The most payments that did not go through which are remembered. When the list is full, no further one is called gone. */
         const val MAX_DROPPED = 50
+        /** After this long a payment that still waits for a block is said to have waited long. */
+        const val LONG_WAIT_MILLIS = 60 * 60_000L
         /** The most keys of one branch that are ever looked at. */
         const val MAX_LOOK = 5000
 

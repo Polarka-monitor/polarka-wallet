@@ -141,11 +141,26 @@ fun OverviewTab(model: WalletModel, state: WalletState, owner: Owner, go: (Secti
             }
             if (state.wallet != null) ReceiveAndSend({ go(Section.RECEIVE) }, { go(Section.SEND) })
         }
+        // With no room left among the payments that did not go through, a look cannot settle a payment whose
+        // outcome is open: its entry says that, and does not promise what will not happen.
+        val noRoom = state.dropped.size >= WalletInfo.MAX_DROPPED
+        val now = System.currentTimeMillis()
         state.pending.forEach { waiting ->
             Block(stringResource(if (waiting.unsure) pick(R.string.pending_unsure_title, R.string.pending_unsure_title_server) else R.string.pending_title)) {
                 Field(stringResource(R.string.send_amount), "-" + Format.coins(waiting.sentSat + waiting.feeSat), "pending-amount")
                 Mono(waiting.txid)
-                Text(stringResource(if (waiting.unsure) pick(R.string.pending_unsure_text, R.string.pending_unsure_text_server) else pick(R.string.pending_text, R.string.pending_text_server)), style = MaterialTheme.typography.bodySmall)
+                Text(
+                    when {
+                        waiting.unsure && noRoom -> stringResource(R.string.pending_no_room, WalletInfo.MAX_DROPPED)
+                        waiting.unsure -> stringResource(pick(R.string.pending_unsure_text, R.string.pending_unsure_text_server))
+                        else -> stringResource(pick(R.string.pending_text, R.string.pending_text_server))
+                    },
+                    style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("pending-text"),
+                )
+                // a payment made now would not stand against one that waits: the owner should know before paying the same thing again
+                if (waiting.waitsLong(now)) {
+                    Text(stringResource(R.string.pending_long_text), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("pending-long"))
+                }
             }
         }
         // The coins the node shows for the wallet. A payment that did not go through and has none of its coins
@@ -358,6 +373,9 @@ fun SendTab(model: WalletModel, state: WalletState, owner: Owner) {
             Block(stringResource(R.string.send_confirm_title)) {
                 PlanFields(draft.plan, draft.to, if (draft.everything) draft.plan.payments[0].amountSat else draft.plan.sentSat)
                 if (draft.against > 0) Text(stringResource(R.string.send_against_text), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("send-against"))
+                if (state.pending.any { it.waitsLong(System.currentTimeMillis()) }) {
+                    Text(stringResource(R.string.send_beside_waiting), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("send-beside-waiting"))
+                }
                 if (draft.plan.leftBehind > 0) Text(stringResource(R.string.partial_note, draft.plan.inputs.size.toString(), draft.plan.leftBehind), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 Text(stringResource(R.string.send_confirm_text), style = MaterialTheme.typography.bodySmall)
                 ProblemCard(state.sendProblem, "send-problem")

@@ -378,6 +378,34 @@ class ServerClientTest {
      * as one that was not answered in time, and the next question gets its own answer.
      */
     @Test
+    fun aQuestionDoesNotWaitForItsTurnLongerThanItsTime() {
+        // The tip is answered after two seconds, everything else at once.
+        Fake { _, asked ->
+            if (asked.path == "/v1/chain/tip") {
+                Thread.sleep(2000)
+                Reply(200, "{\"height\":7}")
+            } else Reply(200, "{\"known\":true}")
+        }.use { fake ->
+            val slow = ServerClient(fake.url)
+            val quick = ServerClient(fake.url)          // another client of the same server: the two share its turn
+            val tip = java.util.concurrent.atomic.AtomicReference<Result<Int>>()
+            val asker = thread { tip.set(runCatching { slow.tipHeight() }) }
+            Thread.sleep(300)                           // by now the slow question has its turn
+            val started = System.nanoTime()
+            val e = assertFailsWith<NodeError> { quick.known(txid(5), 500) }
+            val took = (System.nanoTime() - started) / 1_000_000
+            assertEquals(0 to NodeError.TIMEOUT, e.httpStatus to e.code, e.message)
+            assertTrue(took in 400..1300, "the question waited $took ms for its turn")
+            assertEquals(listOf("/v1/chain/tip"), synchronized(fake.seen) { fake.seen.map { it.path } }, "a question that never had its turn was sent")
+            // one that is given time enough waits for its turn and is answered
+            assertTrue(quick.known(txid(5), 4000))
+            asker.join(5000)
+            assertEquals(7, tip.get().getOrThrow())
+            assertEquals(2, synchronized(fake.seen) { fake.seen.size })
+        }
+    }
+
+    @Test
     fun anAnswerThatComesALittleAtATimeIsNotWaitedForWithoutEnd() {
         val server = ServerSocket(0, 50, InetAddress.getLoopbackAddress())
         val slow = java.util.concurrent.atomic.AtomicBoolean(true)

@@ -80,6 +80,11 @@ Dokud nepřijde blok, je platba v Přehledu uvedena jako čekající a její min
 nebo server nepotvrdí, že platbu převzal, aplikace řekne, že výsledek není znám. Neplaťte pak znovu: za minutu obnovte
 přehled a aplikace ukáže, zda platba čeká na blok, nebo neproběhla.
 
+Platba, která čeká na blok, stále může dorazit a platba udělaná mezitím proti ní nestojí: zaplatíte-li totéž
+podruhé, dokud první čeká, mohou dorazit obě. Když platba čeká déle než hodinu, aplikace to řekne v Přehledu
+i tam, kde se potvrzuje další platba. Nejdřív zjistěte, co se s ní stalo. Server nebo veřejný uzel může platbu
+zadržet, proto se před další platbou podívejte na peněženku přes jiný server nebo vlastní uzel.
+
 Platba, která neproběhla, zůstane v Přehledu jako "Neproběhla, ještě může dorazit": uzel nebo server, kterého
 se aplikace ptá, ji nedrží, ale jiný uzel ji držet může. Stejně aplikace naloží s platbou, kterou odmítl server
 nebo veřejný uzel, protože ji viděli. Zaplatit znovu můžete hned. Aplikace postaví novou platbu na

@@ -17,6 +17,13 @@ Beside the API it takes POST /__standin/set with a JSON object:
   {"stale": true}   the index says it is not up to date, and what is read from it is answered 503
   {"busy": N}       the next N requests are answered 429 with Retry-After: 1
   {"hold": true}    a transaction handed over for broadcast is not passed on; the answer is the node's error, 502
+  {"refuse": "WHY"} the server says no and keeps what it was shown: validation answers that the node does not
+                    take the transaction (WHY), broadcast answers the node's error, the node is asked neither
+                    time, and the transaction is kept. "" turns it off
+  {"hide": true}    the coins that a kept transaction spends are left out of /v1/utxos
+The answer names every switch, and under "kept" the transactions that a server which said no was shown. The
+real server has no such switches. The last two play a server that is not honest, which the real one is not
+known to be: a wallet has to stay safe with one all the same.
 """
 import argparse
 import base64
@@ -396,6 +403,10 @@ class App:
         self.stale = False
         self.busy = 0
         self.hold = False
+        self.refuse = ""                    # a reason: every transaction is refused with it, and kept
+        self.hide = False
+        self.kept = []                      # what a server that said no was shown, as hexadecimal text
+        self.kept_coins = set()             # (txid, n) of every coin those transactions spend
         self.posts = {
             "/v1/addresses/activity": self.activity, "/v1/utxos": self.utxos, "/v1/transactions": self.transactions,
             "/v1/transactions/validate": self.validate, "/v1/transactions/broadcast": self.broadcast,
@@ -409,7 +420,10 @@ class App:
                 self.stale = bool(wanted.get("stale", self.stale))
                 self.busy = int(wanted.get("busy", self.busy))
                 self.hold = bool(wanted.get("hold", self.hold))
-                return 200, {"stale": self.stale, "busy": self.busy, "hold": self.hold}
+                self.refuse = str(wanted.get("refuse", self.refuse) or "")
+                self.hide = bool(wanted.get("hide", self.hide))
+                return 200, {"stale": self.stale, "busy": self.busy, "hold": self.hold, "refuse": self.refuse,
+                             "hide": self.hide, "kept": self.kept}
             if path.startswith(("/v1/", "/v2/")) and self.busy > 0:
                 # the real server counts every request against its limit, valid or not, and leaves /ready out
                 self.busy -= 1
@@ -489,7 +503,10 @@ class App:
     def utxos(self, body):
         scripts = self.scripts(body)
         picture = self.picture()
-        return {"utxos": picture.coins(scripts), "index": picture.status()}
+        coins = picture.coins(scripts)
+        if self.hide:
+            coins = [c for c in coins if (c["transaction_id"], c["output_index"]) not in self.kept_coins]
+        return {"utxos": coins, "index": picture.status()}
 
     def transactions(self, body):
         scripts = self.scripts(body)
@@ -514,14 +531,28 @@ class App:
             raise Answer(400, "invalid RPC data: signed transaction must be valid hexadecimal data of at most 800,000 characters")
         return text
 
+    def keep(self, text):
+        """Remembers a transaction that the server refused, and the coins it spends. (The test switch "refuse".)"""
+        if text not in self.kept:
+            self.kept.append(text)
+            for spent in self.node.call("decoderawtransaction", text)["vin"]:
+                self.kept_coins.add((spent["txid"], spent["vout"]))
+
     def validate(self, body):
-        verdict = self.node.call("testmempoolaccept", [self.signed(body)])
+        text = self.signed(body)
+        if self.refuse:
+            self.keep(text)
+            return {"allowed": False, "rejection_reason": self.refuse}
+        verdict = self.node.call("testmempoolaccept", [text])
         if not isinstance(verdict, list) or len(verdict) != 1:
             raise NodeDown("testmempoolaccept answered in an unknown form")
         return {"allowed": bool(verdict[0]["allowed"]), "rejection_reason": verdict[0].get("reject-reason")}
 
     def broadcast(self, body):
         text = self.signed(body)
+        if self.refuse:
+            self.keep(text)
+            raise NodeDown("refused by the test")
         if self.hold:
             raise NodeDown("held back by the test")
         self.node.call("getblockchaininfo")
