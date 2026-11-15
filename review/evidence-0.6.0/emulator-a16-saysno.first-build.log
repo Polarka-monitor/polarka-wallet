@@ -1,0 +1,12 @@
+Android 16, polarka-wallet-0.6.0.apk, a wallet server that says no
+Traceback (most recent call last):
+  File "t07_server_says_no.py", line 148, in <module>
+    flows.import_setup(p, bench("setup", "server"))
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "flows.py", line 304, in import_setup
+    scroll_to(p, "Choose the setup file")
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "flows.py", line 69, in scroll_to
+    raise RuntimeError("%r is not on the screen; there is: %s" % (text, p.texts()[:30]))
+RuntimeError: 'Choose the setup file' is not on the screen; there is: ['Test build 0.6.0', 'This wallet has been checked three times, but not yet by an independent human expert. Use it with small amounts only.', 'Connect through a public server', 'The quickest start, without a node of your own. The wallet asks a server for TrueNorth wallets what your addresses hold and hands it your signed payments. The server filled in below is run by the Northbound project, not by the authors of this app.', 'The server sees all the addresses of your wallet together, every address you watch or empty through this app, and the internet address of this phone. It could show a balance that is not true, keep an incoming payment from you, hold a payment back, or call a payment done that is not. It cannot take your coins: the recovery words and the keys never leave this phone. For more privacy use a node of your own.', 'https://api.northboundwallet.org', 'Server address', 'Continue', 'Connect to a node of your own', 'With a TrueNorth node of your own nobody else learns your addresses. The app needs a small setup file for it: where the node is, how to log in, and which addresses to watch, if any.', 'Make the file on the computer that runs the node and send it to this phone. The password in it is never shown on the screen.', 'Polarka']
+exit 1

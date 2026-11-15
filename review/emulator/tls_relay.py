@@ -3,7 +3,9 @@
 
   tls_relay.py LISTEN_PORT TARGET_PORT CERT KEY
 
-Listens on 127.0.0.1 only (an emulator reaches it as 10.0.2.2) and passes bytes both ways unchanged.
+Listens on 127.0.0.1 only (an emulator reaches it as 10.0.2.2) and passes bytes both ways unchanged. It writes
+one line "connection LISTEN_PORT" for every connection it takes: how often a client opens a new one is how well
+that client keeps its connections.
 """
 import socket
 import ssl
@@ -32,7 +34,7 @@ def pump(src, dst):
                 pass
 
 
-def serve(client, context, target_port):
+def serve(client, context, target_port, listen_port):
     try:
         tls = context.wrap_socket(client, server_side=True)
     except (OSError, ssl.SSLError) as e:
@@ -46,6 +48,7 @@ def serve(client, context, target_port):
         print("target unreachable: %s" % e, flush=True)
         tls.close()
         return
+    print("connection %d" % listen_port, flush=True)
     threading.Thread(target=pump, args=(tls, upstream), daemon=True).start()
     pump(upstream, tls)
 
@@ -62,7 +65,7 @@ def main():
     print("relay 127.0.0.1:%d -> 127.0.0.1:%d" % (listen_port, target_port), flush=True)
     while True:
         client, _ = server.accept()
-        threading.Thread(target=serve, args=(client, context, target_port), daemon=True).start()
+        threading.Thread(target=serve, args=(client, context, target_port, listen_port), daemon=True).start()
 
 
 if __name__ == "__main__":

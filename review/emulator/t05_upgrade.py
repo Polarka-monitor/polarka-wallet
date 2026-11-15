@@ -10,6 +10,9 @@ package stored, and it must find the paper that was written with the old package
 whole paper, since 0.5.1). The screens of 0.4.1 differ from the later ones, so with an old package of 0.4 the
 first part uses the steps as they were then (flows_0_4.py).
 
+Since 0.6 the wallet is then taken from its node to a wallet server: the setup is removed, a setup that names
+the bench's server is saved, and the same wallet must show the same coins and its history there.
+
 The emulator must be running with a screen lock and a fingerprint and must trust the test authority, as for
 t02_wallet.py.
 """
@@ -48,7 +51,7 @@ def fresh_look(steps, seconds=4):
     steps.tab(p, "Overview")
     steps.top(p)
     steps.refresh(p, seconds)
-    p.wait("Asking the node", 30, gone=True)
+    flows.asking_gone(p)
 
 
 def version():
@@ -65,7 +68,7 @@ expect("Success" in out, "the old package was not installed: %s" % out[-200:])
 was = version()
 old = flows_0_4 if was.startswith("0.4") else flows
 p.start(PKG + "/.MainActivity")
-p.wait("Connect to a public node", 30)
+flows.first_screen(p)
 old.import_setup(p, bench("setup", "own", st["bench_address"]))
 p.tap("Save and connect")
 p.wait("Total", 40, exact=True)
@@ -91,6 +94,11 @@ flows.unlock_if_locked(p)
 p.wait("Total", 40, exact=True)
 expect(p.has("Sent, waiting for a block") and p.has(txid), "after the new package was installed the waiting payment is forgotten")
 expect(amount("In payments waiting for a block") == "25.00000000", "the coin of the waiting payment is not set aside: " + amount("In payments waiting for a block"))
+newer = tuple(int(x) for x in now.split(".")[:2]) >= (0, 6)
+if newer:
+    # a setup saved by an older version names a node, and the new version must go on calling it one
+    flows.seek(p, "The node answers, block %s" % bench("call", "getblockcount"))
+    expect(not p.has("The server answers"), "after the new package was installed the node of the old setup is called a server")
 step("version %s installed over it: the same wallet opens after the fingerprint and still knows the waiting payment" % now)
 
 bench("mine", 1)
@@ -108,4 +116,21 @@ step("the new package signs with the words the old one stored: a payment of 3 NO
 flows.check_paper(p, words)
 flows.answer(p, "They match")
 step("the paper written with version %s is found right by version %s" % (was, now))
+if newer:
+    flows.remove_setup(p, wallet=True)
+    flows.import_setup(p, bench("setup", "server"))
+    expect(p.has("Server", exact=True) and p.has("regtest", exact=True), "the setup file is not shown as a wallet server on the test network")
+    p.tap("Save and connect")
+    p.wait("Total", 40, exact=True)
+    fresh_look(flows, 6)
+    expect(amount("Can be spent") == "16.99999348", "over the wallet server the wallet shows " + amount("Can be spent"))
+    flows.seek(p, "The server answers, block %s" % bench("call", "getblockcount"))
+    flows.tab(p, "History")
+    expect(p.has("paid") and p.has("received"), "over the wallet server the history lacks the payments or the receipt")
+    third = flows.send(p, st["bench_address"], "2")
+    expect(third in bench("call", "getrawmempool"), "the node behind the server does not hold the payment")
+    bench("mine", 1)
+    fresh_look(flows)
+    expect(amount("Can be spent") == "14.99999022", "after the payment through the server: " + amount("Can be spent"))
+    step("the setup removed and a wallet server saved in its place: the same wallet shows the same 16.99999348 NORTH and its history there, and a payment of 2 NORTH through the server went into a block")
 print("UPGRADE: ALL %d STEPS PASSED (%s -> %s)" % (len(done), was, now), flush=True)

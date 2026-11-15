@@ -1,0 +1,13 @@
+Android 16, polarka-wallet-0.6-before-fixes-893f6b7-debug.apk, a wallet server that says no
+ok     1  a wallet with one coin of 10 NORTH, at a wallet server that can say no and keep what it was shown
+Traceback (most recent call last):
+  File "t07_server_says_no.py", line 159, in <module>
+    lost = refused_payment("5", already)
+  File "t07_server_says_no.py", line 119, in refused_payment
+    p.wait("The server says that the node behind it does not take the transaction (%s)" % WHY, 90)
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "emu.py", line 106, in wait
+    raise RuntimeError("%r did not %s within %d s; on screen: %s" % (
+        text, "go away" if gone else "appear", seconds, self.texts()[:40]))
+RuntimeError: 'The server says that the node behind it does not take the transaction (min relay fee not met)' did not appear within 90 s; on screen: ['Confirm the payment', 'Recipient address', 'rnorth1zupuwhycvtmfxvzvgdkvwu504mu382hndgejxt0setsg5lm9m60wsmg8jzm', 'Amount (NORTH)', '5.00000000', 'Fee', '0.00000326', 'Returns to you', '4.99999674', 'Coins used', '1', 'Size', '163 vB', 'Compare the address with its source character by character. A payment that has been sent cannot be taken back.', 'The node behind the server refused the transaction (min relay fee not met). Nothing was sent.', 'Sign with my fingerprint and send', 'Cancel', 'Polarka', 'Refresh', 'Lock', 'Overview', 'Receive', 'Send', 'History', 'More']
+exit 1

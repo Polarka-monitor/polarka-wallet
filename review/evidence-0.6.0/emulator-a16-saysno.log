@@ -1,0 +1,9 @@
+Android 16, polarka-wallet-0.6.0.apk, a wallet server that says no
+ok     1  a wallet with one coin of 10 NORTH, at a wallet server that can say no and keep what it was shown
+ok     2  the server said no to a payment of 5 NORTH and kept it: the app does not forget the payment, it keeps it on the overview as one that did not go through
+ok     3  the next payment of 5 NORTH spends the coin of the kept one, not the larger coin that has arrived, and the screen says why
+ok     4  the kept transaction, handed to the node as the server could, is refused beside the new payment and after its block; one payment arrived
+ok     5  the server said no to a payment of 3 NORTH, kept it and hides its coin: the entry stays, the app says that the server lists none of its coins, and no payment is worked out
+ok     6  when the server lists the coin again, the next payment is built on it, and the kept transaction can no longer arrive: 52.99999348 NORTH are left
+A SERVER THAT SAYS NO: ALL 6 STEPS PASSED on Android 16
+exit 0

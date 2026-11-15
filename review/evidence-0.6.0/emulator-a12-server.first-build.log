@@ -1,0 +1,14 @@
+Android 12, polarka-wallet-0.6.0.apk, connection: server
+ok     1  installed and started; the first screen offers the wallet server of the Northbound project, says whose it is and what it sees, and below it a node of one's own
+ok     2  self-test passed: this Android derives and signs like the published vectors
+ok     3  another server address typed over the one filled in, checked before saving and saved: the server answers over TLS
+ok     4  a wallet of 12 words made with it: the server works for another network than the wallet, and the app says so in words; wallet and setup removed again
+Traceback (most recent call last):
+  File "t02_wallet.py", line 121, in <module>
+    p.wait("Total", 40, exact=True)
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "emu.py", line 106, in wait
+    raise RuntimeError("%r did not %s within %d s; on screen: %s" % (
+        text, "go away" if gone else "appear", seconds, self.texts()[:40]))
+RuntimeError: 'Total' did not appear within 40 s; on screen: ['No wallet in this phone yet', 'A wallet here can receive and send coins. Its keys are made in this phone and protected by your fingerprint. Keep only amounts you can afford to lose in a phone; larger savings belong on paper.', 'Number of words', '24 words', '12 words', '24 words carry 256 bits of randomness, 12 words 128 bits. Twelve words are easier to write down, and the Northbound wallet for computers opens them too. The number of words of a finished wallet cannot be changed.', 'Make a new wallet', 'To bring back a wallet from its recovery words, go to More.', 'Bring back a wallet', 'Type the 12 or 24 recovery words of an existing wallet, separated by spaces. They will be stored in this phone, protected by your fingerprint. The coins of the wallet are found from the chain.', 'Recovery words', 'Store the wallet', 'Polarka', 'Refresh', 'Overview', 'Receive', 'Send', 'History', 'More']
+exit 1

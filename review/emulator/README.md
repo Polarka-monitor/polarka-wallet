@@ -13,16 +13,19 @@ repeated. Nothing here touches a real network, a real coin or a real key.
 | `make_ca.sh`, `trust_ca.sh` | a throwaway certificate authority, and how a running emulator is made to trust it until its next restart |
 | `tls_relay.py` | TLS in front of a local service |
 | `tls_gate.py` | the same in front of the node, but it can keep a transaction to itself: what a payment looks like whose outcome nobody knows |
-| `bench.py` | the test network: a regtest TrueNorth Core, the public gateway (`gateway.py` of polarka-node), TLS in front of both |
+| `bench.py` | the test network: a regtest TrueNorth Core, the public gateway (`gateway.py` of polarka-node), a stand-in for a Northbound wallet server (`../standin`), and TLS in front of all three |
 | `emu.py` | reads the screen as text and touches it, through adb |
 | `flows.py` | what a user does in the wallet, as steps (the screens since 0.5.0) |
 | `flows_0_4.py` | the same steps on the screens of 0.4.1; `t05_upgrade.py` needs them for the older package |
 | `t01_selftest.py` | starts the app and runs its self-test |
-| `t02_wallet.py` | the whole way: setup, new wallet, the whole paper checked against it, receive, send, the app closed while a payment waits, a paper address emptied, wallet removed and brought back after a slip in a word was named |
+| `t02_wallet.py` | with a node of one's own, a public node or a wallet server (`own`, `public`, `server`), the whole way: setup, new wallet, the whole paper checked against it, receive, send, the app closed while a payment waits, a paper address emptied, wallet removed and brought back after a slip in a word was named |
 | `t03_lock.py` | the lock after a minute away, also when Android rebuilds the screen meanwhile; the lock in the top bar; optionally what the app says after the screen lock of the phone is removed |
 | `t04_not_gone_through.py` | a payment that is kept from the node: "outcome not known" and no other payment meanwhile, then "did not go through", the next payment built on its coin, and the kept transaction refused by the node afterwards |
 | `t05_upgrade.py` | the package installed over the one before it (0.5.0, or 0.4.1 with `flows_0_4.py`): the same wallet opens, still knows a waiting payment, signs with the words the older package stored, and finds the paper written with the older package right |
-| `matrix.sh` | the five runs for one emulator, one after the other |
+| `t06_real_server.py` | the first screen as it is, with the public Northbound server that it offers: the app connects and shows the height of the real chain. No wallet is made, so the server is told no address; it is asked for its tip and nothing else |
+| `t07_server_says_no.py` | a wallet server that is not honest: it says no to a payment and keeps it, and later hides its coin. The payment is not forgotten, the next one is built on its coin, the node has no room for the kept transaction, and while the coin is hidden nothing is paid |
+| `probe_server.py`, `probe_says_no.py` | the bench's wallet server asked from the computer, without a phone: the first through TLS as the app asks it, the second the two switches that `t07_server_says_no.py` uses |
+| `matrix.sh` | the seven runs for one emulator, one after the other |
 
 ## Why it is built this way
 
@@ -33,7 +36,8 @@ repeated. Nothing here touches a real network, a real coin or a real key.
   under test is then the very file that would be handed out. It needs an emulator image without Google Play
   (those allow `adb root`).
 - The emulator reaches the host as 10.0.2.2. The bench listens there: 18651 goes straight to the node (a node
-  of one's own, user `phone`, limited like a real phone account), 18652 goes through the gateway (a public node).
+  of one's own, user `phone`, limited like a real phone account), 18652 goes through the gateway (a public node),
+  18654 is the stand-in for a wallet server.
   `BENCH=2` and `BENCH=3` start further benches on other ports, so that three emulators can run side by side.
   `t04_not_gone_through.py` puts its gate on a third port of the same bench (18653, 18673, 18683).
 - Android installs a package over another one only when both are signed with the same key. `t05_upgrade.py`
@@ -51,12 +55,65 @@ repeated. Nothing here touches a real network, a real coin or a real key.
     python3 t03_lock.py emulator-5560
     python3 t04_not_gone_through.py emulator-5560 /path/to/polarka-wallet.apk
     python3 t05_upgrade.py emulator-5560 /path/to/the-package-before.apk /path/to/polarka-wallet.apk
+    python3 t02_wallet.py emulator-5560 /path/to/polarka-wallet.apk server
+    python3 t07_server_says_no.py emulator-5560 /path/to/polarka-wallet.apk
+    python3 t06_real_server.py emulator-5560 /path/to/polarka-wallet.apk       # asks the public server for its tip
 
 `bench.py` needs `TN_BIN` (the folder with the official `truenorthd` and `truenorth-cli`) and finds the gateway
 through `POLARKA_GATEWAY`. The other paths inside the scripts assume the folder layout of the machine they were
 written on (`~/north-build`); change `emu-env.sh`, `emu-start.sh`, `make_ca.sh`, `trust_ca.sh`, `matrix.sh` and
 the first lines of `emu.py` for another one. An emulator that was restarted shows its lock screen and has
 forgotten the test authority: unlock it and run `trust_ca.sh` again.
+
+## What was run for 0.6.0
+
+On 15 November 2026 the signed package of 0.6.0 (SHA-256 `7c0968934f4b08748d30cd1c93f76aade95155e84a7be38a996ebe97925f56c4`,
+built from commit 94b8725) went through seven runs on Android 12, 14 and 16: `t02_wallet.py` with a node of
+one's own, through the gateway (0.1.2) and with a wallet server, `t03_lock.py`, `t04_not_gone_through.py`,
+`t05_upgrade.py` over the signed package of 0.5.1, and `t07_server_says_no.py`. Every run ended with its line
+of success: `ALL 12 STEPS PASSED` with a node of one's own and through the gateway, `LOCK STEPS PASSED: 4`,
+`NOT GONE THROUGH: ALL 6 STEPS PASSED`, `UPGRADE: ALL 5 STEPS PASSED (0.5.1 -> 0.6.0)`, `ALL 18 STEPS PASSED`
+with a wallet server, and `A SERVER THAT SAYS NO: ALL 6 STEPS PASSED`. None of the twenty-one had to be
+repeated. The logs are in `../evidence-0.6.0`.
+
+The wallet server of these runs is the stand-in of `../standin` on the bench's regtest node, behind TLS. The
+steps that are new with it: the first screen offers the Northbound server and says whose it is and what a
+server sees; another address is typed over the one that is filled in; a server that works for another network
+than the wallet is named as that; a setup file names a server; the wallets have twelve words; an amount that
+waits for a block is shown apart from what can be spent; a paper address is emptied through the server; a
+server that asks to slow down is waited for, and one that stays behind its node is called busy; and the
+mining page says what a server does not tell. In each of the three runs the wallet asked the server 69 times
+over 2 connections.
+
+`t05_upgrade.py` installs 0.6.0 over 0.5.1 with a wallet and a waiting payment in it. The new package signs
+with the words the old one stored and finds the paper written with it right. Then the setup is removed and a
+wallet server saved in its place: the same wallet shows the same balance and its history there, and a payment
+through the server goes into a block.
+
+`t07_server_says_no.py` is the run for what the reviewer's sixth look found. The stand-in is told to say no to
+a payment and to keep it: the app keeps the payment on the Overview, builds the next one on its coin, and the
+node then has no room for the kept transaction, neither beside the new payment nor after its block. Then the
+stand-in keeps a second payment and leaves its coin out of its list: the entry stays and no payment is worked
+out, until the coin is listed again. The same run on a build of the sources before the fixes (893f6b7, a debug
+build) stops at its second step: after the server's no the screen says "Nothing was sent", which the app
+cannot know of a server that was shown the whole transaction (`emulator-a16-saysno.before-the-fixes.log`).
+
+`t06_real_server.py` ran once on each emulator after the seven runs. The app, as installed and with the
+address it offers, connected to the public Northbound server and showed the height of the main chain (block
+24685 on all three, the height that the computer was told at the same moment). There was no wallet in the
+phone, so the server was named no address. Nothing else was asked of the real server.
+
+The package was built twice. The first one, from 529f5ba, was put through three of the runs as a rehearsal,
+and they stopped in three places. All three were in the app and none in what it does with coins: the banner
+of a test build counted the checks and the count was stale; on Android 16 the keyboard stood over the first
+screen, which begins with a field since 0.6; and after a setup was removed on the More page and another one
+saved, the app showed More and not the Overview, where the steps looked for the balance. 94b8725 put the three
+right, and the first package was never handed out (`*.first-build.log`). The steps needed one correction of
+their own: `scroll_to` closes an open keyboard before it swipes.
+
+Not run on an emulator: what is listed for 0.5.0 and 0.5.1 below; a payment that has waited for over an hour;
+a full list of payments that did not go through; a refused emptying of a paper address. These three have
+tests on the screen in the suite, against the stand-in on a real node.
 
 ## What was run for 0.5.1
 

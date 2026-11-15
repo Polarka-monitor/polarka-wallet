@@ -49,7 +49,7 @@ def fresh_look(seconds=4):
     tab(p, "Overview")
     top(p)
     refresh(p, seconds)
-    p.wait("Asking the node", 30, gone=True)
+    flows.asking_gone(p)
 
 
 def fill_payment(to, coins):
@@ -107,7 +107,7 @@ try:
     out = p.adb("install", apk, timeout=180)
     expect("Success" in out, "the package was not installed: %s" % out[-200:])
     p.start(PKG + "/.MainActivity")
-    p.wait("Connect to a public node", 30)
+    flows.first_screen(p)
     flows.import_setup(p, path)
     p.tap("Save and connect")
     p.wait("Total", 40, exact=True)

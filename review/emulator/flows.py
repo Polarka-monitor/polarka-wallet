@@ -61,6 +61,7 @@ def tab(p, name):
 
 
 def scroll_to(p, text, tries=8, exact=False):
+    hide_keyboard(p)            # a swipe that begins on an open keyboard moves nothing
     for _ in range(tries):
         found = p.find(text, exact, nodes=visible(p.nodes()))
         if found:
@@ -123,12 +124,21 @@ def fingerprint(p, wait=10):
     time.sleep(1.5)
 
 
-def make_wallet(p):
-    """Makes a new wallet from the overview or from More. Returns its recovery words."""
+def make_wallet(p, count=24):
+    """Makes a new wallet from the overview. Returns its recovery words. Since 0.6 the owner chooses 24 words
+    (what is set) or 12; before that there was no choice."""
+    if count != 24:
+        chip = seek(p, "%d words" % count, exact=True)
+        p.tap_xy(*chip.center)
+        time.sleep(0.5)
     scroll_to(p, "Make a new wallet")
     p.tap("Make a new wallet")
     p.wait("Your recovery words", 15)
     words = read_words(p)
+    if len(words) != count:
+        raise RuntimeError("%d words were asked for and %d are shown" % (count, len(words)))
+    if not p.has("Write these %d words on paper" % count):
+        raise RuntimeError("the screen does not say how many words there are to write: %s" % p.texts()[:12])
     tick(p, "I have written all")
     p.tap("Continue", exact=True)
     p.wait("Check your paper", 10)
@@ -334,10 +344,81 @@ def send(p, to, amount, everything=False):
     scroll_to(p, "Sign with my fingerprint and send")
     p.tap("Sign with my fingerprint and send")
     fingerprint(p)
-    p.wait("The node accepted the transaction", 40)
+    wait_any(p, ("The node accepted the transaction", "The server took the transaction"), 60)
     txid = [t for t in p.texts() if re.match(r"^[0-9a-f]{64}$", t)][0]
     p.tap("OK", exact=True)
     return txid
+
+
+def wait_any(p, texts, seconds=20):
+    """Waits until one of some texts is on the screen and returns that one."""
+    end = time.time() + seconds
+    while True:
+        shown = p.texts()
+        for text in texts:
+            if any(text.lower() in t.lower() for t in shown):
+                return text
+        if time.time() > end:
+            raise RuntimeError("none of %s appeared within %d s; on screen: %s" % (list(texts), seconds, shown[:40]))
+        time.sleep(0.6)
+
+
+FIRST_SCREENS = ("Connect through a public server", "Connect to a public node", "Connect to a node of your own")
+
+
+def first_screen(p, seconds=30):
+    """Waits for the screen of an app that has no setup yet, whatever the version: 0.6 opens with a wallet
+    server, 0.5 with a public node, and every version offers a node of one's own."""
+    return wait_any(p, FIRST_SCREENS, seconds)
+
+
+def asking_gone(p, seconds=30):
+    """Waits until the app has its answer, from a node or from a wallet server."""
+    end = time.time() + seconds
+    while any(t.startswith("Asking the ") for t in p.texts()):
+        if time.time() > end:
+            raise RuntimeError("the app is still asking after %d s; on screen: %s" % (seconds, p.texts()[:20]))
+        time.sleep(0.6)
+
+
+def connect_to_server(p, url, filled="api.northboundwallet.org"):
+    """On the first screen (since 0.6): writes another server address over the one that is filled in, and goes
+    on to the check before saving."""
+    top(p)
+    field = seek(p, filled)
+    p.tap_xy(*field.center)
+    time.sleep(0.6)
+    p.sh("input keycombination 113 29")         # Control and A: everything in the field
+    p.sh("input keyevent 67")
+    time.sleep(0.6)
+    if p.has(filled):
+        # this Android did not take the two keys together: to the end of the field, and back letter by letter
+        p.sh("input keycombination 113 123")
+        p.sh("input keyevent " + " ".join(["67"] * 60))
+        time.sleep(0.6)
+    if p.has(filled):
+        raise RuntimeError("the address that was filled in could not be cleared; on screen: %s" % p.texts()[:20])
+    p.type(url)
+    if not p.find(url, exact=True):
+        raise RuntimeError("the field does not hold %s; on screen: %s" % (url, p.texts()[:20]))
+    hide_keyboard(p)
+    button = seek(p, "Continue", exact=True)
+    p.tap_xy(*button.center)
+    wait_any(p, ("Check before saving",), 20)
+
+
+def remove_setup(p, wallet):
+    """More, "Remove the setup": the app forgets the node or the server. With a wallet in the phone its owner is
+    asked for first. Afterwards the first screen is there again; the wallet, if there is one, stays."""
+    tab(p, "More")
+    top(p)
+    button = seek(p, "Remove the setup", exact=True)
+    p.tap_xy(*button.center)
+    p.wait("Remove the setup?", 10)
+    p.tap("Remove", exact=True)
+    if wallet:
+        fingerprint(p)
+    first_screen(p, 20)
 
 
 def type_words(p, words):

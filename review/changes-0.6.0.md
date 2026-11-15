@@ -91,3 +91,31 @@ The limit of a hundred addresses to a request and four smaller things (a refusal
 a node that is away; the status of a transaction does not tell a block from waiting; nothing says which
 network a server works for; a line of the history does not say that it was a block reward) were reported to
 the author of Northbound as issues 7 and 8 of his repository.
+
+## How it was checked
+
+- The independent reviewer looked at 0.6.0 three times (`independent-review-0.6.0`): at the version as it
+  was first written, where it found the two high findings; at the fixes; and at what its second look had left
+  open. After the third look nothing of high or medium severity was open. The last changes, two notes from
+  that look and three things the emulators showed, were made after it and the reviewer has not seen them.
+- The tests: 187, none failed, none skipped. Lint: 0 errors, 6 warnings, 2 hints. Both on the sources of the
+  package (commit 94b8725). The tests about a server run against a stand-in for a Northbound server on a real
+  regtest node.
+- Deliberate faults, one at a time, each to be caught by a test: 18 in the client for a server, 41 in the
+  look through a server, 21 in paying through one, 1 for the connection, 21 in the setup, the common face,
+  the model and the notifier, 21 in the screens and the number of words, 24 in what the sixth look changed,
+  22 in what its second look changed, 2 for its third and 1 for the pages that begin again. Each was caught.
+  Where one was not caught at first, a test was made to look further before the count was taken. The earlier
+  groups ran on the code as it was then, and some of their faults aim at lines that later fixes changed.
+- The signed package (SHA-256 `7c0968934f4b08748d30cd1c93f76aade95155e84a7be38a996ebe97925f56c4`, version
+  code 11) went through `static-checks.sh`; the output is in `evidence-0.6.0`. Permissions, components and
+  libraries are those of 0.5.1. The code holds one address of a server, the one the first screen offers.
+- The same package ran on emulators with Android 12, 14 and 16, seven runs on each, and all passed at the
+  first try. Among the steps are a wallet server from the first screen to a payment in a block, the upgrade
+  from 0.5.1 with the wallet moved from its node to a server, and a server that says no to a payment and keeps
+  it. `emulator/README.md` says what was run, and why the package was built twice.
+- The stand-in was compared with the public Northbound server by reading (`standin/README.md`). From the
+  emulators the public server was asked for the height of the chain and nothing else.
+- Not checked: a real phone, and a payment through the real server. The race between the clock and the
+  reader of an answer in `ServerClient.once` has no test of its own. Android's own classes for a connection
+  were not looked at when a connection is closed from another thread.

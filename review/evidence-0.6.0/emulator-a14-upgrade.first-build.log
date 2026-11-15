@@ -1,0 +1,14 @@
+Android 14, polarka-wallet-0.5.1.apk, then polarka-wallet-0.6.0.apk over it
+ok     1  version 0.5.1: a wallet with 25 NORTH and a payment of 5 NORTH that waits for a block
+ok     2  version 0.6.0 installed over it: the same wallet opens after the fingerprint and still knows the waiting payment
+ok     3  the new package signs with the words the old one stored: a payment of 3 NORTH went through, 16.99999348 NORTH are left
+ok     4  the paper written with version 0.5.1 is found right by version 0.6.0
+Traceback (most recent call last):
+  File "t05_upgrade.py", line 124, in <module>
+    p.wait("Total", 40, exact=True)
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "emu.py", line 106, in wait
+    raise RuntimeError("%r did not %s within %d s; on screen: %s" % (
+        text, "go away" if gone else "appear", seconds, self.texts()[:40]))
+RuntimeError: 'Total' did not appear within 40 s; on screen: ['Wallet in this phone', 'Public descriptor of the receiving addresses. It shows the whole wallet and cannot spend; a TrueNorth Core node can watch the wallet with it.', 'qrh(tpuadsaFXyjTJh3ZqtKngcZgaFA2DqM1WTBe5jP78okf2844muiy7UoN2e95mFrhWxDtcXWS61XJt7BbP7AEyvyWymcN94synUtDkQN1vgfT6Xn/0/*)#jwapput8', 'Copy', 'Ask for the fingerprint when the app opens', 'At the moment the app looks at the first 40 addresses of this wallet. If coins that you know of are missing, for example after the wallet was brought back from its words, let it look at twice as many. The server is then told twice as many addresses.', 'Look at twice as many', 'If the address numbers of this wallet have run ahead (a server that did not show the truth can cause that), they can be worked out again from what the current server shows.', 'Work out the address numbers again', 'Remove the wallet from this phone', 'Check the whole paper', 'Type the words from your paper. The app says whether they are the words of the wallet in this phone. Nothing is stored and nothing is changed.', 'Polarka', 'Refresh', 'Lock', 'Overview', 'Receive', 'Send', 'History', 'More']
+exit 1
