@@ -17,8 +17,10 @@ other shapes, and 0.6.0 can no longer show a wallet that has any history through
 answers (`review/changes-0.6.1.md`). The seventh look was at these changes, before anything of 0.6.1 was
 handed out. It gave no safety reason to hold the release back. It found that a look failed outright when the
 server's picture of the chain kept changing while a list was read, and that nothing bounded the pages of one
-list. Both were put right before the package was built. What is left is said under Limits: a long history
-through a busy server.
+list. The pages are bounded now. The first was eased and not cured: the look is made again, and the app says
+why it failed, but the whole history is still read on every look, so a long history through a busy server
+can still get no look (see Limits). The reviewer looked at these changes as well; what it still noted was
+dealt with too (`review/independent-review-0.6.1`).
 It is an independent community project and not a product of the TrueNorth developers.
 
 ## Getting the package
@@ -164,9 +166,10 @@ While such a payment has no coin among those the server lists, the wallet makes 
 - Through a wallet server every look reads the whole history again, and all of a look has to come from one
   picture of the chain. With the Northbound server that picture changes with every block and with every
   transaction that begins to wait anywhere on the network. When it changes during a look the app looks
-  again, three times at the most. On a network much busier than today's a wallet with a long history, one
-  that is mined to for example, may get no look that way; the app then says that the picture kept changing
-  and shows nothing new until a quieter moment. Coins are not touched by that.
+  again, three times at the most. On 15 November 2026 that was enough in every look that was tried, from a
+  computer and from an emulator; it was not measured on a phone. On a much busier network a wallet with a
+  long history, one that is mined to for example, may get no look that way; the app then says that the
+  picture kept changing and shows nothing new until a quieter moment. Coins are not touched by that.
 - With a wallet server the wallet depends on that one server: while it is out of service nothing is shown
   and nothing can be sent. The coins are not touched by that, and the wallet can be connected elsewhere.
 - The price of a coin is typed in by hand; nothing is looked up.
@@ -222,7 +225,7 @@ a real network.
     TN_BIN=/path/to/bin gradle :core:test :node:test :app:testDebugUnitTest :app:lintDebug
     sh review/tests-summary.sh
 
-202 tests. A test that cannot run (no node programs, or no `gateway.py` of polarka-node next to this
+203 tests. A test that cannot run (no node programs, or no `gateway.py` of polarka-node next to this
 repository or named by `POLARKA_GATEWAY`) is reported as skipped; for a release none may be skipped. `polarka-node` is not published, so with this
 repository alone the tests that need it (in `PublicNodeTest` and `RetestModelTest`) are skipped. Every library is pinned by its SHA-256 in `gradle/verification-metadata.xml`:
 the build stops if one differs from the day it was first downloaded. The pins were made by Gradle on that day

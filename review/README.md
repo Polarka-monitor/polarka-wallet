@@ -20,7 +20,7 @@ about a wallet server also need python3 (3.9 or later), for the stand-in.
 
 | Check | Command | Passes when |
 |---|---|---|
-| All tests (202) | `gradle :core:test :node:test :app:testDebugUnitTest`, then `sh review/tests-summary.sh` | exit 0; 202 tests, 0 failures, 0 skipped |
+| All tests (203) | `gradle :core:test :node:test :app:testDebugUnitTest`, then `sh review/tests-summary.sh` | exit 0; 203 tests, 0 failures, 0 skipped |
 | The findings of the independent review, of its retest and of its later looks stay fixed | the `Audit*Test` classes in the three modules, `RetestModelTest`, `AfterRetestTest`, `AfterRetestScreenTest`, `Retest2ModelTest`, `Retest3ModelTest`, `ThirdLookTest`, `Retest4Test`, `Retest4CoreTest`, `SixthLookTest`, `SixthLookScreenTest`, `AfterSixthLookPlainTest`, `AfterSeventhLookTextsTest` | all pass |
 | A wallet server, or a public node, cannot make the wallet pay the same thing twice, take a coin for the wallet's that is not, or hold a look or a payment without end | app tests `SixthLookTest`, `ServerPayTest`, `ServerEngineTest`, `ServerModelTest`, `StandInTest`; node test `ServerClientTest` | all pass |
 | A payment that did not go through cannot arrive beside the next one | `NotGoneThroughTest`, `NotGoneThroughPlainTest`, `NotGoneThroughScreenTest`, core test `PlannerMustTest`, node test `SpendersTest` | all pass |

@@ -76,7 +76,8 @@ data class ServerVerdict(val allowed: Boolean, val reason: String?)
  *
  * A list that comes in pages, coins or history, is many questions. The reading as a whole has a time limit of
  * its own, [readMs] with every new start in it, and the number of its pages is bounded: a server cannot keep
- * a look going by handing out a little at a time.
+ * a look going by handing out a little at a time. When that time runs out in a reading that a change had
+ * already cut, the list is refused with [MOVED] too: the picture that kept moving is why nothing came of it.
  */
 class ServerClient(
     url: String, private val timeoutMs: Int = 30_000, private val maxWaitMs: Long = MAX_WAIT_MS,
@@ -193,6 +194,14 @@ class ServerClient(
 
     /** What one question of a reading may take: its own time, and no more than is left of the reading's. Nothing left fails as not answered in time. */
     private fun left(until: Long): Long = minOf(deadlineMs, until - now())
+
+    /**
+     * True when a question of a reading was not answered in time because the reading's own time was running out,
+     * in a reading that a change of the picture had already made start again. The picture that kept moving is then
+     * why nothing came of the reading, and the one who asked is told that, not that the server was late.
+     */
+    private fun cutShort(e: NodeError, restarts: Int, within: Long): Boolean =
+        restarts > 0 && e.httpStatus == 0 && e.code == NodeError.TIMEOUT && within < deadlineMs
 
     /**
      * One question at a time to one server: the requests of all its users share one budget. [withinMs] is the
@@ -387,9 +396,11 @@ class ServerClient(
                 while (true) {
                     // The real server gives a thousand coins to a page. One that hands them out a few at a time is not followed without end.
                     if (++pages > MAX_COIN_PAGES + asked.size) throw NodeError(200, null, "the server lists its coins in more pages than the app reads")
+                    val within = left(until)
                     val answer = try {
-                        call("/v1/utxos", naming(part, if (cursor == null) emptyMap() else mapOf("cursor" to JsonPrimitive(cursor))), left(until))
+                        call("/v1/utxos", naming(part, if (cursor == null) emptyMap() else mapOf("cursor" to JsonPrimitive(cursor))), within)
                     } catch (e: NodeError) {
+                        if (cutShort(e, restarts, within)) throw NodeError(409, MOVED, "the server's coins kept changing until the time to read them was over")
                         if (e.httpStatus != 409) throw e
                         changed = true
                         break@reading
@@ -485,9 +496,11 @@ class ServerClient(
                 val more = HashMap<String, JsonPrimitive>()
                 more["limit"] = JsonPrimitive(PAGE)
                 if (cursor != null) more["cursor"] = JsonPrimitive(cursor)
+                val within = left(until)
                 val answer = try {
-                    call("/v1/transactions", naming(asked[0], more), left(until))
+                    call("/v1/transactions", naming(asked[0], more), within)
                 } catch (e: NodeError) {
+                    if (cutShort(e, restarts, within)) throw NodeError(409, MOVED, "the server's history kept changing until the time to read it was over")
                     if (e.httpStatus != 409) throw e
                     changed = true
                     break

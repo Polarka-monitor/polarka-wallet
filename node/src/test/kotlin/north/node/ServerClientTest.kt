@@ -688,12 +688,22 @@ class ServerClientTest {
             assertEquals(0, error.httpStatus)
             assertEquals(NodeError.TIMEOUT, error.code)
         }
-        // New starts are in the same time: a list that is cut by a change again and again is not read three times as long.
+        // New starts are in the same time: a list that is cut by a change again and again is not read three times as
+        // long. When the time runs out in a reading that a change has cut, the picture that kept moving is named as
+        // the reason, not a server that is late (the reviewer's second look, R5).
         Fake { count, _ -> Thread.sleep(350); if (count % 2 == 1) coins(coin(count), cursor = "aa") else Reply(409, "{\"message\":\"again\"}") }.use { fake ->
             val started = System.nanoTime()
             val error = refused { ServerClient(fake.url, readMs = 1_000).utxos(listOf(address(1))) }
-            assertEquals(NodeError.TIMEOUT, error.code)
+            assertEquals(409, error.httpStatus)
+            assertEquals(ServerClient.MOVED, error.code)
+            assertTrue("until the time to read them was over" in error.message.orEmpty(), error.message)
             assertTrue((System.nanoTime() - started) / 1_000_000 < 3_000)
+        }
+        Fake { count, _ -> Thread.sleep(350); if (count % 2 == 1) page(line(count), cursor = "aa") else Reply(409, "{\"message\":\"again\"}") }.use { fake ->
+            val error = refused { ServerClient(fake.url, readMs = 1_000).history(listOf(address(1))) }
+            assertEquals(409, error.httpStatus)
+            assertEquals(ServerClient.MOVED, error.code)
+            assertTrue("until the time to read it was over" in error.message.orEmpty(), error.message)
         }
         // a reading that is quick has all the time it needs
         Fake { count, _ -> coins(coin(count), cursor = if (count < 5) "aa" else null) }.use { fake ->

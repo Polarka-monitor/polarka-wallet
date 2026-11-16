@@ -36,7 +36,8 @@ class AfterSeventhLookTextsTest {
     fun aPictureThatKeptChangingIsSaidAsThatAndNotAsABusyServerOrAnError() {
         val text = said(Problem(Problem.Kind.MOVING))
         assertTrue("kept changing while the app was reading it" in text && "Try again in a moment" in text, text)
-        assertTrue("nothing new can be shown" in text && "long history" in text, text)
+        // the same words stand on the payment screen, where the coins are read for a payment: they have to fit both (R6)
+        assertTrue("nothing new is shown, and no payment is worked out" in text && "long history" in text, text)
         assertFalse("busy" in text || "error" in text, text)
     }
 

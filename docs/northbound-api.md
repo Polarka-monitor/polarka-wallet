@@ -77,8 +77,9 @@ server and offers its three fixed rates.
 - Coins and activity can be asked for in parts of a hundred addresses and put together exactly, provided all
   parts and all pages were read from the same picture: the same block and the same `pending_revision`.
   `ServerClient` reads coins again from the start when that changes in between (three readings at most), and
-  refuses activity that was read across a change. Coins and history that a change cut in all three readings
-  are refused in the same way, as something to ask for again, and the wallet then makes its whole look again.
+  refuses activity that was read across a change. Coins and history that a change cut in all three readings,
+  or cut before the time of the reading ran out, are refused in the same way, as something to ask for again,
+  and the wallet then makes its whole look again if there is time for it.
   Half a list of coins is never taken for a balance.
 - A history can be put together from parts: the lines that several requests give for one transaction add up
   to what the transaction did to all their addresses. A wallet with more than a hundred addresses has an exact

@@ -777,4 +777,45 @@ class ServerEngineTest {
             assertEquals(ServerClient.PAGE, seen.watchedMoves.size)
         }
     }
+
+    /**
+     * The reviewer's second look at 0.6.1, N5. Lines that two parts of the watched addresses give for one transaction
+     * and that cannot both be true are not shown as a movement, and the history says that it is not whole, as it
+     * does for the wallet's own.
+     */
+    @Test
+    fun linesForWatchedAddressesThatDoNotFitTogetherSayThatTheHistoryIsNotWhole() {
+        bench().use { b ->
+            val keys = fresh()
+            val watched = (0..ServerClient.MAX_ADDRESSES).map { keys.address(0, it) }      // a hundred and one addresses: two parts
+            val payer = fresh()
+            val miner = fresh().address(0, 0)
+            b.node.mine(1, payer.address(0, 0))
+            b.node.mine(100, miner)                                             // tip 101
+            val theirs = ServerEngine(Chain.REGTEST, emptyList(), b.client)
+                .fetch(WalletInfo(Chain.REGTEST, payer.watchKey().xpub, lockOnOpen = false)).coins
+            // one transaction pays a watched address of the first part and gives its change to one of the second
+            val plan = Planner.pay(theirs, script(watched.first()), 3 * coin, 2, script(watched.last()))
+            val signed = plan.sign(payer)
+            assertEquals(signed.txid, b.client.broadcast(signed.hex))
+            b.node.mine(1, miner)                                               // tip 102
+            ServerRelay(b.server.url).use { relay ->
+                val engine = ServerEngine(Chain.REGTEST, watched, ServerClient(relay.url, maxWaitMs = 0))
+                var seen = engine.fetch(null)
+                assertTrue(seen.historyWhole)
+                assertEquals(listOf(signed.txid), seen.watchedMoves.map { it.txid })
+                assertEquals(seen.watched!!.totalSat, seen.watchedMoves.single().netSat)      // the lines of both parts, added up
+                // the second part names another fee for the same transaction than the first
+                relay.paths.clear()
+                relay.rewrite = { path, answer ->
+                    val second = path == "/v1/transactions" && synchronized(relay.paths) { relay.paths.count { it == path } } % 2 == 0
+                    if (second) answer.replace("\"network_fee\":${plan.feeSat}", "\"network_fee\":${plan.feeSat + 1}") else answer
+                }
+                seen = engine.fetch(null)
+                assertFalse(seen.historyWhole)
+                assertTrue(seen.watchedMoves.isEmpty())
+                assertEquals(2, seen.watched!!.utxos.size)                      // the coins are what they are
+            }
+        }
+    }
 }

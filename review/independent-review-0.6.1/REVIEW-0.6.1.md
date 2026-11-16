@@ -270,3 +270,176 @@ right. They are not part of the author's suite and I did not commit anything.
   the earlier shapes.
 - Performance on a phone of a look through the real server with a long history (R1 rests on the author's
   probe and on the sources).
+
+## After the changes (5d923fd)
+
+A second, short look on 16 November 2026 at commit 5d923fd (one commit on d4a89e6), brought into my clone by
+`git merge --ff-only` from the author's repository. I read the code diff (`node/src/main`, `app/src/main`),
+the eight new tests, `review/independent-review-0.6.1/README.md`, the changed parts of
+`review/changes-0.6.1.md`, the README, `review/README.md`, `docs/northbound-api.md`, both strings, and the
+four texts in `release-texts-after-look/`, and ran the whole suite again.
+
+### R1: partly closed (the fault is closed; its cause remains and is now said plainly)
+
+What changed: `ServerClient.utxos` and `.history` end with `NodeError(409, MOVED)` after three cut
+readings; `ServerEngine.asked` turns every `MOVED` (activity, coins, history) into
+`EngineError(Problem.Kind.MOVING)`; `fetch` makes the look again, three looks at most, none begun more than
+`AGAIN_MILLIS` (90 s) after the first, and throws `MOVING` when no look came to its end.
+
+Every path, as I read it:
+- `fetch` (the look, from `WalletModel` line 338): retried as described. A steady look is returned at once,
+  so the loop cannot return an unsteady look where a steady one came; an unsteady look is returned only when
+  no later look was steady, as before. Errors other than `MOVING` (TIMEOUT, BUSY, NODE, OTHER_CHAIN,
+  TOO_MANY_COINS) leave the loop at once, as before: nothing is hidden. `MOVING` is mapped by
+  `Problem.of` to its own kind and text; the model keeps the earlier snapshot and judges nothing from a
+  failed look, so `MOVING` cannot be mistaken for anything that settles or forgets a payment.
+- `incomingSince` (the fifteen-minute check): `MOVING` is thrown, `WatchJob` catches every exception, the
+  last height is not moved on, and the next run tries again. Nothing is told twice or lost.
+- `plan` and `paperLook`: a coin list that kept moving now shows `MOVING` ("nothing new can be shown") on the
+  payment screen. The words fit a look better than a payment, but nothing is sent and nothing is wrong.
+- The hand-over (`deliver`, `known`, `validate`, `broadcast`) reads no list and is unchanged.
+- Is any path left that ends as `NODE` for a moving picture? Not by 409 or by a changed picture: both now
+  end as `MOVED`. One path ends otherwise: the time limit of a reading (`READ_MS`, 120 s, restarts
+  included) runs out as `NodeError(0, TIMEOUT)`, shown as "the server did not answer in time ... may be
+  busy" (see R5 below).
+
+The test `ServerEngineTest.aListThatAMovingPictureKeptCuttingIsLookedAtAgain` tells the story I told in
+`ReviewerBusyTest` and asserts the opposite, and it also checks the 90-second gate with a clock of its own
+and `incomingSince`. My `ReviewerBusyTest` now fails at its assertion of the fault (see "Tests").
+
+Why only partly closed: the second remedy, not reading the whole history again on every look, was not
+done. On a network much busier than today's a wallet with a long history will still get no look, now
+after up to three looks instead of one, and with words that say why. The author says so in
+`changes-0.6.1.md`, the README Limits, `docs/northbound-api.md` and the release notes, and asks the
+server's author for a cursor that would help. That is a fair account of what is left.
+
+### R2: closed
+
+Coins: `++pages > MAX_COIN_PAGES + asked.size` (200 plus one page per part) is checked before each request
+and counted afresh for every reading. History: `mostPages = 2 * ceil(most / 200) + 2` (22 for 2,000 lines);
+past that the history ends as cut short (`complete = false`), which the engine already handles (note,
+unsure lines). Each request of a reading gets `left(until)`; once that is zero or below, `call` fails the
+question as not answered in time without sending it, so a reading ends within about `READ_MS` (plus at most
+one wait for its turn of zero length). Off by one: none that I found; the author's test pins both limits
+exactly (201 requests fail, 202 with two parts succeed; 22 lines of history).
+
+Can an honest server reach the bounds? No. In `indexer/src/utxos.rs` a cursor is given only when the page
+holds `limit` rows (`has_more` after `limit` rows), and the client names no limit, so the server gives
+1,000 coins a page: 20,000 coins take at most 20 pages plus one short last page per part. In
+`indexer/src/history.rs` the same holds with the client's `limit` of 200; the waiting lines are not a page
+of their own but come first in one ordering of all lines (`coalesce(block_height, i64::MAX) DESC, txid`),
+so every page but the last is full. 2,000 lines take ten pages and stop at `most` before the page bound.
+The default page size is a constant of the server (`DEFAULT_UTXO_PAGE_SIZE`), not a setting.
+
+The longest a look can take now: activity (one question per hundred addresses, 90 s each), coins (120 s),
+history (120 s per part), the same again for watched addresses, and one `known` question (90 s) for every
+open payment that the history does not show. For a wallet of one part with no watched addresses and no
+open payment that is about 5.5 minutes for a hostile or very slow server, and `fetch` may begin a second
+look up to 90 s after the first: about 7 minutes in all. That is bounded and acceptable for a server that
+is trying to stall; an honest server takes seconds. A look as a whole still has no limit of its own, as the
+author says.
+
+My `ReviewerPagesTest` now fails at both assertions of the fault (201 and 22 requests).
+
+### R3: closed
+
+`ServerEngine.look` sets `whole = false` when the watched history is cut short or a watched line could not
+be told. `historyWhole` is read in one place only, the note on the History page (`Tabs.kt` line 405);
+nothing is judged from it, so making it depend on watched addresses changes nothing but that note. One
+note for both histories does not say which is not whole; the author says so. The new test
+`aHistoryOfWatchedAddressesThatIsCutShortSaysSo` covers the cut-short case only; the case of a watched line
+that cannot be told (`lines.any { it == null }`) has no test of its own (N5 below).
+
+### R4: closed, with two sentences I would still change
+
+The busy-network sentence in `changes-0.6.1.md` now says what the code does, in more detail than I gave;
+"blocks kept arriving" is gone; the sums check is described as what it was (rewards only; nothing about
+losses, fees or parts, which rest on the sources and the stand-in); the note to the server's author names
+`indexed_height`, `indexed_hash` and `pending_revision` of `index`; the test count names the gateway; the
+bound is written "20,000" (and with a space in Czech, by locale). `docs/northbound-api.md` matches the
+server's sources at 07523b6.
+
+The account of my review in `review/independent-review-0.6.1/README.md` is fair: it gives the severities,
+says that I found the author's own account of one weakness not right, that I advised holding the release
+for the texts, that the second remedy of R1 was not done and that the note does not say which history is
+not whole. It does not make my look sound better than it was, and it says that the reviewer is an AI model
+and not a human expert. Two sentences elsewhere make the remaining risk sound smaller than it is:
+
+1. README ("Both were put right before the package was built") and release notes, "How it was checked"
+   ("That and the low ones were put right"). R1 was mitigated, not put right: the look is now made again and
+   the app says what happened, but a long history through a busy server still gets no look, which is what
+   R1 was about. Both texts say so a few lines further on (Limits; "A long history through a busy server"),
+   so the reader is not misled for long, but I would write "the medium one was mitigated: the look is now
+   made again and the app says why it failed; the cause, reading the whole history on every look, remains
+   (see below)".
+2. README Limits and release notes: "On today's network that is enough." Nothing measured it on a phone.
+   What supports it is the author's probe from a computer on 15 November (every look steady, one change in
+   about two minutes) and my estimate from those figures. I would write "On 15 November 2026 that was
+   enough in every look that was tried; it was not measured on a phone."
+
+The placeholder in the release notes "and the reviewer looked at the fixes" may stay: I did, and this
+section is that look.
+
+### New findings
+
+**R5 (note). A reading that runs out of its time is shown as a slow server, not as a moving picture.**
+Place: `ServerClient.left` and the `call`s in `utxos` and `history`; `Problem.of` (`Engine.kt`, TIMEOUT).
+`READ_MS` (120 s) holds the restarts of a reading. On a slow phone line a long history that keeps being cut
+can use up those 120 s before its third reading, and the look then ends as TIMEOUT ("The server did not
+answer in time. It may be busy.") instead of `MOVING`, and `fetch` does not make it again. Nothing is
+judged from it, and the words are not false (the reading did take too long). Shown by reading; the author's
+test `aListInPagesIsNotReadForLongerThanItsTime` asserts exactly this TIMEOUT for a list cut again and again.
+What would put it right, if wanted: when the time runs out in a reading that was cut at least once, throw
+`MOVED` rather than TIMEOUT.
+
+**R6 (note). `MOVING` on the payment screen speaks of a look.** `plan` and `paperLook` go through `asked`,
+so a coin list that kept moving while a payment is being worked out shows "nothing new can be shown". The
+payment is not made and nothing is wrong; a sentence of its own ("the coins could not be read in one piece;
+try again in a moment") would fit better. Shown by reading.
+
+**N5 (note). One branch of the R3 fix has no test.** `ServerEngine.look`, `|| lines.any { it == null }` for
+watched addresses (a watched movement that a cut-short part makes unsure, or whose lines do not fit). I
+removed that branch and ran `ServerEngineTest` and `HistoryNoteTest`: result in "Tests" below.
+
+### The eight new tests
+
+- `ServerClientTest.aListThatKeptChangingIsRefusedAsOneToAskForAgain`: tests what it says, for coins and
+  history, and that a 400 is passed on after one request.
+- `.aServerThatHandsOutALittleAtATimeIsNotFollowedWithoutEnd`: pins both bounds exactly, and that full
+  pages of history still read 2,000 lines in ten requests. Good.
+- `.aListInPagesIsNotReadForLongerThanItsTime`: real time with sleeps of 350 ms and windows of 900 to 3,000
+  ms; it passed here in 3.0 s on a loaded machine, but it is the kind of test that can become flaky.
+- `.aReadingThatMeetsABusyServerAndThenANewPictureStartsAgain`: answers N1 at the level of the client
+  (503, then 409, then a new picture), including a waiting line first on the new history page. Good.
+- `ServerEngineTest.aListThatAMovingPictureKeptCuttingIsLookedAtAgain`: the R1 story, the opposite of my
+  test, with the 90-second gate and `incomingSince`. Good.
+- `ServerEngineTest.aHistoryOfWatchedAddressesThatIsCutShortSaysSo`: the cut-short case only (N5).
+- `AfterSeventhLookTextsTest`: the `MOVING` text and the bound "20,000"; it checks the words, not the
+  path that leads to them, which the engine test covers.
+
+### Tests (second look)
+
+- The whole suite on 5d923fd with my two test files present: `logs/all2.log`, `logs/all2-summary.txt`:
+  205 tests, 3 failures, 1 skipped. The three failures are mine and fail at their assertions of the fault:
+  `ReviewerPagesTest` (coins: the bound of pages ended the reading, not the bound of coins; history: 22
+  requests, not 2,000) and `ReviewerBusyTest` (`EngineError: MOVING` where it expected `NodeError` 409).
+  The skipped one is `PublicNodeTest`, for want of `gateway.py` on this machine, as before. The author's
+  202 tests pass.
+- One deliberate fault of my own (N5): the watched branch `|| lines.any { it == null }` removed.
+  `ServerEngineTest` (15 tests) and `HistoryNoteTest` (2) all passed with it (`logs/mutant-watched.log`): the
+  fault is not caught. The source was put back; `git status` shows only my two test files, and HEAD is
+  5d923fd.
+
+### What I did not check in the second look
+
+The package of the release, the deliberate faults of the author and the emulator runs on the new code
+(not done yet, and not to be judged now, by the brief); anything on a phone; how long a look through the
+real server takes from a phone; the stand-in itself (unchanged); code outside the diff of 5d923fd. I did not
+re-run the whole of the first look's reasoning; I checked that the diff touches neither `judge`, the
+reading of amounts, nor the wallet's file, and it does not.
+
+### Would I hold the release back now?
+
+No: R1 is mitigated as far as the client alone can do it and its remaining risk is told, R2 to R4 are
+closed, and the new points are notes; I would only change the two sentences under R4 ("put right" for R1,
+and "on today's network that is enough") before the texts go out, and add a test for N5 when convenient.

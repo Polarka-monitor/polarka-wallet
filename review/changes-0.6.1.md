@@ -43,10 +43,22 @@ notes. These changes followed, before the package of the release was built:
 |---|---|---|
 | A list of coins or a history that a change of the picture cut in each of its three readings no longer ends the look with an error. The client refuses it as something to ask for again, like activity read across a change, and the look is made again: three looks at the most, and none begun later than a minute and a half after the first. When no look comes to its end, the app says that the picture of the chain kept changing while it was read and shows nothing new. Before, it said after one look that the server answered with an error. | `ServerClient.utxos`, `.history`, `.MOVED`, `ServerEngine.asked`, `.fetch`, `Problem.Kind.MOVING`, `Parts.kt`, `strings.xml` (en, cs) | `ServerClientTest.aListThatKeptChangingIsRefusedAsOneToAskForAgain`, `.aReadingThatMeetsABusyServerAndThenANewPictureStartsAgain`, `ServerEngineTest.aListThatAMovingPictureKeptCuttingIsLookedAtAgain`, `AfterSeventhLookTextsTest` |
 | A list in pages is not followed without end. Coins: at most 200 pages beside one for every part of the addresses; the real server gives a thousand coins to a page. History: at most twice the pages that the lines read for one part take when the pages are full, and two more (22 for 2,000 lines); a server that hands out less to a page gets its history cut short, and the history says that it is not whole. The reading of one list also has a time limit as a whole, two minutes with its new starts in it. Before, a server that gave one coin to a page was asked 20,001 times for one list. | `ServerClient.utxos`, `.history`, `.MAX_COIN_PAGES`, `.READ_MS` | `ServerClientTest.aServerThatHandsOutALittleAtATimeIsNotFollowedWithoutEnd`, `.aListInPagesIsNotReadForLongerThanItsTime` |
-| The history of watched addresses says when it is not whole, as the wallet's own does: when it is longer than the app reads, when a part of the addresses was cut short and may hold a line for a movement, and when the lines for one movement do not fit together. The note on the History page is the same one for both. | `ServerEngine.look`, `Snapshot.historyWhole` | `ServerEngineTest.aHistoryOfWatchedAddressesThatIsCutShortSaysSo` |
+| The history of watched addresses says when it is not whole, as the wallet's own does: when it is longer than the app reads, when a part of the addresses was cut short and may hold a line for a movement, and when the lines for one movement do not fit together. The note on the History page is the same one for both. | `ServerEngine.look`, `Snapshot.historyWhole` | `ServerEngineTest.aHistoryOfWatchedAddressesThatIsCutShortSaysSo`, `.linesForWatchedAddressesThatDoNotFitTogetherSayThatTheHistoryIsNotWhole` |
 | The message about more coins than are read writes the bound with its thousands apart. | `Parts.kt` | `AfterSeventhLookTextsTest.theBoundOfCoinsIsWrittenWithItsThousandsApart` |
 
-These changes touch neither the safeguard against paying the same thing twice nor the reading of an amount.
+The reviewer looked at these changes on the same day (commit 5d923fd). It found the bound of pages, the
+history of watched addresses and the texts in order, and the first finding eased as far as the client alone
+can do it: a look that a moving picture cuts is made again, but the whole history is still read on every
+look (see "What was not done"). It had three notes more, and these changes followed:
+
+| Change | Where | Tests |
+|---|---|---|
+| A reading whose time runs out after a change of the picture has already cut it is refused as a picture that kept moving, like one that was cut three times. Before, the app said that the server did not answer in time. | `ServerClient.cutShort`, `.utxos`, `.history` | `ServerClientTest.aListInPagesIsNotReadForLongerThanItsTime` |
+| The words for a picture that kept changing fit the payment screen as well, where the coins are read for a payment: nothing new is shown, and no payment is worked out. | `strings.xml` (en, cs) | `AfterSeventhLookTextsTest.aPictureThatKeptChangingIsSaidAsThatAndNotAsABusyServerOrAnError` |
+| A test for the one branch that had none: lines of two parts of the watched addresses that do not fit together. | | `ServerEngineTest.linesForWatchedAddressesThatDoNotFitTogetherSayThatTheHistoryIsNotWhole` |
+
+None of the changes after the independent look touches the safeguard against paying the same thing twice,
+the reading of an amount or the wallet's file.
 
 ## What was checked against the real server
 
@@ -109,8 +121,9 @@ that one writes here, and into `evidence-0.6.1`, what they gave.
   it asks again. Every look reads the whole history again, up to ten pages of 200 lines for each part of
   the addresses, and a page took about a second from the public server (4,000 lines in twenty seconds, read
   from a computer). A reading that a change cut starts again, three readings at the most, and then the look
-  is made again, three looks at the most. At the rate of that day a reading of ten seconds is cut about one
-  time in twelve, and three in a row rarely. On a network ten times as busy such a reading is cut more often
+  is made again, three looks at the most. Worked out from the figures of that day, and not measured: a reading
+  of ten seconds is cut about one time in twelve, and three in a row rarely. On a network ten times as busy
+  such a reading is cut more often
   than not, and a wallet with a long history, one that is mined to for example, will often get no look of
   one picture. The app then shows a look that nothing is judged from or, when no look came to its end, says
   that the picture kept changing and shows nothing new. Coins are not touched by that. What would mend it
