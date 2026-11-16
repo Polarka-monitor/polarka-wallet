@@ -48,7 +48,10 @@ from the descriptor. The phrases are random and used once; delete the file after
 ## What these checks do not show
 
 - A real wallet server. The tests run against a stand-in that was written from the server's sources and
-  compared with the public server by reading. From the real server the client has read the coins and the history of public addresses, and an emulator the height of the chain and one watched address. No payment has gone from this app through it.
+  compared with the public server by reading. From the real server the client has read the coins and the
+  history of public addresses, and an emulator the height of the chain and one watched address. Payments
+  went through it from this app once: on 16 November 2026, from one real phone with 0.6.1, in a test by
+  hand of which no log was kept.
 - How the phone itself behaves: the keystore, the fingerprint dialog, the camera and the background check
   run only on a real device and were tried by hand.
 - That the libraries are free of faults. The recorded checksums only show that they did not change after

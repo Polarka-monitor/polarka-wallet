@@ -66,8 +66,8 @@ the wallet's file.
 
 ## What was checked against the real server
 
-All of it reading, with addresses that are public chain data. Where no other day is named, on 15 November
-2026, with the code of that day (commit 96d78d5) and the first package built from it:
+All of it reading, with addresses that are public chain data, but for the last point. Where no other day is
+named, on 15 November 2026, with the code of that day (commit 96d78d5) and the first package built from it:
 
 - `review/standin/compare_pages.py`: 51 questions about pages of coins and of history and about what must be
   refused, to the stand-in and to the public server. Status, words, fields and page sizes were alike in all 51.
@@ -94,6 +94,9 @@ All of it reading, with addresses that are public chain data. Where no other day
   34719.97039914 NORTH for the watched address, the sum of the 3,440 coins that the server listed for it at block
   25629 over four pages, and block rewards in its history. That run needed a second try, through a fault of the
   test script's own reading of the server and not of the app (`emulator/README.md`).
+- On the same day the package of the release was tried by hand on one real phone, and there payments were
+  sent from the wallet and received through the public server ("How it was checked" says more). That is the
+  one thing here that was more than reading. No log was kept of it.
 
 ## How it was checked
 
@@ -123,7 +126,11 @@ run again on it.
 - The independent reviewer read the sources at three looks (`independent-review-0.6.1/`). It did not look at
   the package, at the runs on emulators, or at the seventeen deliberate faults that were added after its
   first look.
-- Not checked: what is listed under "What was not done", and 0.6.1 on a real phone.
+- On 16 November 2026, after all of the above, the package was installed by hand over 0.6.0 on one real
+  phone (Android 16). Payments were sent from the wallet and received, through its owner's node and through
+  the public Northbound server, and all went through. No log was kept and nothing was measured, so
+  `evidence-0.6.1` holds nothing of it.
+- Not checked: what is listed under "What was not done".
 
 ## What 0.6.1 knows less well than 0.6.0 did
 
@@ -140,8 +147,9 @@ run again on it.
 - A review by an independent human expert. The look at 0.6.1 was made by an AI model, like the six before
   it, and it did not cover the build of the package, the runs on emulators or anything on a phone
   (`independent-review-0.6.1/`).
-- No payment has been made through the public server from this app, on a phone or otherwise.
-- 0.6.1 has not been on a real phone. It ran on emulators.
+- More on a real phone than one test by hand. On 16 November 2026 payments went out and came in on one
+  phone, through a node and through the public server (above). No log was kept, nothing was timed, and no
+  scripted run was made on a phone: those ran on emulators.
 - A server that still answers in the earlier shapes is not read. None is known.
 - A long history through a busy server. Everything in one look has to come from one picture, and the
   server's picture changes with every transaction that begins to wait anywhere on the network, not only

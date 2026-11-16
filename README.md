@@ -200,8 +200,10 @@ While such a payment has no coin among those the server lists, the wallet makes 
   History show both payments.
 - Version 0.3.1 was tried on one real phone (Android 16), and 0.6.0 was installed there over 0.5.1: the
   wallet was there and worked with its owner's node. The versions since 0.3.1 were tried on emulators with
-  Android 12, 14 and 16; `review/emulator/README.md` says what was run for each of them. 0.6.1 has been on
-  emulators only. No payment has been made through a wallet server on a real phone yet.
+  Android 12, 14 and 16; `review/emulator/README.md` says what was run for each of them. On 16 November
+  2026 0.6.1 was installed on that phone over 0.6.0, and payments were sent from the wallet and received,
+  through its owner's node and through the public Northbound server. All went through. That was one test by
+  hand: no log was kept of it and nothing was measured.
 
 ## Code
 
