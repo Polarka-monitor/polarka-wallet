@@ -1,0 +1,6 @@
+exit 0 08:20:08
+REVIEWER one coin per page: 20001 requests, 1724 ms, ended with NodeError code=-3
+REVIEWER one line per page: 2000 requests, complete=false
+<testsuite name="north.node.ReviewerPagesTest" tests="2" skipped="0" failures="0" errors="0"
+ok   oneCoinToAPageIsFollowedForMoreThanTwentyThousandRequests() 1.74
+ok   oneLineToAPageIsFollowedForTwoThousandRequestsPerPart() 0.146

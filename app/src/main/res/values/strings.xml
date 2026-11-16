@@ -297,6 +297,7 @@
     <string name="problem_foreign_server">The server answered with outputs that do not belong to your addresses. Nothing is shown. Consider another server.</string>
     <string name="problem_timeout_server">The server did not answer in time. It may be busy. Try again in a moment.</string>
     <string name="problem_busy_server">The server is busy. Try again in a moment.</string>
+    <string name="problem_moving_server">The picture of the chain that the server shows kept changing while the app was reading it, so nothing new can be shown. That happens when blocks or new transactions come faster than the answers can be read, most easily with a long history. Try again in a moment.</string>
     <string name="problem_rejected_server">The server says that the node behind it does not take the transaction (%1$s). An honest server has passed nothing on. It has seen the transaction, though.</string>
     <string name="problem_unsure_server">It is not known whether the payment went out: the server did not confirm that it took it (id %1$s). Do not pay again now. Refresh in a minute: the payment then shows as waiting for a block, or the app tells you that it did not go through.</string>
     <string name="problem_store_server">Something stored in this phone cannot be read or written (%1$s). If the server setup is missing, enter it again.</string>

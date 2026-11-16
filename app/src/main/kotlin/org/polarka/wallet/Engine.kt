@@ -39,6 +39,8 @@ data class Problem(val kind: Kind, val detail: String = "") {
         NO_ROOM,
         /** Somebody who is not the owner's node refused the emptying of a paper address after seeing the whole transaction. */
         PAPER_REFUSED,
+        /** The picture of the chain that a wallet server shows kept changing while it was read, and no look of one piece came of it. */
+        MOVING,
     }
 
     companion object {
@@ -89,7 +91,10 @@ data class Snapshot(
     val lookedTo: Int = 0,
     /** The chain shows used keys closer than twenty to the last key looked at, and looking further needs the owner's yes. */
     val wantsFurther: Boolean = false,
-    /** False when a block arrived while the look was under way: its parts belong to different moments, and nothing is judged from it. */
+    /**
+     * False when a block arrived while the look was under way, or through a wallet server a waiting transaction:
+     * its parts belong to different moments, and nothing is judged from it.
+     */
     val steady: Boolean = true,
     /** Ids of the wallet's payments that did not go through which the node holds among the waiting transactions again. */
     val back: Set<String> = emptySet(),
@@ -105,8 +110,8 @@ data class Snapshot(
      */
     val arrivingSat: Long = 0,
     /**
-     * False when the history leaves a transaction out because the server's lines do not say what the wallet
-     * put into it, or when it is cut short (a look through a wallet server).
+     * False when the history of the wallet or of the watched addresses leaves a movement out: it is cut short,
+     * or the server's lines for one movement do not fit together (a look through a wallet server).
      */
     val historyWhole: Boolean = true,
 ) {

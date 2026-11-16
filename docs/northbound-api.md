@@ -77,7 +77,9 @@ server and offers its three fixed rates.
 - Coins and activity can be asked for in parts of a hundred addresses and put together exactly, provided all
   parts and all pages were read from the same picture: the same block and the same `pending_revision`.
   `ServerClient` reads coins again from the start when that changes in between (three readings at most), and
-  refuses activity that was read across a change. Half a list of coins is never taken for a balance.
+  refuses activity that was read across a change. Coins and history that a change cut in all three readings
+  are refused in the same way, as something to ask for again, and the wallet then makes its whole look again.
+  Half a list of coins is never taken for a balance.
 - A history can be put together from parts: the lines that several requests give for one transaction add up
   to what the transaction did to all their addresses. A wallet with more than a hundred addresses has an exact
   history that way.
@@ -102,6 +104,18 @@ server and offers its three fixed rates.
   another payment of the same wallet that spends one of its coins.
 - No answer is waited for without end. Every question has a time limit as a whole (`ServerClient.DEADLINE_MS`),
   beside the limits for a connection and for a single read.
+- A list in pages is not followed without end either. The server decides how much it gives to a page, so the
+  client bounds the pages of one reading: 200 for coins beside one for every part of the addresses (the
+  server gives a thousand coins to a page unless asked otherwise), and for history twice what the lines it
+  reads would take in full pages, and two more. The reading of one list has a time limit as a whole
+  (`ServerClient.READ_MS`), its new starts included.
+- The picture changes with every block and with every transaction that begins to wait anywhere on the
+  network, the server answers 503 for a moment while it takes a new one, and a cursor holds for one picture.
+  A long history can therefore be read only while the network is quiet for as long as the reading takes. From
+  the public server on 15 November 2026 that was about a second for a page of 200 lines, and the picture
+  changed about once in two minutes. This wallet reads the whole history on every look, up to 2,000 lines
+  for each hundred addresses, and keeps none of it between looks. A client cannot make a long reading safe
+  from that by itself; a cursor for the lines in blocks that held for the block alone would.
 - Nothing in the answers below names the version of the shapes. A client learns of a change by failing to
   read an answer, as 0.6.0 did. The author of the server was asked on 15 November 2026 whether a change could
   be made visible to a client (github.com/nova9/northbound, issue 5). On 16 November 2026 he added `GET /info`,

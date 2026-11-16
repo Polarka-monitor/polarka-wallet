@@ -296,6 +296,7 @@
     <string name="problem_foreign_server">Server vrátil výstupy, které nepatří k vašim adresám. Nic se nezobrazí. Zvažte jiný server.</string>
     <string name="problem_timeout_server">Server neodpověděl včas. Může být zaneprázdněný. Zkuste to za chvíli znovu.</string>
     <string name="problem_busy_server">Server je zaneprázdněný. Zkuste to za chvíli znovu.</string>
+    <string name="problem_moving_server">Obraz řetězce, který server ukazuje, se při čtení stále měnil, proto aplikace nemůže ukázat nic nového. Stává se to, když bloky nebo nové transakce přicházejí rychleji, než se dají odpovědi přečíst, nejspíš u dlouhé historie. Zkuste to za chvíli znovu.</string>
     <string name="problem_rejected_server">Server hlásí, že uzel za ním transakci nepřijme (%1$s). Poctivý server nic dál nepředal. Transakci ale viděl.</string>
     <string name="problem_unsure_server">Není známo, zda platba odešla: server nepotvrdil, že ji převzal (id %1$s). Teď neplaťte znovu. Za minutu obnovte přehled: platba se pak ukáže jako čekající na blok, nebo vám aplikace oznámí, že neproběhla.</string>
     <string name="problem_store_server">Něco uloženého v tomto telefonu nelze přečíst nebo zapsat (%1$s). Pokud chybí nastavení serveru, zadejte ho znovu.</string>

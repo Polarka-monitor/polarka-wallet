@@ -4,17 +4,21 @@ A wallet for TrueNorth (NORTH) on Android. It keeps its keys in the phone, signs
 server or a TrueNorth Core node what its addresses hold. The project runs no server of its own. There is no
 account and no analytics.
 
-**State: test build 0.6.1, a pre-release.** The wallet has been checked by its author and, in six looks, by an
-independent reviewer, an AI model that had not seen the code being written (`review/independent-review-0.3.1`,
-`review/independent-review-0.4.0`, `review/independent-review-0.4.2`, `review/independent-review-0.5.1` and
-`review/independent-review-0.6.0`). The sixth look found that a wallet server could have made the wallet pay
-the same thing twice. That was put right before 0.6.0, and the reviewer looked at the fixes. All of that was
-AI-assisted; a review by an independent human expert is still recommended. Until then it is for small amounts.
+**State: test build 0.6.1, a pre-release.** The wallet has been checked by its author and, in seven looks, by
+independent reviewers: AI models that had not seen the code being written (`review/independent-review-0.3.1`,
+`review/independent-review-0.4.0`, `review/independent-review-0.4.2`, `review/independent-review-0.5.1`,
+`review/independent-review-0.6.0` and `review/independent-review-0.6.1`). The sixth look found that a wallet
+server could have made the wallet pay the same thing twice. That was put right before 0.6.0, and the reviewer
+looked at the fixes. All of that was AI-assisted; a review by an independent human expert is still
+recommended. Until then it is for small amounts.
 
 0.6.1 follows a change of the public Northbound server. On 15 November 2026 that server began to answer in
 other shapes, and 0.6.0 can no longer show a wallet that has any history through it. 0.6.1 reads the new
-answers (`review/changes-0.6.1.md`). Its changes were checked by their author; the independent reviewer has
-not looked at them.
+answers (`review/changes-0.6.1.md`). The seventh look was at these changes, before anything of 0.6.1 was
+handed out. It gave no safety reason to hold the release back. It found that a look failed outright when the
+server's picture of the chain kept changing while a list was read, and that nothing bounded the pages of one
+list. Both were put right before the package was built. What is left is said under Limits: a long history
+through a busy server.
 It is an independent community project and not a product of the TrueNorth developers.
 
 ## Getting the package
@@ -25,8 +29,8 @@ apps. A later package installs over an earlier one and the wallet stays where it
 
 | | |
 |---|---|
-| File | `polarka-wallet-0.6.1.apk`, built from commit `96d78d5` (tag `v0.6.1`) |
-| SHA-256 of the file | `7da80705ad9c70ffc1ee4646d5f5d0bac86a707593476ac5214b1c3a420c914b` |
+| File | `polarka-wallet-0.6.1.apk`, built from the commit that the tag `v0.6.1` names |
+| SHA-256 of the file | written here by the commit after that one, and on the Releases page: a commit cannot name the checksum of a package that is built from it |
 | SHA-256 of the signer's certificate | `f441275239c880d0855a40525ca2449a2aa4992b4d4c2e63143d36c088ce103b` |
 
 Compare both before installing: `shasum -a 256 polarka-wallet-0.6.1.apk` (or `sha256sum`), and
@@ -157,6 +161,12 @@ While such a payment has no coin among those the server lists, the wallet makes 
   then refuses what it cannot read and shows nothing, as 0.6.0 does since 15 November 2026 with the public
   Northbound server, until a version that reads the new answers is installed. A node of one's own does not
   change under the wallet in that way.
+- Through a wallet server every look reads the whole history again, and all of a look has to come from one
+  picture of the chain. With the Northbound server that picture changes with every block and with every
+  transaction that begins to wait anywhere on the network. When it changes during a look the app looks
+  again, three times at the most. On a network much busier than today's a wallet with a long history, one
+  that is mined to for example, may get no look that way; the app then says that the picture kept changing
+  and shows nothing new until a quieter moment. Coins are not touched by that.
 - With a wallet server the wallet depends on that one server: while it is out of service nothing is shown
   and nothing can be sent. The coins are not touched by that, and the wallet can be connected elsewhere.
 - The price of a coin is typed in by hand; nothing is looked up.
@@ -212,7 +222,7 @@ a real network.
     TN_BIN=/path/to/bin gradle :core:test :node:test :app:testDebugUnitTest :app:lintDebug
     sh review/tests-summary.sh
 
-194 tests. A test that cannot run (no node programs, or no `gateway.py` of polarka-node next to this
+202 tests. A test that cannot run (no node programs, or no `gateway.py` of polarka-node next to this
 repository or named by `POLARKA_GATEWAY`) is reported as skipped; for a release none may be skipped. `polarka-node` is not published, so with this
 repository alone the tests that need it (in `PublicNodeTest` and `RetestModelTest`) are skipped. Every library is pinned by its SHA-256 in `gradle/verification-metadata.xml`:
 the build stops if one differs from the day it was first downloaded. The pins were made by Gradle on that day

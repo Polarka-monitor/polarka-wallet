@@ -62,7 +62,8 @@ data class ServerVerdict(val allowed: Boolean, val reason: String?)
  * The server answers at most a hundred addresses in one request, and it lists coins a page at a time. Coins
  * and activity are asked for in parts and pages and put together. That is exact when every answer was read
  * from the same picture: the same block and the same waiting transactions. Activity that was read across a
- * change is refused with [MOVED]; coins are read again from the start, as the server asks for. [history]
+ * change is refused with [MOVED]; coins are read again from the start, as the server asks for, and when three
+ * readings in a row were cut by a change they are refused with [MOVED] as well, and so is history. [history]
  * takes at most a hundred addresses. Who has more asks in parts and adds up the lines of one transaction:
  * each says what the transaction did to the addresses of its own request.
  *
@@ -72,10 +73,16 @@ data class ServerVerdict(val allowed: Boolean, val reason: String?)
  * server, takes [deadlineMs] at most. The timeouts of a connection do not see to that: a server that keeps sending a
  * little is never late for them. When the time is over the connection is closed and the question fails as
  * one that was not answered in time.
+ *
+ * A list that comes in pages, coins or history, is many questions. The reading as a whole has a time limit of
+ * its own, [readMs] with every new start in it, and the number of its pages is bounded: a server cannot keep
+ * a look going by handing out a little at a time.
  */
 class ServerClient(
     url: String, private val timeoutMs: Int = 30_000, private val maxWaitMs: Long = MAX_WAIT_MS,
     private val pause: (Long) -> Unit = { Thread.sleep(it) }, private val deadlineMs: Long = DEADLINE_MS,
+    /** The longest a list that comes in pages may take to read as a whole, its new starts included. */
+    private val readMs: Long = READ_MS,
 ) {
     private val base: String
     private val lock: ReentrantLock
@@ -183,6 +190,9 @@ class ServerClient(
     }
 
     private fun now(): Long = System.nanoTime() / 1_000_000
+
+    /** What one question of a reading may take: its own time, and no more than is left of the reading's. Nothing left fails as not answered in time. */
+    private fun left(until: Long): Long = minOf(deadlineMs, until - now())
 
     /**
      * One question at a time to one server: the requests of all its users share one budget. [withinMs] is the
@@ -355,24 +365,30 @@ class ServerClient(
      * waits for a block. Any number of addresses. The server lists them a page at a time, and every page of
      * every part has to come from the same picture. When the server says that its index changed (409), or a
      * page shows another block or other waiting transactions than the page before, everything read so far is
-     * thrown away and the reading starts again: half a list is never taken for a balance. More than [most]
-     * coins are not read ([TOO_MANY]). Whose the scripts are is for the caller to check: the server is trusted
+     * thrown away and the reading starts again: half a list is never taken for a balance. After three readings
+     * that were all cut by a change the list is refused with [MOVED]: asking again later helps. More than [most]
+     * coins are not read ([TOO_MANY]), nor more than [MAX_COIN_PAGES] pages beside one for every part, and the
+     * whole reading has its time limit. Whose the scripts are is for the caller to check: the server is trusted
      * for what exists, not for what belongs to the wallet.
      */
     fun utxos(addresses: List<String>, most: Int = MAX_COINS): ServerCoins {
         val asked = parts(addresses)
         require(most > 0) { "nothing to read" }
+        val until = now() + readMs
         var restarts = 0
         while (true) {
             val coins = ArrayList<Utxo>()
             val seen = HashSet<String>()
             var at: Moment? = null
             var changed = false
+            var pages = 0
             reading@ for (part in asked) {
                 var cursor: String? = null
                 while (true) {
+                    // The real server gives a thousand coins to a page. One that hands them out a few at a time is not followed without end.
+                    if (++pages > MAX_COIN_PAGES + asked.size) throw NodeError(200, null, "the server lists its coins in more pages than the app reads")
                     val answer = try {
-                        call("/v1/utxos", naming(part, if (cursor == null) emptyMap() else mapOf("cursor" to JsonPrimitive(cursor))))
+                        call("/v1/utxos", naming(part, if (cursor == null) emptyMap() else mapOf("cursor" to JsonPrimitive(cursor))), left(until))
                     } catch (e: NodeError) {
                         if (e.httpStatus != 409) throw e
                         changed = true
@@ -412,7 +428,7 @@ class ServerClient(
                 }
                 return ServerCoins(at!!.height, at.hash, coins, at.revision)
             }
-            if (++restarts > MAX_RESTARTS) throw NodeError(409, null, "the server's coins kept changing while they were read")
+            if (++restarts > MAX_RESTARTS) throw NodeError(409, MOVED, "the server's coins kept changing while they were read")
         }
     }
 
@@ -444,12 +460,18 @@ class ServerClient(
      * most a hundred addresses: each line says what its transaction did to the addresses of this request,
      * and who has more adds up the lines of several requests. It is read page by page; when a block or a
      * waiting transaction arrives in between, the server says so and the reading starts again, so that all
-     * lines belong to one moment. At most [most] lines are read (rounded up to a page).
+     * lines belong to one moment; after three readings that were all cut by a change the history is refused
+     * with [MOVED]. At most [most] lines are read (rounded up to a page). An honest server fills every page but
+     * the last, so [most] lines take no more pages than that; twice as many pages and two more are followed,
+     * and a server that hands out less to a page gets its history cut short ([ServerHistory.complete] is false).
+     * The whole reading has its time limit.
      */
     fun history(addresses: List<String>, most: Int = 2000): ServerHistory {
         val asked = parts(addresses)
         require(asked.size == 1) { "one request for history takes at most $MAX_ADDRESSES addresses" }
         require(most > 0) { "nothing to read" }
+        val until = now() + readMs
+        val mostPages = 2 * ((most + PAGE - 1) / PAGE) + 2
         var restarts = 0
         while (true) {
             val moves = ArrayList<ServerMove>()
@@ -458,12 +480,13 @@ class ServerClient(
             var cursor: String? = null
             var changed = false
             var complete = true
+            var pages = 0
             while (true) {
                 val more = HashMap<String, JsonPrimitive>()
                 more["limit"] = JsonPrimitive(PAGE)
                 if (cursor != null) more["cursor"] = JsonPrimitive(cursor)
                 val answer = try {
-                    call("/v1/transactions", naming(asked[0], more))
+                    call("/v1/transactions", naming(asked[0], more), left(until))
                 } catch (e: NodeError) {
                     if (e.httpStatus != 409) throw e
                     changed = true
@@ -484,13 +507,13 @@ class ServerClient(
                 cursor = answer.textOrNull("next_cursor", MAX_CURSOR)
                 if (cursor == null) break
                 if (page.isEmpty()) throw unknown("next_cursor")        // a page with nothing on it and another one after it would never end
-                if (moves.size >= most) {
+                if (moves.size >= most || ++pages >= mostPages) {
                     complete = false
                     break
                 }
             }
             if (!changed) return ServerHistory(at!!.height, at.hash, moves, complete, at.revision)
-            if (++restarts > MAX_RESTARTS) throw NodeError(409, null, "the server's history kept changing while it was read")
+            if (++restarts > MAX_RESTARTS) throw NodeError(409, MOVED, "the server's history kept changing while it was read")
         }
     }
 
@@ -525,6 +548,8 @@ class ServerClient(
         const val MAX_UTXOS = 10_000
         /** The most coins read for one question, over all its pages. */
         const val MAX_COINS = 20_000
+        /** The most pages of coins followed in one reading, beside one for every part of the addresses. The real server gives a thousand coins to a page. */
+        const val MAX_COIN_PAGES = MAX_COINS / 100
         const val MAX_HEX = 800_000
         const val MAX_CURSOR = 1024
         const val MAX_HEIGHT = 500_000_000L
@@ -535,8 +560,13 @@ class ServerClient(
         const val MAX_WAIT_MS = 20_000L
         /** The longest one question may take as a whole. An answer of the largest size still fits over a slow line. */
         const val DEADLINE_MS = 90_000L
+        /** The longest a list that comes in pages may take to read as a whole, its new starts included. */
+        const val READ_MS = 120_000L
         const val MAX_ANSWER_BYTES = 8 * 1024 * 1024
-        /** [NodeError.code] when the parts of one answer were not read from the same picture of the chain. Asking again helps. */
+        /**
+         * [NodeError.code] when the parts of one answer were not read from the same picture of the chain, or when a
+         * list in pages was cut by a change of that picture in every one of its readings. Asking again helps.
+         */
         const val MOVED = -2
         /** [NodeError.code] when the addresses hold more coins than are read for one question. */
         const val TOO_MANY = -3

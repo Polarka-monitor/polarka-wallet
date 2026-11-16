@@ -607,4 +607,136 @@ class ServerClientTest {
             assertTrue(waits.isNotEmpty() && fake.seen.size > 2)
         }
     }
+
+    /**
+     * The reviewer's look at 0.6.1, R1. A list that was cut by a change of the server's picture in every one of its
+     * readings is refused in the way that makes the one who asked ask again; before, it failed like any error.
+     */
+    @Test
+    fun aListThatKeptChangingIsRefusedAsOneToAskForAgain() {
+        Fake { count, _ -> if (count % 2 == 1) coins(coin(count), cursor = "aa") else Reply(409, "{\"message\":\"again\"}") }.use { fake ->
+            val error = refused { ServerClient(fake.url).utxos(listOf(address(1))) }
+            assertEquals(409, error.httpStatus)
+            assertEquals(ServerClient.MOVED, error.code)
+        }
+        Fake { count, _ -> if (count % 2 == 1) page(line(count), cursor = "aa") else Reply(409, "{\"message\":\"again\"}") }.use { fake ->
+            val error = refused { ServerClient(fake.url).history(listOf(address(1))) }
+            assertEquals(409, error.httpStatus)
+            assertEquals(ServerClient.MOVED, error.code)
+        }
+        // a refusal of another kind is passed on as it is, and nothing is asked a second time
+        Fake { _, _ -> Reply(400, "{\"message\":\"invalid UTXO cursor\"}") }.use { fake ->
+            val error = refused { ServerClient(fake.url).utxos(listOf(address(1))) }
+            assertEquals(400, error.httpStatus)
+            assertNull(error.code)
+            assertEquals(1, fake.seen.size)
+        }
+    }
+
+    /**
+     * The reviewer's look at 0.6.1, R2. A server that hands out one coin or one line to a page, each with a cursor
+     * to the next, was followed for as many pages as it liked: more than twenty thousand questions for one list.
+     */
+    @Test
+    fun aServerThatHandsOutALittleAtATimeIsNotFollowedWithoutEnd() {
+        // coins: the real server gives a thousand to a page; two hundred pages are followed, and no more
+        Fake { count, _ -> coins(coin(count), cursor = "aa") }.use { fake ->
+            val error = refused { ServerClient(fake.url).utxos(listOf(address(1))) }
+            assertEquals(200, error.httpStatus)
+            assertNull(error.code)
+            assertTrue("more pages than the app reads" in error.message.orEmpty(), error.message)
+            assertEquals(ServerClient.MAX_COIN_PAGES + 1, fake.seen.size)
+        }
+        // every part of the addresses has a page of its own beside those
+        Fake { count, _ -> coins(coin(count), cursor = if (count <= ServerClient.MAX_COIN_PAGES) "aa" else null) }.use { fake ->
+            val found = ServerClient(fake.url).utxos((1..150).map { address(it) })
+            assertEquals(ServerClient.MAX_COIN_PAGES + 2, found.utxos.size)
+            assertEquals(ServerClient.MAX_COIN_PAGES + 2, fake.seen.size)
+        }
+        // History: an honest server fills every page but the last, so two thousand lines take ten pages. Twenty-two
+        // are followed; then the history ends where it is and says that it is cut short.
+        Fake { count, _ -> page(line(count), cursor = "aa") }.use { fake ->
+            val history = ServerClient(fake.url).history(listOf(address(1)))
+            assertFalse(history.complete)
+            assertEquals(22, history.moves.size)
+            assertEquals(22, fake.seen.size)
+        }
+        // a history that comes in full pages is read as far as before
+        Fake { count, _ -> page((1..ServerClient.PAGE).joinToString(",") { line(1000 * count + it) }, cursor = "aa") }.use { fake ->
+            val history = ServerClient(fake.url).history(listOf(address(1)))
+            assertEquals(2000, history.moves.size)
+            assertFalse(history.complete)
+            assertEquals(10, fake.seen.size)
+        }
+    }
+
+    /** The same finding: a list in pages is many questions, and the reading as a whole has a time limit of its own. */
+    @Test
+    fun aListInPagesIsNotReadForLongerThanItsTime() {
+        // every page comes after a third of a second, and the whole reading may take one second
+        Fake { count, _ -> Thread.sleep(350); coins(coin(count), cursor = "aa") }.use { fake ->
+            val started = System.nanoTime()
+            val error = refused { ServerClient(fake.url, readMs = 1_000).utxos(listOf(address(1))) }
+            val took = (System.nanoTime() - started) / 1_000_000
+            assertEquals(0, error.httpStatus)
+            assertEquals(NodeError.TIMEOUT, error.code)
+            assertTrue(took in 900..3_000, "took $took ms")
+            assertTrue(fake.seen.size in 2..4, "pages asked for: ${fake.seen.size}")
+        }
+        Fake { count, _ -> Thread.sleep(350); page(line(count), cursor = "aa") }.use { fake ->
+            val error = refused { ServerClient(fake.url, readMs = 1_000).history(listOf(address(1))) }
+            assertEquals(0, error.httpStatus)
+            assertEquals(NodeError.TIMEOUT, error.code)
+        }
+        // New starts are in the same time: a list that is cut by a change again and again is not read three times as long.
+        Fake { count, _ -> Thread.sleep(350); if (count % 2 == 1) coins(coin(count), cursor = "aa") else Reply(409, "{\"message\":\"again\"}") }.use { fake ->
+            val started = System.nanoTime()
+            val error = refused { ServerClient(fake.url, readMs = 1_000).utxos(listOf(address(1))) }
+            assertEquals(NodeError.TIMEOUT, error.code)
+            assertTrue((System.nanoTime() - started) / 1_000_000 < 3_000)
+        }
+        // a reading that is quick has all the time it needs
+        Fake { count, _ -> coins(coin(count), cursor = if (count < 5) "aa" else null) }.use { fake ->
+            assertEquals(5, ServerClient(fake.url, readMs = 10_000).utxos(listOf(address(1))).utxos.size)
+        }
+    }
+
+    /**
+     * The reviewer's look at 0.6.1, N1. The real server answers 503 for a moment whenever it takes a new picture of
+     * the waiting transactions, and after that it refuses the cursor of the picture before (409). A reading that
+     * meets both in its middle waits, asks again, starts from the first page and ends in the new picture.
+     */
+    @Test
+    fun aReadingThatMeetsABusyServerAndThenANewPictureStartsAgain() {
+        val pauses = ArrayList<Long>()
+        Fake { count, _ ->
+            when (count) {
+                1 -> coins(coin(1) + "," + coin(2), cursor = "aa")
+                2 -> Reply(503, "{\"message\":\"index is synchronizing or stale; retry shortly\"}")
+                3 -> Reply(409, "{\"message\":\"The index changed; restart pagination.\"}")
+                4 -> coins(coin(2) + "," + coin(3), index(revision = 8), cursor = "bb")
+                else -> coins(coin(4), index(revision = 8))
+            }
+        }.use { fake ->
+            val found = ServerClient(fake.url, pause = { pauses.add(it) }).utxos(listOf(address(1)))
+            assertEquals(listOf(txid(2), txid(3), txid(4)), found.utxos.map { it.txid })     // coin 1 was read in the picture before and is not kept
+            assertEquals(8L, found.revision)
+            assertEquals(listOf(2000L), pauses)                                    // the busy server was waited for once
+            assertEquals(listOf(null, "aa", "aa", null, "bb"), fake.seen.map { Json.parseToJsonElement(it.body).jsonObject["cursor"]?.jsonPrimitive?.content })
+        }
+        Fake { count, _ ->
+            when (count) {
+                1 -> page(line(1), cursor = "aa")
+                2 -> Reply(503, "{\"message\":\"index is synchronizing or stale; retry shortly\"}")
+                3 -> Reply(409, "{\"message\":\"The index changed; restart pagination.\"}")
+                4 -> page(line(5, height = null, deep = 0) + "," + line(1), cursor = "bb", index = index(revision = 8))
+                else -> page(line(3, height = 80, deep = 21), index = index(revision = 8))
+            }
+        }.use { fake ->
+            val history = ServerClient(fake.url, pause = { pauses.add(it) }).history(listOf(address(1)))
+            assertEquals(listOf(txid(5), txid(1), txid(3)), history.moves.map { it.txid })
+            assertEquals(8L, history.revision)
+            assertEquals(5, fake.seen.size)
+        }
+    }
 }

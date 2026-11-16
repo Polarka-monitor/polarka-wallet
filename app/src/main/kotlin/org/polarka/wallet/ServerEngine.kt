@@ -56,7 +56,10 @@ import north.node.Utxo
  *   it answers. A payment is therefore never forgotten on the server's word ([ownersNode]).
  *
  * Everything in one look has to come from the same picture of the chain: the same block and, with a server
- * that numbers them, the same waiting transactions. If that changes in between, the look is made again.
+ * that numbers them, the same waiting transactions. If that changes in between, the look is made again,
+ * three looks at the most and none begun later than a minute and a half after the first. On a network where
+ * transactions arrive faster than a long history can be read, no look may come of that: the app then says
+ * that the picture kept changing ([Problem.Kind.MOVING]) and shows nothing new.
  */
 class ServerEngine(
     private val chain: Chain, private val watched: List<String>, private val server: ServerClient,
@@ -127,16 +130,18 @@ class ServerEngine(
     private fun key(coin: Unspent): String = coin.txid + ":" + coin.vout
 
     /**
-     * What the engine makes of two answers of the server. More coins on the addresses than are read for one
-     * question is said as that. A server that will not take what the wallet asks (HTTP 400) is about the
-     * addresses themselves: it works for another network than the setup names, which is what it says of
-     * addresses it does not know, or it is not a server of this kind. That is said as one thing, with the
-     * server's words.
+     * What the engine makes of three answers of the server. More coins on the addresses than are read for one
+     * question is said as that. A picture of the chain that changed under a question, in every one of its
+     * readings, is said as that as well: asking again in a moment helps. A server that will not take what the
+     * wallet asks (HTTP 400) is about the addresses themselves: it works for another network than the setup
+     * names, which is what it says of addresses it does not know, or it is not a server of this kind. That is
+     * said as one thing, with the server's words.
      */
     private inline fun <T> asked(what: () -> T): T = try {
         what()
     } catch (e: NodeError) {
         if (e.code == ServerClient.TOO_MANY) throw EngineError(Problem.Kind.TOO_MANY_COINS, ServerClient.MAX_COINS.toString())
+        if (e.code == ServerClient.MOVED) throw EngineError(Problem.Kind.MOVING)
         if (e.httpStatus != 400) throw e
         throw EngineError(Problem.Kind.OTHER_CHAIN, e.message.orEmpty())
     }
@@ -361,7 +366,10 @@ class ServerEngine(
             watchedCoins.totalSat                                   // refused here if the sum cannot exist
             val told = histories(watched.chunked(ServerClient.MAX_ADDRESSES))
             tips.addAll(told.tips)
-            watchedMoves = ordered(movements(told))
+            val lines = movements(told)
+            // the history of watched addresses is cut short and thinned out like the wallet's own, and has to say so like it
+            if (!told.whole || lines.any { it == null }) whole = false
+            watchedMoves = ordered(lines)
         }
         if (tip < 0) tip = server.tipHeight()
 
@@ -375,25 +383,32 @@ class ServerEngine(
 
     /**
      * One look at the chain for the wallet and the watched addresses. When its parts were not read from the
-     * same picture of the chain it is made again; if the chain keeps changing, the last look is returned and
-     * says that it is not steady, so that nothing is judged from it.
+     * same picture of the chain it is made again: because two questions were answered from different pictures,
+     * or because one list was cut by a change in every one of its readings. Three looks are made at the most,
+     * and none is begun later than [AGAIN_MILLIS] after the first, so that a server that is slow as well is not
+     * asked over and over. If the picture keeps changing, the last look that came to its end is returned and
+     * says that it is not steady, so that nothing is judged from it; if none came to its end, the app says
+     * that the picture kept changing ([Problem.Kind.MOVING]).
      */
     @Synchronized
     override fun fetch(wallet: WalletInfo?): Snapshot {
         var seen: Snapshot? = null
-        repeat(TRIES) {
+        val start = clock()
+        var looks = 0
+        while (looks++ < TRIES) {
             val now = try {
                 asked { look(wallet) }
-            } catch (e: NodeError) {
-                if (e.code != ServerClient.MOVED) throw e
+            } catch (e: EngineError) {
+                if (e.kind != Problem.Kind.MOVING) throw e
                 null
             }
             if (now != null) {
                 if (now.steady) return now
                 seen = now
             }
+            if ((clock() - start) / 1_000_000 > AGAIN_MILLIS) break
         }
-        return seen ?: throw NodeError(503, null, "blocks kept arriving while the server was asked")
+        return seen ?: throw EngineError(Problem.Kind.MOVING)
     }
 
     /**
@@ -550,6 +565,8 @@ class ServerEngine(
         /** The most lines of history read for one part of the addresses in one look. */
         const val MAX_LINES = 2000
         const val TRIES = 3
+        /** A look that a moving picture cut is not begun again later than this after the first one began. */
+        const val AGAIN_MILLIS = 90_000L
         /** The longest the check before a hand-over may take. */
         const val CHECK_MILLIS = 20_000L
         /** The shortest time a question of the hand-over is given, however little of the forty seconds is left. */

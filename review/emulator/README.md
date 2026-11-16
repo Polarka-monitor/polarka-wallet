@@ -74,7 +74,7 @@ forgotten the test authority: unlock it and run `trust_ca.sh` again.
 
 ## What was run for 0.6.1
 
-On 15 November 2026 the signed package of 0.6.1 (SHA-256 `7da80705ad9c70ffc1ee4646d5f5d0bac86a707593476ac5214b1c3a420c914b`,
+On 15 November 2026 the first signed package of 0.6.1 (SHA-256 `7da80705ad9c70ffc1ee4646d5f5d0bac86a707593476ac5214b1c3a420c914b`,
 built from commit 96d78d5) went through eight runs on Android 12, 14 and 16: the seven of 0.6.0, with
 `t05_upgrade.py` again over the signed package of 0.5.1, and `t08_server_changed.py`. Every run ended with its
 line of success: `ALL 12 STEPS PASSED` with a node of one's own and through the gateway, `LOCK STEPS PASSED: 4`,

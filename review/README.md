@@ -7,8 +7,9 @@ review of the same version (`independent-review-0.3.1/`), the report of the same
 (`independent-review-0.4.2/`), of its fifth look at what 0.5.1 changed (`independent-review-0.5.1/`, with
 `changes-0.5.1.md`) and of its sixth look at 0.6.0 (`independent-review-0.6.0/`, with `changes-0.6.0.md`), a
 stand-in for a wallet server that the tests use (`standin/`), and the scripts that run the package on
-emulators (`emulator/`). `changes-0.6.1.md` says what 0.6.1 changed when a wallet server changed its answers;
-the reviewer has not looked at that. None of it replaces a review by an independent human expert.
+emulators (`emulator/`). `changes-0.6.1.md` says what 0.6.1 changed when a wallet server changed its answers,
+and `independent-review-0.6.1/` holds the report of the seventh look, at those changes, by a reviewer of the
+same kind that began afresh. None of it replaces a review by an independent human expert.
 
 ## How to repeat the checks
 
@@ -19,8 +20,8 @@ about a wallet server also need python3 (3.9 or later), for the stand-in.
 
 | Check | Command | Passes when |
 |---|---|---|
-| All tests (194) | `gradle :core:test :node:test :app:testDebugUnitTest`, then `sh review/tests-summary.sh` | exit 0; 194 tests, 0 failures, 0 skipped |
-| The findings of the independent review, of its retest and of its later looks stay fixed | the `Audit*Test` classes in the three modules, `RetestModelTest`, `AfterRetestTest`, `AfterRetestScreenTest`, `Retest2ModelTest`, `Retest3ModelTest`, `ThirdLookTest`, `Retest4Test`, `Retest4CoreTest`, `SixthLookTest`, `SixthLookScreenTest`, `AfterSixthLookPlainTest` | all pass |
+| All tests (202) | `gradle :core:test :node:test :app:testDebugUnitTest`, then `sh review/tests-summary.sh` | exit 0; 202 tests, 0 failures, 0 skipped |
+| The findings of the independent review, of its retest and of its later looks stay fixed | the `Audit*Test` classes in the three modules, `RetestModelTest`, `AfterRetestTest`, `AfterRetestScreenTest`, `Retest2ModelTest`, `Retest3ModelTest`, `ThirdLookTest`, `Retest4Test`, `Retest4CoreTest`, `SixthLookTest`, `SixthLookScreenTest`, `AfterSixthLookPlainTest`, `AfterSeventhLookTextsTest` | all pass |
 | A wallet server, or a public node, cannot make the wallet pay the same thing twice, take a coin for the wallet's that is not, or hold a look or a payment without end | app tests `SixthLookTest`, `ServerPayTest`, `ServerEngineTest`, `ServerModelTest`, `StandInTest`; node test `ServerClientTest` | all pass |
 | A payment that did not go through cannot arrive beside the next one | `NotGoneThroughTest`, `NotGoneThroughPlainTest`, `NotGoneThroughScreenTest`, core test `PlannerMustTest`, node test `SpendersTest` | all pass |
 | The package on emulators (Android 12, 14, 16) | `review/emulator/README.md` | each script ends with its line of success (`ALL 12 STEPS PASSED` with a node, `ALL 18 STEPS PASSED` with a wallet server, `LOCK STEPS PASSED`, `NOT GONE THROUGH: ALL 6 STEPS PASSED`, `UPGRADE: ALL 5 STEPS PASSED`, `A SERVER THAT SAYS NO: ALL 6 STEPS PASSED`, `A SERVER THAT CHANGED ITS ANSWERS: ALL 6 STEPS PASSED`) |
@@ -47,7 +48,7 @@ from the descriptor. The phrases are random and used once; delete the file after
 ## What these checks do not show
 
 - A real wallet server. The tests run against a stand-in that was written from the server's sources and
-  compared with the public server by reading. From the real server an emulator has read the height of the chain, and nothing else: no payment has gone from this app through it.
+  compared with the public server by reading. From the real server the client has read the coins and the history of public addresses, and an emulator the height of the chain and one watched address. No payment has gone from this app through it.
 - How the phone itself behaves: the keystore, the fingerprint dialog, the camera and the background check
   run only on a real device and were tried by hand.
 - That the libraries are free of faults. The recorded checksums only show that they did not change after

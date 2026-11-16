@@ -1,0 +1,5 @@
+Warning: SDK processing. This version only understands SDK XML versions up to 3 but an SDK XML file of version 4 was encountered. This can happen if you use versions of Android Studio and the command-line tools that were released at different times.
+exit 0 08:21:08
+REVIEWER moving picture: 409 null 'the server's history kept changing while it was read', problem Problem(kind=NODE, detail=the server's history kept changing while it was read), requests [/v1/addresses/activity, /v1/utxos, /v1/transactions, /v1/transactions, /v1/transactions, /v1/transactions, /v1/transactions, /v1/transactions]
+<testsuite name="org.polarka.wallet.ReviewerBusyTest" tests="1" skipped="0" failures="0" errors="0"
+ok   aHistoryOfTwoPagesOnAMovingPictureFailsTheWholeLook 16.059

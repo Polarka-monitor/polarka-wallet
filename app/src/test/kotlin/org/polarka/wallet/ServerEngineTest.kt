@@ -694,4 +694,87 @@ class ServerEngineTest {
             }
         }
     }
+
+    /**
+     * The reviewer's look at 0.6.1, R1. On the real server the number of the picture changes with every transaction
+     * that begins to wait anywhere on the network. A list of several pages that such a change cut in every one of
+     * its readings used to end the look with an error at once. Now the look is made again, and when the picture
+     * holds still for one look, that look stands.
+     */
+    @Test
+    fun aListThatAMovingPictureKeptCuttingIsLookedAtAgain() {
+        bench().use { b ->
+            val wallet = fresh()
+            val info = WalletInfo(Chain.REGTEST, wallet.watchKey().xpub, lockOnOpen = false)
+            b.node.mine(ServerClient.PAGE + 1, wallet.address(0, 0))               // 201 lines of history: two pages
+            ServerRelay(b.server.url).use { relay ->
+                val history = "/v1/transactions"
+                val first = listOf("/v1/addresses/activity", "/v1/utxos")
+                val number = java.util.concurrent.atomic.AtomicLong(1_000)
+                val moving = java.util.concurrent.atomic.AtomicInteger(6)           // so many answers about history come with a number of their own
+                relay.rewrite = { path, answer ->
+                    if (path == history && moving.getAndDecrement() > 0) {
+                        answer.replace(Regex("\"pending_revision\":\\d+"), "\"pending_revision\":${number.incrementAndGet()}")
+                    } else answer
+                }
+                val engine = ServerEngine(Chain.REGTEST, emptyList(), ServerClient(relay.url, maxWaitMs = 0))
+                // The first look: three readings of the two pages, each cut by a change. The second look meets a picture that holds still.
+                val seen = engine.fetch(info)
+                assertTrue(seen.steady && seen.historyWhole)
+                assertEquals(ServerClient.PAGE + 1, seen.moves.size)
+                assertEquals(first + List(6) { history } + first + List(2) { history }, relay.paths)
+
+                // A picture that never holds still: three looks, and then the app says what happened in words of its own.
+                moving.set(Int.MAX_VALUE)
+                relay.paths.clear()
+                val error = assertFailsWith<EngineError> { engine.fetch(info) }
+                assertEquals(Problem.Kind.MOVING, error.kind)
+                assertEquals(Problem(Problem.Kind.MOVING), Problem.of(error))
+                assertEquals(3, relay.paths.count { it == "/v1/utxos" })
+                assertEquals(18, relay.paths.count { it == history })
+
+                // A server that is slow as well is not asked over and over: a look that was cut is begun again only
+                // within a minute and a half of the first one's beginning. Here every look takes a hundred seconds.
+                var time = 0L
+                val slow = ServerEngine(
+                    Chain.REGTEST, emptyList(), ServerClient(relay.url, maxWaitMs = 0),
+                    clock = { time.also { time += 100_000_000_000L } },
+                )
+                relay.paths.clear()
+                assertEquals(Problem.Kind.MOVING, assertFailsWith<EngineError> { slow.fetch(info) }.kind)
+                assertEquals(1, relay.paths.count { it == "/v1/utxos" })
+
+                // what arrived since a block is read from the same history, and says the same
+                assertEquals(Problem.Kind.MOVING, assertFailsWith<EngineError> { engine.incomingSince(info, 1) }.kind)
+            }
+        }
+    }
+
+    /**
+     * The reviewer's look at 0.6.1, R3. The history of watched addresses is cut short like the wallet's own, and the
+     * look has to say so for them as well: the note on the History page stands on it.
+     */
+    @Test
+    fun aHistoryOfWatchedAddressesThatIsCutShortSaysSo() {
+        bench().use { b ->
+            val watched = fresh().address(0, 0)
+            b.node.mine(ServerClient.PAGE + 1, watched)                             // one line more than a page
+            // one page of history is read, and no more
+            var seen = ServerEngine(Chain.REGTEST, listOf(watched), b.client, most = ServerClient.PAGE).fetch(null)
+            assertFalse(seen.historyWhole)
+            assertEquals(ServerClient.PAGE, seen.watchedMoves.size)
+            assertEquals(ServerClient.PAGE + 1, seen.watched!!.utxos.size)          // the coins are all there whatever the history says
+            // read to its end, the same history is whole
+            seen = ServerEngine(Chain.REGTEST, listOf(watched), b.client).fetch(null)
+            assertTrue(seen.historyWhole)
+            assertEquals(ServerClient.PAGE + 1, seen.watchedMoves.size)
+            // a wallet whose own history is whole says "not whole" as soon as that of a watched address is not
+            val wallet = fresh()
+            val info = WalletInfo(Chain.REGTEST, wallet.watchKey().xpub, lockOnOpen = false)
+            seen = ServerEngine(Chain.REGTEST, listOf(watched), b.client, most = ServerClient.PAGE).fetch(info)
+            assertFalse(seen.historyWhole)
+            assertTrue(seen.moves.isEmpty())
+            assertEquals(ServerClient.PAGE, seen.watchedMoves.size)
+        }
+    }
 }
