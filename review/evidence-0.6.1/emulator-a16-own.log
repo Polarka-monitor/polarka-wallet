@@ -10,6 +10,6 @@ ok     8  a second payment on the same coin is refused while the first one waits
 ok     9  after the block: 19.99999674 NORTH, history shows both movements
 ok    10  an address that was used still receives; wallet A removed after the fingerprint
 ok    11  the words of wallet A, typed as a paper address, were emptied into wallet B: 26.99999302 NORTH (fee 0.00000372)
-ok    12  wallet B removed and brought back from its 24 words, after a slip in the last word was named (24 (shoex)) and put right: the coins are found again
+ok    12  wallet B removed and brought back from its 24 words, after a slip in the last word was named (24 (tailx)) and put right: the coins are found again
 ALL 12 STEPS PASSED on Android 16 (own node)
 exit 0

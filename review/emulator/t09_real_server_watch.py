@@ -12,7 +12,10 @@ phone and nothing is sent: the server is only read.
 The app has to show what the address holds. That is compared with what the same server lists for the address
 when this machine asks it, page by page, right before and right after the app's look. An address in use can
 change with any block, so the comparison is repeated a few times until the two readings around a look agree.
-Then the setup is removed again.
+The server's picture also changes with every transaction that begins to wait anywhere on the network: a
+reading of this machine that such a change cuts (the server answers 409, or 503 while it takes the new
+picture) counts as one that did not agree, and is made again with the next look. Then the setup is removed
+again.
 
 It shows that the package under test reads the real server's coins, also when they come in several pages, and
 its history. It shows nothing about payments through that server.
@@ -21,6 +24,7 @@ import json
 import os
 import sys
 import time
+import urllib.error
 import urllib.request
 
 from emu import Phone
@@ -54,8 +58,15 @@ def listed():
         if cursor is not None:
             body["cursor"] = cursor
         request = urllib.request.Request(SERVER + "/v1/utxos", json.dumps(body).encode(), {"Content-Type": "application/json"})
-        with urllib.request.urlopen(request, timeout=60) as answer:
-            page = json.loads(answer.read().decode())
+        try:
+            with urllib.request.urlopen(request, timeout=60) as answer:
+                page = json.loads(answer.read().decode())
+        except urllib.error.HTTPError as refused:
+            # 409: the server took a new picture between two pages and no longer knows the cursor. 503: it is taking
+            # one right now. Either way this reading is over, as it is for the app: read again.
+            if refused.code in (409, 503):
+                return None
+            raise
         now = (page["index"]["indexed_height"], page["index"].get("pending_revision"))
         if at is not None and now != at:
             return None                                   # the picture changed between two pages: read again

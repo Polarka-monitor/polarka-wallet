@@ -1,4 +1,4 @@
-== 2026-11-15 21:12:00, sources at 96d78d5, changed in the working tree: M app/src/test/kotlin/org/polarka/wallet/ServerEngineTest.kt, ?? review/evidence-0.6.1/
+== 2026-11-16 09:44:26, sources at 4c0f648, changed in the working tree: M review/evidence-0.6.1/02-package.txt
 M1   only the first page of coins is read                                                     caught by coinsComeInPagesAndAreReadToTheLastOne
 M2   after a 409 the coins read so far are taken for the list                                 caught by coinsComeInPagesAndAreReadToTheLastOne
 M3   pages of coins from two pictures are put together                                        caught by coinsComeInPagesAndAreReadToTheLastOne, partsReadFromDifferentPicturesAreNotPutTogether
@@ -22,5 +22,22 @@ S1   what a payment put in is not written to the wallet's file                  
 S2   a note of what a payment put in that cannot be is read from the file                     caught by aNoteThatCannotBeIsRefused
 W1   a payment is written down without what it put in                                         caught by aPaymentThatComesBackFromThoseThatDidNotGoThroughKeepsItsTime
 W2   a payment that comes back from those that did not go through loses the note of what it put in caught by aPaymentThatComesBackFromThoseThatDidNotGoThroughKeepsItsTime
+M10  coins that a change cut in every reading fail like any error, not as something to ask for again caught by aListThatKeptChangingIsRefusedAsOneToAskForAgain
+M11  a history that a change cut in every reading fails like any error, not as something to ask for again caught by aListThatKeptChangingIsRefusedAsOneToAskForAgain
+M12  the pages of one reading of coins are not bounded                                        caught by aServerThatHandsOutALittleAtATimeIsNotFollowedWithoutEnd
+M13  the pages of one reading of history are not bounded                                      caught by aServerThatHandsOutALittleAtATimeIsNotFollowedWithoutEnd
+M14  a list in pages has no time limit as a whole                                             caught by aListInPagesIsNotReadForLongerThanItsTime
+M15  one page of coins fewer is followed than the bound says                                  caught by aServerThatHandsOutALittleAtATimeIsNotFollowedWithoutEnd
+M16  a history in pages has no time limit as a whole                                          caught by aListInPagesIsNotReadForLongerThanItsTime
+M17  a reading that a change cut and that then ran out of time is called a server that is late caught by aListInPagesIsNotReadForLongerThanItsTime
+M18  a reading that ran out of time without any change is called a picture that kept moving   caught by aListInPagesIsNotReadForLongerThanItsTime
+E11  a list that kept changing is not told to the engine as a picture that moved              caught by aListThatAMovingPictureKeptCuttingIsLookedAtAgain
+E12  after a list that kept changing the look is not made again                               caught by aListThatAMovingPictureKeptCuttingIsLookedAtAgain
+E13  a look is begun again however long the looks before it took                              caught by aListThatAMovingPictureKeptCuttingIsLookedAtAgain
+E14  four looks are made where three are the most                                             caught by aListThatAMovingPictureKeptCuttingIsLookedAtAgain
+E15  a history of watched addresses that is cut short does not say so                         caught by aHistoryOfWatchedAddressesThatIsCutShortSaysSo
+E16  a watched movement whose lines do not fit together is left out without a word            caught by linesForWatchedAddressesThatDoNotFitTogetherSayThatTheHistoryIsNotWhole
+P1   a picture that kept changing is said as a busy server                                    caught by aPictureThatKeptChangingIsSaidAsThatAndNotAsABusyServerOrAnError
+P2   the bound of coins is written without its thousands apart                                caught by theBoundOfCoinsIsWrittenWithItsThousandsApart
 sources after the runs: as they were
-done 21:20:59
+done 09:55:04

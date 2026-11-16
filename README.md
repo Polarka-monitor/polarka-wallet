@@ -19,8 +19,8 @@ handed out. It gave no safety reason to hold the release back. It found that a l
 server's picture of the chain kept changing while a list was read, and that nothing bounded the pages of one
 list. The pages are bounded now. The first was eased and not cured: the look is made again, and the app says
 why it failed, but the whole history is still read on every look, so a long history through a busy server
-can still get no look (see Limits). The reviewer looked at these changes as well; what it still noted was
-dealt with too (`review/independent-review-0.6.1`).
+can still get no look (see Limits). The reviewer looked at these changes as well, and at what was done
+about the notes it still had (`review/independent-review-0.6.1`).
 It is an independent community project and not a product of the TrueNorth developers.
 
 ## Getting the package
@@ -31,8 +31,8 @@ apps. A later package installs over an earlier one and the wallet stays where it
 
 | | |
 |---|---|
-| File | `polarka-wallet-0.6.1.apk`, built from the commit that the tag `v0.6.1` names |
-| SHA-256 of the file | written here by the commit after that one, and on the Releases page: a commit cannot name the checksum of a package that is built from it |
+| File | `polarka-wallet-0.6.1.apk`, built from commit `4c0f648` (tag `v0.6.1`) |
+| SHA-256 of the file | `03be9b1657e9ee4e43c9676f1cd45afeebcc6bb625de36d2d9961bccbce171ae` |
 | SHA-256 of the signer's certificate | `f441275239c880d0855a40525ca2449a2aa4992b4d4c2e63143d36c088ce103b` |
 
 Compare both before installing: `shasum -a 256 polarka-wallet-0.6.1.apk` (or `sha256sum`), and

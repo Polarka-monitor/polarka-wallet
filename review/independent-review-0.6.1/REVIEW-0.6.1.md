@@ -443,3 +443,46 @@ reading of amounts, nor the wallet's file, and it does not.
 No: R1 is mitigated as far as the client alone can do it and its remaining risk is told, R2 to R4 are
 closed, and the new points are notes; I would only change the two sentences under R4 ("put right" for R1,
 and "on today's network that is enough") before the texts go out, and add a test for N5 when convenient.
+
+## After the second changes (4c0f648)
+
+A third, short look on 16 November 2026 at commit 4c0f648 (one commit on 5d923fd), merged into my clone
+with `--ff-only`. I read the code diff (`ServerClient.kt`, the two strings), the test changes, the changed
+texts and the release texts in `release-texts-after-look-2/`, and ran the tests named below.
+
+1. **R5: closed.** `cutShort` is true only when the question failed as not answered in time
+   (`httpStatus 0`, `TIMEOUT`; an unreachable server has no such code and is passed on as before), the
+   reading had already started again after a change (`restarts > 0`), and the question was given less than
+   its own 90 s (`within < deadlineMs`), i.e. the reading's 120 s were the limit. The condition is right.
+   It can mislabel in one narrow case: a server that stops answering in the last 90 s of a reading that a
+   change had cut is called a moving picture rather than a late server. That does not matter: either way
+   nothing is judged and the owner is told to try again, and in `fetch` it cannot cause another look,
+   because such an error comes only when the reading's 120 s are over, so more than `AGAIN_MILLIS` (90 s)
+   has passed since the look began; `fetch` then returns an earlier unsteady look if there was one, or
+   `MOVING`. The reverse (a moving picture called a late server) remains only for a reading whose time ran
+   out before any change cut it, which is a late server. The third and fourth parts of
+   `ServerClientTest.aListInPagesIsNotReadForLongerThanItsTime` test it for coins and history.
+2. **R6: closed.** "What was read is not of one piece, so the app does not use it: nothing new is shown,
+   and no payment is worked out" fits a look, the payment screen and the look at a paper address (where
+   nothing is shown and nothing is emptied). The Czech text says the same.
+3. **N5: closed.** With my fault planted again (the watched branch without `|| lines.any { it == null }`),
+   `ServerEngineTest.linesForWatchedAddressesThatDoNotFitTogetherSayThatTheHistoryIsNotWhole` failed at
+   `assertFalse(seen.historyWhole)` (`logs/mutant-watched-2.log`). Source put back; `git status` shows only
+   my two test files.
+4. **The two sentences: closed.** The README (state at the top: "eased and not cured", and why; Limits:
+   "On 15 November 2026 that was enough in every look that was tried ... it was not measured on a phone")
+   and release texts 1 and 3 now say what is true. `review/independent-review-0.6.1/README.md`, "The look
+   at the changes", is a fair account of my second look: R2 to R4 closed, R1 partly closed with its cause
+   remaining, no hold, two sentences and three notes, and it keeps my remark about the real-time test. The
+   short account in `changes-0.6.1.md` ("found ... the texts in order") passes over the two sentences, which
+   the table in the review folder names; that is a small omission, not a misstatement. The release notes
+   now say "The reviewer looked at these changes as well", which is true.
+5. **Anything else:** nothing. The diff touches no other code; `docs/northbound-api.md` ("cut before the
+   time of the reading ran out ... if there is time for it") matches the code.
+
+Tests run on 4c0f648: `ServerClientTest`, the new watched test and `AfterSeventhLookTextsTest`: 18, 1 and 2 tests,
+all passed (`logs/third.log`); the planted fault above. Not checked: the whole suite again (the author reports 203
+passing on these sources), the package, the author's deliberate faults and the emulator runs, anything on
+a phone.
+
+Would I hold the release back now? No.

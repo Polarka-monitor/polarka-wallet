@@ -74,13 +74,17 @@ forgotten the test authority: unlock it and run `trust_ca.sh` again.
 
 ## What was run for 0.6.1
 
-On 15 November 2026 the first signed package of 0.6.1 (SHA-256 `7da80705ad9c70ffc1ee4646d5f5d0bac86a707593476ac5214b1c3a420c914b`,
-built from commit 96d78d5) went through eight runs on Android 12, 14 and 16: the seven of 0.6.0, with
-`t05_upgrade.py` again over the signed package of 0.5.1, and `t08_server_changed.py`. Every run ended with its
-line of success: `ALL 12 STEPS PASSED` with a node of one's own and through the gateway, `LOCK STEPS PASSED: 4`,
-`NOT GONE THROUGH: ALL 6 STEPS PASSED`, `UPGRADE: ALL 5 STEPS PASSED (0.5.1 -> 0.6.1)`, `ALL 18 STEPS PASSED`
-with a wallet server, `A SERVER THAT SAYS NO: ALL 6 STEPS PASSED` and `A SERVER THAT CHANGED ITS ANSWERS: ALL 6
-STEPS PASSED (0.6.0 -> 0.6.1)`. None of the twenty-four had to be repeated. The logs are in `../evidence-0.6.1`.
+0.6.1 was built twice; `../changes-0.6.1.md` says why. On 16 November 2026 the package of the release (SHA-256
+`03be9b1657e9ee4e43c9676f1cd45afeebcc6bb625de36d2d9961bccbce171ae`, built from commit 4c0f648) went through
+eight runs on Android 12, 14 and 16: the seven of 0.6.0, with `t05_upgrade.py` again over the signed package
+of 0.5.1, and `t08_server_changed.py`. Every run ended with its line of success: `ALL 12 STEPS PASSED` with a
+node of one's own and through the gateway, `LOCK STEPS PASSED: 4`, `NOT GONE THROUGH: ALL 6 STEPS PASSED`,
+`UPGRADE: ALL 5 STEPS PASSED (0.5.1 -> 0.6.1)`, `ALL 18 STEPS PASSED` with a wallet server, `A SERVER THAT
+SAYS NO: ALL 6 STEPS PASSED` and `A SERVER THAT CHANGED ITS ANSWERS: ALL 6 STEPS PASSED (0.6.0 -> 0.6.1)`.
+None of the twenty-four had to be repeated. The logs are in `../evidence-0.6.1`. The first package (SHA-256
+`7da80705ad9c70ffc1ee4646d5f5d0bac86a707593476ac5214b1c3a420c914b`, built from commit 96d78d5) had gone
+through the same twenty-four runs on 15 November 2026, also without a repeat. It was handed to nobody, and
+its logs are not kept here.
 
 The wallet server of these runs is the stand-in of `../standin`, which now answers in the shapes that the
 public server has had since 15 November 2026: a line of history is one signed amount with the fee of the
@@ -99,14 +103,23 @@ list three coins to a page, four more payments arrive, and the wallet's five coi
 
 Two runs touched the public Northbound server, both reading only. `t06_real_server.py` ran once on each
 emulator: the app, as installed and with the address it offers, connected to the server and showed the height
-of the main chain (blocks 25235, 25237 and 25238, each the height that the computer was told at the same
+of the main chain (blocks 25625, 25625 and 25626, each the height that the computer was told at the same
 moment). There was no wallet in the phone, so the server was named no address. `t09_real_server_watch.py` ran
-once, on Android 14: the app was given a setup file that names the public server and one address to watch, an
-address that is public chain data and holds several thousand coins. The app showed 33829.09039810 NORTH for
-it. That is the sum of the 3,353 coins that the server listed for the address at
-block 25240, which the computer read over four pages right before and right after the app's look, with the
-same result. The History page listed block rewards of that address. Nothing was sent, and there was no wallet
-in the phone.
+on Android 14: the app was given a setup file that names the public server and one address to watch, an
+address that is public chain data and holds several thousand coins. The app showed 34719.97039914 NORTH for
+it. That is the sum of the 3,440 coins that the server listed for the address at block 25629, which the computer
+read over four pages right before and right after the app's look, with the same result. The History page
+listed block rewards of that address. Nothing was sent, and there was no wallet in the phone. The first
+package had made the same two runs on 15 November 2026 (blocks 25235, 25237 and 25238; 33829.09039810 NORTH,
+the sum of 3,353 coins at block 25240).
+
+On 16 November `t09_real_server_watch.py` needed a second try. At the first the app had made its look, and
+then the script's own reading of the server stopped: between two of its pages the server took a new picture
+of the chain and answered 409 for the cursor of the picture before, and the script did not start again as
+the app does. The script now takes such an answer, and a 503 while the new picture is taken, as a reading
+that did not agree, and reads again. The log of the first try is `emulator-a14-realwatch.first-try.log` in
+`../evidence-0.6.1`. What stopped the script is what the app meets as well, and answers by reading again: a
+change of the server's picture in the middle of a list.
 
 Not run on an emulator: what is listed for 0.6.0 below; a payment through the public server; a block or a
 transaction that arrives in the middle of a look; lines of history that do not fit together; and more coins

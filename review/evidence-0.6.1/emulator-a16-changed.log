@@ -20,7 +20,7 @@ ok     1  version 0.6.0 and a wallet server that answers in the new shapes: the 
   -E-- TextView       (95, 1888, 300, 1941) Block height
   -E-- TextView       (922, 1888, 985, 1941) 120
   -E-- TextView       (95, 1962, 240, 2015) Asked at
-  -E-- TextView       (842, 1962, 985, 2015) 21:16:12
+  -E-- TextView       (842, 1962, 985, 2015) 10:00:13
   -E-- TextView       (137, 175, 305, 249) Polarka
   -E-- View           (849, 181, 912, 244) Refresh
   -E-- View           (975, 181, 1038, 244) Lock

@@ -49,7 +49,10 @@ notes. These changes followed, before the package of the release was built:
 The reviewer looked at these changes on the same day (commit 5d923fd). It found the bound of pages, the
 history of watched addresses and the texts in order, and the first finding eased as far as the client alone
 can do it: a look that a moving picture cuts is made again, but the whole history is still read on every
-look (see "What was not done"). It had three notes more, and these changes followed:
+look (see "What was not done"). It asked for two sentences to be changed that made the risk that is left
+sound smaller than it is: that both findings had been put right, where the first was eased and not cured,
+and that today's network is quiet enough, which nothing had measured on a phone. They were changed. It had
+three notes more, and these changes followed:
 
 | Change | Where | Tests |
 |---|---|---|
@@ -57,13 +60,14 @@ look (see "What was not done"). It had three notes more, and these changes follo
 | The words for a picture that kept changing fit the payment screen as well, where the coins are read for a payment: nothing new is shown, and no payment is worked out. | `strings.xml` (en, cs) | `AfterSeventhLookTextsTest.aPictureThatKeptChangingIsSaidAsThatAndNotAsABusyServerOrAnError` |
 | A test for the one branch that had none: lines of two parts of the watched addresses that do not fit together. | | `ServerEngineTest.linesForWatchedAddressesThatDoNotFitTogetherSayThatTheHistoryIsNotWhole` |
 
-None of the changes after the independent look touches the safeguard against paying the same thing twice,
-the reading of an amount or the wallet's file.
+The reviewer looked at these as well (commit 4c0f648) and found them in order. None of the changes after
+the independent look touches the safeguard against paying the same thing twice, the reading of an amount or
+the wallet's file.
 
 ## What was checked against the real server
 
-All of it reading, with addresses that are public chain data, on 15 November 2026, with the code of that day
-(commit 96d78d5) and the first package built from it:
+All of it reading, with addresses that are public chain data. Where no other day is named, on 15 November
+2026, with the code of that day (commit 96d78d5) and the first package built from it:
 
 - `review/standin/compare_pages.py`: 51 questions about pages of coins and of history and about what must be
   refused, to the stand-in and to the public server. Status, words, fields and page sizes were alike in all 51.
@@ -85,16 +89,41 @@ All of it reading, with addresses that are public chain data, on 15 November 202
   address to watch that holds several thousand coins. It showed 33829.09039810 NORTH, the sum of the 3,353
   coins that the server listed for the address at block 25240 over four pages, and block rewards in its
   history. On the three emulators the package as installed read the height of the chain from the server.
+- On 16 November 2026 the package of the release repeated the two runs on emulators. On Android 14, 12 and
+  16 it read the height of the chain from the server (blocks 25625, 25625 and 25626). On Android 14 it showed
+  34719.97039914 NORTH for the watched address, the sum of the 3,440 coins that the server listed for it at block
+  25629 over four pages, and block rewards in its history. That run needed a second try, through a fault of the
+  test script's own reading of the server and not of the app (`emulator/README.md`).
 
 ## How it was checked
 
-A first package of 0.6.1 was built on 15 November 2026 from commit 96d78d5 (SHA-256
-`7da80705ad9c70ffc1ee4646d5f5d0bac86a707593476ac5214b1c3a420c914b`). It went through the tests (194 at that
-time), 23 deliberate faults, `static-checks.sh` and twenty-four runs on emulators with Android 12, 14 and
-16, and it read the public server from an emulator; `evidence-0.6.1` holds what that gave. It was handed to
-nobody. The independent look came after it and changed the code, so the package of the release is built
-from the commit that the tag `v0.6.1` names, and the checks are made again on that package. The commit after
-that one writes here, and into `evidence-0.6.1`, what they gave.
+0.6.1 was built twice. A first package was built on 15 November 2026 from commit 96d78d5 (SHA-256
+`7da80705ad9c70ffc1ee4646d5f5d0bac86a707593476ac5214b1c3a420c914b`) and went through the checks below as
+they stood then: 194 tests, 23 deliberate faults, `static-checks.sh` and twenty-four runs on emulators, all of
+which passed at the first try. It was handed to nobody. The independent look came after it and changed the
+code. The package of the release was built on 16 November 2026 from commit 4c0f648, and everything below was
+run again on it.
+
+- The tests: 203, none failed, none skipped. Lint: 0 errors, 6 warnings, 2 hints. The tests about a server
+  run against the stand-in on a real regtest node.
+- Deliberate faults, one at a time, each to be caught by a test: 18 in the client for a server, 16 in the
+  look through a server, 2 in the wallet's file, 2 in the model and 2 in what the screen says. Each of the
+  forty was caught (`evidence-0.6.1/deliberate-faults.txt`). Seventeen of them are in what was changed after
+  the independent look.
+- The signed package (SHA-256 `03be9b1657e9ee4e43c9676f1cd45afeebcc6bb625de36d2d9961bccbce171ae`, version
+  code 12) went through `static-checks.sh`; the output is in `evidence-0.6.1`. Permissions, components and
+  libraries are those of 0.6.0, and the code holds the same one address of a server.
+- The same package ran on emulators with Android 12, 14 and 16, eight runs on each, and all passed at the
+  first try: the seven runs of 0.6.0, with the stand-in answering in the new shapes, and a new one. In the
+  new one the signed package of 0.6.0 meets such a server, says that it cannot read the answer and shows no
+  coins; then 0.6.1 is installed over it and shows the same wallet with its coins and history, the change of
+  a waiting payment as on its way, and coins that come three to a page. `emulator/README.md` says what was
+  run.
+- Two runs on emulators read the public server (above). The second of them was repeated once.
+- The independent reviewer read the sources at three looks (`independent-review-0.6.1/`). It did not look at
+  the package, at the runs on emulators, or at the seventeen deliberate faults that were added after its
+  first look.
+- Not checked: what is listed under "What was not done", and 0.6.1 on a real phone.
 
 ## What 0.6.1 knows less well than 0.6.0 did
 

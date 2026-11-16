@@ -51,6 +51,13 @@ changed and had three notes more.
 | N5 (note). One branch of the change for R3 had no test: a watched movement that cannot be told because its lines do not fit together. The reviewer removed the branch and no test failed. | A test for it. | `ServerEngineTest.linesForWatchedAddressesThatDoNotFitTogetherSayThatTheHistoryIsNotWhole` |
 | A remark on a test: `aListInPagesIsNotReadForLongerThanItsTime` runs in real time, with windows of 900 to 3,000 ms, and could fail on a machine that is very busy. | Left as it is. The time limit of a reading is real time, and the windows are wide. | |
 
+The reviewer then looked at what this table says was done (commit 4c0f648) and added the section "After the
+second changes (4c0f648)" to its report: all five points closed, nothing new, and no reason to hold the
+release back. With its fault for N5 planted again, the new test failed, as it should. It remarked that the
+short account in `changes-0.6.1.md` passed over the two sentences; that account names them now. The
+reviewer read the sources at each of its three looks. It did not look at the package, at the runs on
+emulators or at the deliberate faults that the author added after its first look.
+
 ## The reviewer's own tests
 
 `ReviewerPagesTest.kt` and `ReviewerBusyTest.kt` in this folder are the reviewer's tests as they were handed
@@ -69,15 +76,18 @@ They are not part of the suite. The tests named in the tables tell the same stor
 of the whole suite on its machine: 194 tests, one of them skipped there for want of the gateway of
 polarka-node. `all2-summary.txt` is the whole suite at the look at the changes: 205 tests with the
 reviewer's own three, which failed as said above, and one skipped as before. `mutant-watched.log` is the run
-of the fault that the reviewer planted for N5, which no test caught at that time. The log of the fault that
-the reviewer planted at its first look is not in this folder because it holds paths of the machine; the
-report says what it showed.
+of the fault that the reviewer planted for N5, which no test caught at that time. `third.log` is the run of
+the tests at its third look. Two logs are not in this folder because they hold paths of the machine: that
+of the fault planted at the first look, and that of the fault for N5 planted again at the third, when the
+new test failed. The report says what they showed.
 
-SHA-256 of the reviewer's files as they were handed over. The report is here as it was after the look at the
-changes. After the first look, when it ended with the section "What I did not check", it was
-b64fd300ce0b1bb2785533918ae652ca68cc50f48cedd1fd83822f01418756e7.
+SHA-256 of the reviewer's files as they were handed over. The report is here as it was after the third look.
+After the first look, when it ended with the section "What I did not check", it was
+b64fd300ce0b1bb2785533918ae652ca68cc50f48cedd1fd83822f01418756e7, and after the second, when it ended with
+the section "After the changes (5d923fd)",
+49afae685572d38e96a19cc5f618fd27407d5b80a94874642c400587c6235e43.
 
-    49afae685572d38e96a19cc5f618fd27407d5b80a94874642c400587c6235e43  REVIEW-0.6.1.md
+    143811df3161df013d4c007d84fcf7db85c04887f1dfa75fcd029e9af828763e  REVIEW-0.6.1.md
     dd7dac71c7e658399bf96f33eca82e0b14b0fc3ea5fc8d1c0df291c05595fc3a  ReviewerPagesTest.kt
     0edc81c01e09978691d6861d6818e1ada25b7263469ddf12060b9508260d479d  ReviewerBusyTest.kt
     f1698c91592f5fb6bcad4fe4baedda1482e2b300a1621d67431d4459cd2a4d13  reviewer-node.log
@@ -85,3 +95,4 @@ b64fd300ce0b1bb2785533918ae652ca68cc50f48cedd1fd83822f01418756e7.
     0e089de14e50dd3270828349cc81127f2ac0c701778c58ee64ef038e51cb0f31  all-summary.txt
     16003ef05f5601824055b6c1a494cd8616118e73bddf0e4dab5f69297fd6575b  all2-summary.txt
     2f7096b19b2bbfe006020984fad0f2b5c652793610f143ed189cf3f74e51850e  mutant-watched.log
+    b6626325212c261682bf2160762ab96b23986510e13a14e129f27a2805b52907  third.log
