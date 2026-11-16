@@ -100,6 +100,8 @@ All of it reading, with addresses that are public chain data, on 15 November 202
 - The note under a history that is not whole is about the wallet's own history. The history of watched
   addresses with more lines than the app reads (2,000 for each hundred addresses) ends with the oldest line
   that was read and has no such note, as in 0.6.0.
-- Nothing in an answer says which shapes a server speaks, so the next change of this kind will again be found
-  by an answer that cannot be read. The author of the server has been asked whether a change could be made
-  visible to a client.
+- Nothing in the answers that 0.6.1 reads says which shapes a server speaks, so the next change of this kind
+  will again be found by an answer that cannot be read. The author of the server was asked whether a change
+  could be made visible to a client, and on 16 November 2026 he added `GET /info`, which names the release of
+  the server (github.com/nova9/northbound, issue 5; the public server did not have it yet on the morning of
+  that day). 0.6.1 was finished before that and does not ask it.

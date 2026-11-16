@@ -9,8 +9,8 @@ It was written from the server's sources: first at the tag v0.1.0-rc.5 and commi
 server on 14 and 15 November 2026 came back in these shapes.
 
 The paths of version 1 have stayed as they were. The shapes have not. On 15 November 2026 the lines of history
-changed and coins began to come in pages (commits d72a5e1, e3376a1 and 66fa1d9), and nothing in an answer says
-which shapes a server speaks. Polarka Wallet 0.6.0 read the earlier shapes and refuses the new history as an
+changed and coins began to come in pages (commits d72a5e1, e3376a1 and 66fa1d9), and nothing in these answers
+says which shapes a server speaks. Polarka Wallet 0.6.0 read the earlier shapes and refuses the new history as an
 answer in an unknown form; 0.6.1 reads the shapes below, and refuses the earlier history in the same way.
 
 ## Calls
@@ -102,6 +102,9 @@ server and offers its three fixed rates.
   another payment of the same wallet that spends one of its coins.
 - No answer is waited for without end. Every question has a time limit as a whole (`ServerClient.DEADLINE_MS`),
   beside the limits for a connection and for a single read.
-- Nothing in an answer names the version of the shapes. A client learns of a change by failing to read an
-  answer, as 0.6.0 did. The author of the server was asked on 15 November 2026 whether a change could be made
-  visible to a client (github.com/nova9/northbound, issue 5).
+- Nothing in the answers below names the version of the shapes. A client learns of a change by failing to
+  read an answer, as 0.6.0 did. The author of the server was asked on 15 November 2026 whether a change could
+  be made visible to a client (github.com/nova9/northbound, issue 5). On 16 November 2026 he added `GET /info`,
+  which answers with the release of the server, `{"version":"0.2.0-alpha.1"}` at first; a server from before
+  that answers 404, and so did the public server on the morning of that day. The other answers were not
+  changed by it. Polarka Wallet 0.6.1 does not ask `/info`.
