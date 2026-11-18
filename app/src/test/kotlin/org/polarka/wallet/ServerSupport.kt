@@ -54,7 +54,10 @@ internal class ServerNode private constructor(private val bin: File) : AutoClose
         return out
     }
 
-    fun mine(blocks: Int, address: String): String = cli("generatetoaddress", blocks.toString(), address)
+    /** Called after blocks were mined: a real wallet server needs a moment to read them, the stand-in does not. */
+    @Volatile var afterMining: () -> Unit = {}
+
+    fun mine(blocks: Int, address: String): String = cli("generatetoaddress", blocks.toString(), address).also { afterMining() }
 
     fun bestHash(): String = cli("getbestblockhash")
 
@@ -94,8 +97,48 @@ internal class ServerNode private constructor(private val bin: File) : AutoClose
  * It is a program of its own, written in Python from the real server's sources; the same program serves the
  * emulators. The real server's code is not run anywhere in these tests.
  */
-internal class StandIn private constructor(private val process: Process, val port: Int) : AutoCloseable {
-    val url: String get() = "http://127.0.0.1:$port"
+internal class StandIn private constructor(private val process: Process, val port: Int, private val real: File? = null) : AutoCloseable {
+    private var front: ServerRelay? = null
+    private val direct: String get() = "http://127.0.0.1:$port"
+    val url: String get() = front?.url ?: direct
+
+    /** With a real server: waits until it has looked at the node (its blocks and what waits there) after this moment. */
+    fun settled(node: ServerNode) {
+        val arrived = System.currentTimeMillis()
+        val end = arrived + 30_000
+        while (System.currentTimeMillis() < end) {
+            val done = runCatching {
+                val c = URL("$direct/ready").openConnection() as HttpURLConnection
+                c.connectTimeout = 2000
+                c.readTimeout = 5000
+                val status = c.responseCode
+                val text = ((if (status in 200..299) c.inputStream else c.errorStream)?.use { it.readBytes() } ?: ByteArray(0)).decodeToString()
+                val seen = Regex("\"pending_observed_at\":(\\d+)").find(text)?.groupValues?.get(1)?.toLong()
+                status == 200 && seen != null && text.contains(node.bestHash()) && (if (seen > 100_000_000_000L) seen else seen * 1000) > arrived
+            }.getOrDefault(false)
+            if (done) return
+            Thread.sleep(100)
+        }
+    }
+
+    /** With a real server: waits until it is ready and has read the node's newest block. */
+    fun caughtUp(node: ServerNode) {
+        val end = System.currentTimeMillis() + 90_000
+        var last = "no answer"
+        while (System.currentTimeMillis() < end) {
+            check(process.isAlive) { "the real server has ended; its log is ${File(real, "server.log")}" }
+            runCatching {
+                val c = URL("$direct/ready").openConnection() as HttpURLConnection
+                c.connectTimeout = 2000
+                c.readTimeout = 5000
+                val status = c.responseCode
+                last = ((if (status in 200..299) c.inputStream else c.errorStream)?.use { it.readBytes() } ?: ByteArray(0)).decodeToString()
+                if (status == 200 && last.contains(node.bestHash())) return
+            }
+            Thread.sleep(200)
+        }
+        throw IllegalStateException("the real server did not catch up with the node in 90 s; it last said: $last")
+    }
 
     /** A request as it is, for what the client under test does not let through. Returns the status and the body. */
     fun post(path: String, json: String): Pair<Int, String> {
@@ -111,16 +154,48 @@ internal class StandIn private constructor(private val process: Process, val por
 
     /** The stand-in's switches: {"stale":true} (the index is behind), {"busy":2} (the next two requests get 429), {"hold":true} (nothing is passed on). */
     fun set(json: String) {
+        if (real != null) throw org.junit.AssumptionViolatedException("a real server has no switches; this test needs the stand-in")
         check(post("/__standin/set", json).first == 200) { "the stand-in did not take $json" }
     }
 
     override fun close() {
         runCatching { process.outputStream.close() }            // it stops when its standard input closes
+        front?.close()
+        if (real != null) process.destroy()
         if (!process.waitFor(10, TimeUnit.SECONDS)) process.destroyForcibly()
+        if (real != null && System.getenv("NORTHBOUND_KEEP_LOG") == null) real.deleteRecursively()
     }
 
     companion object {
+        /**
+         * NORTHBOUND_SERVER names the program of a real Northbound server: the tests then stand on it and not on
+         * the stand-in. It is how a new version of the server is tried before the public one moves to it.
+         */
+        private fun startReal(node: ServerNode, program: File): StandIn {
+            val port = ServerSocket(0).use { it.localPort }
+            val dir = Files.createTempDirectory("polarka-real-server-").toFile()
+            val builder = ProcessBuilder(program.path).redirectErrorStream(true).redirectOutput(File(dir, "server.log"))
+            builder.environment().putAll(mapOf(
+                "TRUENORTH_NETWORK" to "regtest", "TRUENORTH_RPC_URL" to "http://127.0.0.1:${node.port}", "TRUENORTH_RPC_COOKIE_PATH" to node.cookie.path,
+                "TRUENORTH_SERVER_BIND" to "127.0.0.1:$port", "TRUENORTH_INDEX_DATABASE" to File(dir, "chain.sqlite").path,
+                "TRUENORTH_INDEX_POLL_SECONDS" to "1", "TRUENORTH_SERVER_REQUESTS_PER_SECOND" to "1000",
+            ))
+            val server = StandIn(builder.start(), port, dir)
+            try {
+                server.caughtUp(node)
+            } catch (e: Throwable) {
+                server.process.destroyForcibly()
+                throw e
+            }
+            node.afterMining = { server.caughtUp(node) }
+            if (System.getenv("NORTHBOUND_NO_WAIT") == null) {
+                server.front = ServerRelay(server.direct).also { relay -> relay.instead = { _, _ -> server.settled(node); null } }
+            }
+            return server
+        }
+
         fun start(node: ServerNode): StandIn {
+            System.getenv("NORTHBOUND_SERVER")?.let { return startReal(node, File(it)) }
             val script = generateSequence(File("").absoluteFile) { it.parentFile }
                 .map { File(it, "review/standin/northbound_standin.py") }.firstOrNull { it.isFile }
                 ?: throw IllegalStateException("review/standin/northbound_standin.py was not found above the working folder")
