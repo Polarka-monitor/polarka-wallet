@@ -335,4 +335,16 @@
     <string name="send_beside_waiting">An earlier payment of this wallet has waited for a block for over an hour and can still arrive. This payment does not stand against it: both could arrive. If you are paying the same thing a second time, first find out what became of the earlier one; unless you asked a node of your own, look at the wallet through another server or node as well.</string>
     <string name="problem_paper_refused">The node says that it does not take the transaction (%1$s). It is not a node of your own and it has seen the whole transaction: it could still pass it on while the coins of the paper address are unspent. Look at the address again and empty it again, through another node if this one keeps saying no. Once the address is empty, the transaction it has seen can no longer arrive. Until then do not pay the same thing in another way.</string>
     <string name="problem_paper_refused_server">The server says that the node behind it does not take the transaction (%1$s). The server has seen the whole transaction: it could still pass it on while the coins of the paper address are unspent. Look at the address again and empty it again, through another server or a node of your own if this one keeps saying no. Once the address is empty, the transaction it has seen can no longer arrive. Until then do not pay the same thing in another way.</string>
+    <string name="receive_note_fixed">This is the wallet\'s fixed address: everyone pays to the same one. Whoever knows it can see every payment to it; turn this off in Settings for a new address each time.</string>
+    <string name="fixed_address_setting">One fixed receiving address (turn off for a new address for each payment)</string>
+    <string name="about_link">polarka.org: about this app</string>
+    <string name="server_pick_northbound">Northbound</string>
+    <string name="server_pick_polarka">Polarka</string>
+    <string name="server_intro_polarka">The quickest start, without a node of your own. The wallet asks a server for TrueNorth wallets what your addresses hold and hands it your signed payments. This server is run by Polarka, the authors of this app, on a node of its own.</string>
+    <string name="faucet_title">A first coin</string>
+    <string name="faucet_text">Polarka\'s faucet sends a small amount to the address above, once a day at most. The phone first does a little work for it (some seconds).</string>
+    <string name="faucet_go">Ask the faucet</string>
+    <string name="faucet_busy">Working…</string>
+    <string name="faucet_done">The faucet sent it. It shows in the balance once it is in a block (about two minutes). Its transaction:</string>
+    <string name="faucet_refused">The faucet said no (%1$s). Try again later.</string>
 </resources>

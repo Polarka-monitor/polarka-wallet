@@ -161,7 +161,12 @@ data class WalletInfo(
     val lookTo: Int = 0,
     /** Payments that did not go through as far as the node showed, and that could still arrive. */
     val dropped: List<Dropped> = emptyList(),
+    /** The receive page shows the first address always, in place of a new one for each payment. Null: the edition decides. */
+    val fixedAddress: Boolean? = null,
 ) {
+    /** What the receive page does: the owner's word, else what the edition of the app does by itself. */
+    val fixed: Boolean get() = fixedAddress ?: BuildConfig.FIXED_ADDRESS
+
     fun watchKey(): WatchKey = WatchKey.parse(xpub, chain)
 
     /**
@@ -186,6 +191,7 @@ data class WalletInfo(
         put("price", JsonPrimitive(price))
         put("currency", JsonPrimitive(currency))
         put("lockOnOpen", JsonPrimitive(lockOnOpen))
+        if (fixedAddress != null) put("fixedAddress", JsonPrimitive(fixedAddress))
         put("lookTo", JsonPrimitive(lookTo))
         put("pending", buildJsonArray {
             pending.forEach { p ->
@@ -234,6 +240,7 @@ data class WalletInfo(
                 chain, s("xpub")!!, (o["receiveIndex"] as JsonPrimitive).intOrNull ?: 0, (o["changeIndex"] as JsonPrimitive).intOrNull ?: 0,
                 s("hashrate").orEmpty(), s("price").orEmpty(), s("currency").orEmpty(), (o["lockOnOpen"] as? JsonPrimitive)?.booleanOrNull ?: true,
                 lookTo = (o["lookTo"] as? JsonPrimitive)?.intOrNull ?: 0,
+                fixedAddress = (o["fixedAddress"] as? JsonPrimitive)?.booleanOrNull,
             )
             require(info.receiveIndex in 0..100_000 && info.changeIndex in 0..100_000) { "a key number is out of bounds" }
             require(info.lookTo in 0..MAX_LOOK) { "the number of keys to look at is out of bounds" }

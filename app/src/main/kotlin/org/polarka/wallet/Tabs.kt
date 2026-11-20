@@ -37,6 +37,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -268,15 +272,55 @@ fun ReceiveTab(model: WalletModel, state: WalletState, owner: Owner) {
             NoWallet(model, state, owner)
             return@Page
         }
-        val address = remember(wallet.xpub, wallet.receiveIndex) { wallet.watchKey().address(0, wallet.receiveIndex) }
+        // a fixed address is the first one of the wallet; the keys and what the app looks at stay the same
+        val index = if (wallet.fixed) 0 else wallet.receiveIndex
+        val address = remember(wallet.xpub, index) { wallet.watchKey().address(0, index) }
         Block(stringResource(R.string.receive_title)) {
             QrCode(address, Modifier.fillMaxWidth().padding(horizontal = 24.dp))
             Mono(address, "receive-address")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { copyToClipboard(context, "NORTH address", address) }) { Text(stringResource(R.string.copy)) }
-                OutlinedButton(onClick = model::nextAddress, modifier = Modifier.testTag("next-address")) { Text(stringResource(R.string.receive_next)) }
+                if (!wallet.fixed) {
+                    OutlinedButton(onClick = model::nextAddress, modifier = Modifier.testTag("next-address")) { Text(stringResource(R.string.receive_next)) }
+                }
             }
-            Text(stringResource(R.string.receive_note, wallet.receiveIndex + 1), style = MaterialTheme.typography.bodySmall)
+            Text(
+                if (wallet.fixed) stringResource(R.string.receive_note_fixed) else stringResource(R.string.receive_note, wallet.receiveIndex + 1),
+                style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("receive-note"),
+            )
+        }
+        if (BuildConfig.FAUCET && wallet.chain == north.core.Chain.MAIN) FaucetBlock(address)
+    }
+}
+
+/** The faucet of the personal edition: a first coin to the address shown, after a little work done by the phone. */
+@Composable
+private fun FaucetBlock(address: String) {
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var said by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
+    Block(stringResource(R.string.faucet_title)) {
+        Text(stringResource(R.string.faucet_text), style = MaterialTheme.typography.bodySmall)
+        Button(
+            onClick = {
+                busy = true
+                said = null
+                scope.launch {
+                    said = withContext(Dispatchers.Default) {
+                        try { true to Faucet.ask(address) } catch (e: Faucet.Refused) { false to e.reason }
+                    }
+                    busy = false
+                }
+            },
+            enabled = !busy, modifier = Modifier.testTag("faucet-go"),
+        ) { Text(stringResource(if (busy) R.string.faucet_busy else R.string.faucet_go)) }
+        said?.let { (ok, what) ->
+            if (ok) {
+                Text(stringResource(R.string.faucet_done))
+                Mono(what, "faucet-txid")
+            } else {
+                Text(stringResource(R.string.faucet_refused, what), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("faucet-refused"))
+            }
         }
     }
 }
@@ -536,6 +580,10 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner, go: (Section) 
                 Mono(descriptor)
                 OutlinedButton(onClick = { copyToClipboard(context, "descriptor", descriptor) }) { Text(stringResource(R.string.copy)) }
                 Tick(wallet.lockOnOpen, { model.saveLock(it, owner) }, stringResource(R.string.lock_setting), "lock-setting")
+                Tick(wallet.fixed, { model.saveFixedAddress(it) }, stringResource(R.string.fixed_address_setting), "fixed-address-setting")
+                TextButton(onClick = {
+                    runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://polarka.org"))) }
+                }) { Text(stringResource(R.string.about_link)) }
                 val looked = state.snapshot?.lookedTo ?: 0
                 if (looked > 1) {
                     Text(stringResource(pick(R.string.further_more_text, R.string.further_more_text_server), looked.toString()), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("looked-to"))

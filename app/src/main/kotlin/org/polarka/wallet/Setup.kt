@@ -74,6 +74,9 @@ data class Setup(
          * here at its author's request. The owner may type another one.
          */
         const val DEFAULT_SERVER = "https://api.northboundwallet.org"
+
+        /** The wallet server run by Polarka, the authors of this app, on a node of its own. Offered as a choice. */
+        const val POLARKA_SERVER = "https://node.polarka.org"
         const val MAX_CHARS = 16 * 1024
         const val MAX_ADDRESSES = 20
 

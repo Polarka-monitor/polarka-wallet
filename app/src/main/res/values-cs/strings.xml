@@ -334,4 +334,16 @@
     <string name="send_beside_waiting">Dřívější platba této peněženky čeká na blok déle než hodinu a stále může dorazit. Tato platba proti ní nestojí: dorazit by mohly obě. Pokud totéž platíte podruhé, zjistěte nejdřív, co se s dřívější platbou stalo; pokud jste se neptali vlastního uzlu, podívejte se na peněženku také přes jiný server nebo uzel.</string>
     <string name="problem_paper_refused">Uzel hlásí, že transakci nepřijme (%1$s). Není to váš vlastní uzel a celou transakci viděl: dokud jsou mince papírové adresy neutracené, může ji ještě předat dál. Podívejte se na adresu znovu a vyprázdněte ji znovu, přes jiný uzel, pokud tento stále odmítá. Jakmile bude adresa prázdná, transakce, kterou viděl, už dorazit nemůže. Do té doby neplaťte totéž jinou cestou.</string>
     <string name="problem_paper_refused_server">Server hlásí, že uzel za ním transakci nepřijme (%1$s). Celou transakci ale viděl: dokud jsou mince papírové adresy neutracené, může ji ještě předat dál. Podívejte se na adresu znovu a vyprázdněte ji znovu, přes jiný server nebo vlastní uzel, pokud tento stále odmítá. Jakmile bude adresa prázdná, transakce, kterou viděl, už dorazit nemůže. Do té doby neplaťte totéž jinou cestou.</string>
+    <string name="receive_note_fixed">Toto je stálá adresa peněženky: všichni platí na tutéž. Kdo ji zná, vidí všechny platby na ni; v Nastavení to lze vypnout a mít pro každou platbu novou adresu.</string>
+    <string name="fixed_address_setting">Jedna stálá přijímací adresa (vypnuto: nová adresa pro každou platbu)</string>
+    <string name="about_link">polarka.org: o této aplikaci</string>
+    <string name="server_pick_northbound">Northbound</string>
+    <string name="server_pick_polarka">Polarka</string>
+    <string name="server_intro_polarka">Nejrychlejší začátek, bez vlastního uzlu. Peněženka se ptá serveru pro peněženky TrueNorth, co je na vašich adresách, a předává mu vaše podepsané platby. Tento server provozuje Polarka, autoři této aplikace, na vlastním uzlu.</string>
+    <string name="faucet_title">První mince</string>
+    <string name="faucet_text">Kohoutek Polarky pošle na adresu výše malou částku, nejvýš jednou za den. Telefon pro něj nejdřív udělá kus práce (několik sekund).</string>
+    <string name="faucet_go">Požádat kohoutek</string>
+    <string name="faucet_busy">Pracuji…</string>
+    <string name="faucet_done">Kohoutek poslal. V zůstatku se ukáže, až bude v bloku (asi dvě minuty). Jeho transakce:</string>
+    <string name="faucet_refused">Kohoutek odmítl (%1$s). Zkuste to později.</string>
 </resources>

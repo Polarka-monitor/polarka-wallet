@@ -670,6 +670,11 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Switching the lock off is something only the owner may do. */
+    /** A fixed receiving address, or a new one for each payment. Nothing about the keys changes, only what is shown. */
+    fun saveFixedAddress(on: Boolean) {
+        viewModelScope.launch { change({ it.copy(fixedAddress = on) }) }
+    }
+
     fun saveLock(on: Boolean, owner: Owner) {
         viewModelScope.launch {
             if (!on && !runCatching { owner.present() }.getOrDefault(false)) return@launch

@@ -15,8 +15,24 @@ android {
         applicationId = "org.polarka.wallet"
         minSdk = 31
         targetSdk = 36
-        versionCode = 12
-        versionName = "0.6.1"
+        versionCode = 13
+        versionName = "0.7.0"
+    }
+    // Two editions from one source. "personal": the owner's own phone (a fixed address and the faucet on the receive
+    // page). "public": what is published (a new address for each payment unless the owner asks for a fixed one, no faucet).
+    flavorDimensions += "edition"
+    productFlavors {
+        create("personal") {
+            dimension = "edition"
+            versionNameSuffix = "-personal"
+            buildConfigField("boolean", "FIXED_ADDRESS", "true")
+            buildConfigField("boolean", "FAUCET", "true")
+        }
+        create("public") {
+            dimension = "edition"
+            buildConfigField("boolean", "FIXED_ADDRESS", "false")
+            buildConfigField("boolean", "FAUCET", "false")
+        }
     }
     // The key that signs releases lives outside the project, on the owner's computer only (see make-signing-key.sh).
     // Without it a release cannot be built here, and that is intended. The file that names the key is opened only
@@ -43,7 +59,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
     testOptions {
         unitTests {

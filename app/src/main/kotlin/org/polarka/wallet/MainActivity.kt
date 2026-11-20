@@ -201,7 +201,20 @@ private fun SetupScreen(model: WalletModel, state: WalletState) {
             // A wallet server, for an owner without a node. The one that is filled in is not ours, and the screen says whose it is.
             val server: @Composable () -> Unit = {
                 Block(stringResource(R.string.server_setup_title)) {
-                    Text(stringResource(R.string.server_intro), modifier = Modifier.testTag("server-intro"))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        androidx.compose.material3.FilterChip(
+                            selected = serverUrl == Setup.DEFAULT_SERVER, onClick = { serverUrl = Setup.DEFAULT_SERVER },
+                            label = { Text(stringResource(R.string.server_pick_northbound)) }, modifier = Modifier.testTag("server-pick-northbound"),
+                        )
+                        androidx.compose.material3.FilterChip(
+                            selected = serverUrl == Setup.POLARKA_SERVER, onClick = { serverUrl = Setup.POLARKA_SERVER },
+                            label = { Text(stringResource(R.string.server_pick_polarka)) }, modifier = Modifier.testTag("server-pick-polarka"),
+                        )
+                    }
+                    Text(
+                        stringResource(if (serverUrl == Setup.POLARKA_SERVER) R.string.server_intro_polarka else R.string.server_intro),
+                        modifier = Modifier.testTag("server-intro"),
+                    )
                     Text(stringResource(R.string.server_sees), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("server-sees"))
                     OutlinedTextField(
                         value = serverUrl, onValueChange = { serverUrl = it.trim() }, singleLine = true, label = { Text(stringResource(R.string.server_address)) },
