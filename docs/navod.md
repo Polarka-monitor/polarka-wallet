@@ -3,7 +3,7 @@
 Polarka Wallet je zkušební verze. Zkontroloval ji autor s pomocí AI, nezávislý recenzent, kterým je model AI,
 a jednou, ve verzi 0.7.1, lidé mimo tento projekt. Co našli, je ve verzi 0.7.2 opravené; opravy zatím nikdo
 nezávislý nekontroloval.
-Mějte v ní jen malé částky. Větší úspory patří na papír (studená adresa).
+Jako u každé peněženky v telefonu: úspory, které nepotřebujete mít po ruce, jsou nejbezpečnější na papíře (studená adresa).
 
 ## Před instalací
 

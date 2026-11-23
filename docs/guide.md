@@ -3,7 +3,7 @@
 Polarka Wallet is a test build. It has been checked by its author, with the help of AI, by an independent AI
 reviewer, and once, at version 0.7.1, by people outside this project. What they found is put right in 0.7.2;
 nobody independent has looked at those fixes yet.
-Keep only small amounts in it. Larger savings belong on paper (a cold address).
+As with any wallet in a phone, savings that you do not need at hand are safest on paper (a cold address).
 
 ## Before you install
 

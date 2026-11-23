@@ -10,8 +10,8 @@ security review of 0.7.1 by people outside this project, whose names are not giv
 critical and no high fault, and nothing through which a server, a node or another app could take the recovery
 words, put another address in place of the one typed, or take coins. It found four medium and five low faults;
 0.7.2 puts right the four medium ones and the three low ones that concern the app, and the other two are put
-right in the server software (`review/changes-0.7.md`). Nobody independent has looked at those fixes yet. It
-remains a test build for small amounts, and it comes without any warranty (`LICENSE`).
+right in the server software (`review/changes-0.7.md`). Nobody independent has looked at those fixes yet. Like
+every release it comes without any warranty (`LICENSE`).
 
 0.7 adds three things to 0.6.1. The first screen offers a second wallet server beside the Northbound project's:
 Polarka's own, at `node.polarka.org`, run by the authors of this app. The owner can ask for one fixed receiving
