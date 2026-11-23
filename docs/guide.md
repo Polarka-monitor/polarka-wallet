@@ -20,16 +20,18 @@ Keep only small amounts in it. Larger savings belong on paper (a cold address).
 
 ## First start: a server, or a node of your own
 
-The wallet has no server of its own. It asks elsewhere what your addresses hold, and where is your choice.
+The wallet asks a server or a node what your addresses hold, and which one is your choice.
 
-- **A public server** is the quickest way and is offered first. The one filled in is the server of the
-  Northbound project (`https://api.northboundwallet.org`); it is not run by the authors of this app. The
-  server sees all the addresses of your wallet together, every address you watch or empty through the app,
-  and your internet address. It could show a false balance, keep an incoming payment from you, hold a
-  payment back, or call a payment done that is not. It cannot take your coins: the words and the keys never
-  leave the phone. While the server is down the wallet shows nothing; the coins stay
-  yours and you connect elsewhere. The address of another server with the same interface can be typed in
-  place of the one filled in.
+- **A public server** is the quickest way and is offered first. Two are offered. The one filled in is the
+  server of the Northbound project (`https://api.northboundwallet.org`); it is not run by the authors of this
+  app. The other is Polarka's own (`https://node.polarka.org`), run by the authors of this app on a node of
+  their own. The screen says whose the server in the field is, and once more before it is saved; of an
+  address you type yourself it says that the app does not know who runs it. Any of them sees all the
+  addresses of your wallet together, every address you watch or empty through the app, and your internet
+  address. It could show a false balance, keep an incoming payment from you, hold a payment back, or call a
+  payment done that is not. It cannot take your coins: the words and the keys never leave the phone. While
+  the server is down the wallet shows nothing; the coins stay yours and you connect elsewhere. The address
+  of another server with the same interface can be typed in place of the one filled in.
 - **A node of your own** keeps your addresses to yourself. See the last chapter.
 
 What is different through a server:
@@ -73,7 +75,12 @@ tells you so; the paper is what brings the wallet back.
 
 Receive shows an address and its QR code. Give it to the payer. A payment appears after its first block,
 usually within a few minutes; before that the wallet cannot see it. After an address has been used the wallet
-offers a fresh one; old addresses keep working.
+offers a fresh one; old addresses keep working. A new address for each payer keeps your payments apart.
+
+If you would rather give everybody the same address, tick "One fixed receiving address" under More, Wallet
+in this phone. Receive then always shows the wallet's first address. That costs privacy: every payer can see
+what all the others paid to it, and the payments you make with those coins can be linked to it. Untick it
+to have a new address for each payment again; the address shown next is then a new one, not the fixed one.
 
 ## Sending
 

@@ -198,21 +198,29 @@ private fun SetupScreen(model: WalletModel, state: WalletState) {
             state.offerError?.let { reason ->
                 Text(setupErrorText(reason, state.offerDetail), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("setup-error"))
             }
-            // A wallet server, for an owner without a node. The one that is filled in is not ours, and the screen says whose it is.
+            // A wallet server, for an owner without a node. The screen says whose the server in the field is: Northbound's
+            // or ours only for exactly those two addresses, however they are typed, and for any other that the app does not know.
             val server: @Composable () -> Unit = {
                 Block(stringResource(R.string.server_setup_title)) {
+                    val whose = Setup.ownerOf(serverUrl)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         androidx.compose.material3.FilterChip(
-                            selected = serverUrl == Setup.DEFAULT_SERVER, onClick = { serverUrl = Setup.DEFAULT_SERVER },
+                            selected = whose == ServerOwner.NORTHBOUND, onClick = { serverUrl = Setup.DEFAULT_SERVER },
                             label = { Text(stringResource(R.string.server_pick_northbound)) }, modifier = Modifier.testTag("server-pick-northbound"),
                         )
                         androidx.compose.material3.FilterChip(
-                            selected = serverUrl == Setup.POLARKA_SERVER, onClick = { serverUrl = Setup.POLARKA_SERVER },
+                            selected = whose == ServerOwner.POLARKA, onClick = { serverUrl = Setup.POLARKA_SERVER },
                             label = { Text(stringResource(R.string.server_pick_polarka)) }, modifier = Modifier.testTag("server-pick-polarka"),
                         )
                     }
                     Text(
-                        stringResource(if (serverUrl == Setup.POLARKA_SERVER) R.string.server_intro_polarka else R.string.server_intro),
+                        stringResource(
+                            when (whose) {
+                                ServerOwner.NORTHBOUND -> R.string.server_intro
+                                ServerOwner.POLARKA -> R.string.server_intro_polarka
+                                ServerOwner.OTHER -> R.string.server_intro_other
+                            },
+                        ),
                         modifier = Modifier.testTag("server-intro"),
                     )
                     Text(stringResource(R.string.server_sees), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("server-sees"))
@@ -254,7 +262,8 @@ private fun SetupScreen(model: WalletModel, state: WalletState) {
             Block(stringResource(R.string.offer_title)) {
                 Field(stringResource(if (offered.server) R.string.offer_server else R.string.offer_node), offered.url)
                 if (offered.server) {
-                    // a wallet server has no account
+                    // a wallet server has no account; whose it is, is said once more before it is saved
+                    Field(stringResource(R.string.offer_run_by), runByText(Setup.ownerOf(offered.url)), "offer-run-by")
                 } else if (offered.isPublic) {
                     Field(stringResource(R.string.offer_user), stringResource(R.string.offer_no_account))
                 } else {

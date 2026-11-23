@@ -277,6 +277,16 @@ fun Block(title: String, content: @Composable () -> Unit) {
     }
 }
 
+/** Who runs a wallet server, in a few words, for the screen that checks a setup before it is saved and for More. */
+@Composable
+fun runByText(whose: ServerOwner): String = stringResource(
+    when (whose) {
+        ServerOwner.NORTHBOUND -> R.string.run_by_northbound
+        ServerOwner.POLARKA -> R.string.run_by_polarka
+        ServerOwner.OTHER -> R.string.run_by_other
+    },
+)
+
 @Composable
 fun Field(label: String, value: String, tag: String? = null) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {

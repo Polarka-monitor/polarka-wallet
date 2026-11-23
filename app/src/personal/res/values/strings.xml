@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The faucet's texts: only in the personal edition, as its code is (src/personal). -->
+<resources>
+    <string name="faucet_title">A first coin</string>
+    <string name="faucet_text">Polarka\'s faucet sends a small amount to the address above, once a day at most. The phone first does some work for it: usually seconds, at most a few minutes. The faucet learns this address and the internet address of this phone.</string>
+    <string name="faucet_go">Ask the faucet</string>
+    <string name="faucet_busy">Working…</string>
+    <string name="faucet_stop">Stop</string>
+    <string name="faucet_done">The faucet says it sent it. The coin shows in the balance once it is in a block, usually within a few minutes. The faucet\'s transaction:</string>
+    <string name="faucet_refused">The faucet said no (%1$s). Try again later.</string>
+    <string name="faucet_not_now">The faucet cannot pay just now (NOT_NOW). If you asked a moment ago, its payment may still be on its way: do not ask again for this address today.</string>
+    <string name="faucet_slow">The faucet did not answer in time. Try again later.</string>
+    <string name="faucet_unreachable">The faucet cannot be reached. Try again later.</string>
+    <string name="faucet_unreadable">The faucet sent an answer that this app cannot read.</string>
+    <string name="faucet_too_much">The faucet asks for more work than this app does.</string>
+    <string name="faucet_ran_out">The faucet\'s challenge ran out before the work was done. If this happens every time, check the date and time of this phone.</string>
+    <string name="faucet_no_answer">No answer to the faucet\'s challenge was found. Try again.</string>
+</resources>

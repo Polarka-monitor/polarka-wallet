@@ -19,15 +19,18 @@ Mějte v ní jen malé částky. Větší úspory patří na papír (studená ad
 
 ## První spuštění: server, nebo vlastní uzel
 
-Peněženka nemá vlastní server. Na stav vašich adres se ptá jinde a je na vás, kde.
+Peněženka se na stav vašich adres ptá serveru nebo uzlu a je na vás, kterého.
 
-- **Veřejný server** je nejrychlejší cesta a nabízí se jako první. Předvyplněný je server projektu Northbound
-  (`https://api.northboundwallet.org`); neprovozují ho autoři této aplikace. Server vidí všechny adresy vaší
-  peněženky pohromadě, každou adresu, kterou přes aplikaci sledujete nebo vybíráte, a vaši internetovou
-  adresu. Mohl by vám ukázat nepravdivý zůstatek, zatajit příchozí platbu, platbu zdržet nebo tvrdit, že
-  platba proběhla, i když neproběhla. Mince vám vzít nemůže: slova ani klíče telefon neopouštějí. Když server neběží,
-  peněženka nic neukáže; mince zůstávají vaše a připojíte se jinam. Místo předvyplněné adresy lze napsat
-  adresu jiného serveru se stejným rozhraním.
+- **Veřejný server** je nejrychlejší cesta a nabízí se jako první. Nabízejí se dva. Předvyplněný je server
+  projektu Northbound (`https://api.northboundwallet.org`); neprovozují ho autoři této aplikace. Druhý je
+  vlastní server Polarky (`https://node.polarka.org`), který provozují autoři této aplikace na vlastním uzlu.
+  Obrazovka říká, čí je server v poli, a ještě jednou před uložením; o adrese, kterou napíšete sami, řekne,
+  že aplikace neví, kdo ho provozuje. Kterýkoli z nich vidí všechny adresy vaší peněženky pohromadě, každou
+  adresu, kterou přes aplikaci sledujete nebo vybíráte, a vaši internetovou adresu. Mohl by vám ukázat
+  nepravdivý zůstatek, zatajit příchozí platbu, platbu zdržet nebo tvrdit, že platba proběhla, i když
+  neproběhla. Mince vám vzít nemůže: slova ani klíče telefon neopouštějí. Když server neběží, peněženka nic
+  neukáže; mince zůstávají vaše a připojíte se jinam. Místo předvyplněné adresy lze napsat adresu jiného
+  serveru se stejným rozhraním.
 - **Vlastní uzel** nechá vaše adresy jen vám. Viz poslední kapitolu.
 
 Co je přes server jinak než s vlastním uzlem:
@@ -68,6 +71,12 @@ peněženku pak vrátí jen papír.
 
 Záložka Přijmout ukáže adresu a její QR kód. Dejte ji plátci. Platba se objeví po svém prvním bloku, obvykle
 během několika minut; dřív ji peněženka nevidí. Po použití adresy nabídne peněženka novou; staré adresy fungují dál.
+Nová adresa pro každého plátce drží vaše platby od sebe.
+
+Pokud chcete všem dávat stejnou adresu, zaškrtněte v části Více, Peněženka v tomto telefonu volbu „Jedna stálá
+přijímací adresa“. Záložka Přijmout pak vždy ukáže první adresu peněženky. Stojí to soukromí: každý plátce vidí,
+co na ni zaplatili všichni ostatní, a platby, které z těch mincí uděláte, lze s ní spojit. Po odškrtnutí dostane
+každá platba zase novou adresu; jako další se pak ukáže nová, ne ta stálá.
 
 ## Odeslání
 

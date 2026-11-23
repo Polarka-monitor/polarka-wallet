@@ -15,23 +15,24 @@ android {
         applicationId = "org.polarka.wallet"
         minSdk = 31
         targetSdk = 36
-        versionCode = 13
-        versionName = "0.7.0"
+        versionCode = 14
+        versionName = "0.7.1"
     }
-    // Two editions from one source. "personal": the owner's own phone (a fixed address and the faucet on the receive
-    // page). "public": what is published (a new address for each payment unless the owner asks for a fixed one, no faucet).
+    // Two editions from one source. "personal": the owner's own phone (a fixed address unless the owner switches it off,
+    // and the faucet on the receive page; the faucet's code and texts are in src/personal alone). "public": what is
+    // published (a new address for each payment unless the owner asks for a fixed one; no faucet and none of its code).
+    // Both are the same app to Android (one id, one key), so that the owner's phone keeps its wallet: before a package
+    // is published, review/static-checks.sh shows which edition it is.
     flavorDimensions += "edition"
     productFlavors {
         create("personal") {
             dimension = "edition"
             versionNameSuffix = "-personal"
             buildConfigField("boolean", "FIXED_ADDRESS", "true")
-            buildConfigField("boolean", "FAUCET", "true")
         }
         create("public") {
             dimension = "edition"
             buildConfigField("boolean", "FIXED_ADDRESS", "false")
-            buildConfigField("boolean", "FAUCET", "false")
         }
     }
     // The key that signs releases lives outside the project, on the owner's computer only (see make-signing-key.sh).

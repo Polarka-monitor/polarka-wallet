@@ -37,10 +37,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -273,8 +269,7 @@ fun ReceiveTab(model: WalletModel, state: WalletState, owner: Owner) {
             return@Page
         }
         // a fixed address is the first one of the wallet; the keys and what the app looks at stay the same
-        val index = if (wallet.fixed) 0 else wallet.receiveIndex
-        val address = remember(wallet.xpub, index) { wallet.watchKey().address(0, index) }
+        val address = remember(wallet.xpub, wallet.shownIndex) { wallet.shownAddress() }
         Block(stringResource(R.string.receive_title)) {
             QrCode(address, Modifier.fillMaxWidth().padding(horizontal = 24.dp))
             Mono(address, "receive-address")
@@ -289,39 +284,8 @@ fun ReceiveTab(model: WalletModel, state: WalletState, owner: Owner) {
                 style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("receive-note"),
             )
         }
-        if (BuildConfig.FAUCET && wallet.chain == north.core.Chain.MAIN) FaucetBlock(address)
-    }
-}
-
-/** The faucet of the personal edition: a first coin to the address shown, after a little work done by the phone. */
-@Composable
-private fun FaucetBlock(address: String) {
-    val scope = rememberCoroutineScope()
-    var busy by remember { mutableStateOf(false) }
-    var said by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
-    Block(stringResource(R.string.faucet_title)) {
-        Text(stringResource(R.string.faucet_text), style = MaterialTheme.typography.bodySmall)
-        Button(
-            onClick = {
-                busy = true
-                said = null
-                scope.launch {
-                    said = withContext(Dispatchers.Default) {
-                        try { true to Faucet.ask(address) } catch (e: Faucet.Refused) { false to e.reason }
-                    }
-                    busy = false
-                }
-            },
-            enabled = !busy, modifier = Modifier.testTag("faucet-go"),
-        ) { Text(stringResource(if (busy) R.string.faucet_busy else R.string.faucet_go)) }
-        said?.let { (ok, what) ->
-            if (ok) {
-                Text(stringResource(R.string.faucet_done))
-                Mono(what, "faucet-txid")
-            } else {
-                Text(stringResource(R.string.faucet_refused, what), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("faucet-refused"))
-            }
-        }
+        // the personal edition asks its faucet here; the public edition has none, and holds none of its code (FaucetPart.kt)
+        if (wallet.chain == north.core.Chain.MAIN) FaucetPart(address)
     }
 }
 
@@ -581,6 +545,7 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner, go: (Section) 
                 OutlinedButton(onClick = { copyToClipboard(context, "descriptor", descriptor) }) { Text(stringResource(R.string.copy)) }
                 Tick(wallet.lockOnOpen, { model.saveLock(it, owner) }, stringResource(R.string.lock_setting), "lock-setting")
                 Tick(wallet.fixed, { model.saveFixedAddress(it) }, stringResource(R.string.fixed_address_setting), "fixed-address-setting")
+                Text(stringResource(R.string.fixed_address_note), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("fixed-address-note"))
                 TextButton(onClick = {
                     runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://polarka.org"))) }
                 }) { Text(stringResource(R.string.about_link)) }
@@ -638,6 +603,7 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner, go: (Section) 
         PaperBlock(model, state)
         Block(stringResource(pick(R.string.node_title, R.string.server_title))) {
             state.setup?.let { Field(stringResource(R.string.node_address), it.host) }
+            state.setup?.takeIf { it.server }?.let { Field(stringResource(R.string.offer_run_by), runByText(Setup.ownerOf(it.url)), "server-run-by") }
             OutlinedButton(onClick = { askForget = true }, modifier = Modifier.testTag("forget")) { Text(stringResource(R.string.forget)) }
         }
         SelfTestCard(model, state)
@@ -687,7 +653,8 @@ private fun PaperBlock(model: WalletModel, state: WalletState) {
     var restTo by rememberSaveable { mutableStateOf("") }
     var other by rememberSaveable { mutableStateOf("") }
     var rate by rememberSaveable { mutableStateOf(Planner.DEFAULT_FEE_RATE) }
-    val mine = remember(wallet?.xpub, wallet?.receiveIndex) { wallet?.let { it.watchKey().address(0, it.receiveIndex) } }
+    // the same address as the receive page shows, the fixed one included
+    val mine = remember(wallet?.xpub, wallet?.shownIndex) { wallet?.shownAddress() }
     Block(stringResource(R.string.paper_title)) {
         Text(stringResource(pick(R.string.paper_text, R.string.paper_text_server)), style = MaterialTheme.typography.bodySmall)
         state.paperTxid?.let { txid ->

@@ -1,0 +1,28 @@
+ok   howFastTheWorkIs 0.623
+ok   theWorkIsNotStoppedByCancellingItsCoroutine 1.255
+ok   aFaucetThatTricklesIsWaitedForLongerThanAnyOfItsLimits 95.374
+ok   whatArrivedSinceABlock 7.973
+ok   aListThatAMovingPictureKeptCuttingIsLookedAtAgain 14.699
+ok   aTransactionThatArrivesDuringALookMakesItBeMadeAgain 7.152
+ok   linesOfTwoPartsThatDoNotFitTogetherAreNotShownAsAMovement 7.421
+ok   aPaymentThatWaitsOnTheCoinOfOneThatDidNotGoThrough 7.464
+ok   theFeeStandsBesideALossOnlyWhenTheWalletCanHavePaidIt 8.114
+ok   coinsHistoryAndAWaitingPaymentAsANodeWouldShowThem 8.354
+ok   aPartOfTheAddressesWhoseHistoryIsCutShort 19.292
+ok   aBlockInTheMiddleOfALookAndACoinThatIsNotTheWallets 7.73
+ok   aWalletWithMoreAddressesThanOneRequestTakes 7.946
+ok   aHistoryOfWatchedAddressesThatIsCutShortSaysSo 12.069
+ok   watchedAddressesAndNoWalletAtAll 6.593
+ok   aPaymentThatDidNotGoThroughOneWhoseCoinWentElsewhereAndOneThatCameBack 7.284
+ok   transactionsWhoseKeysSitInTwoPartsOfTheAddresses 8.208
+ok   aPaymentThatTheHistoryDoesNotList 7.329
+ok   linesForWatchedAddressesThatDoNotFitTogetherSayThatTheHistoryIsNotWhole 7.044
+org.polarka.wallet.ServerPayTest                             tests=7 failures=0 errors=0 skipped=1
+skip aHandOverWhoseOutcomeNobodyTells 6.695
+ok   aPaymentThatTheNodeBehindTheServerWillNotTake 6.352
+ok   aPaymentAfterOneThatDidNotGoThrough 6.614
+ok   aServerThatLiesAboutACoin 6.302
+ok   aServerThatAnswersVerySlowlyDoesNotHoldTheHandOver 10.991
+ok   aPaperAddressEmptiedThroughTheServer 15.529
+ok   aPaymentFromItsPlanToABlock 9.314
+TOTAL tests=26 failures=0 errors=0 skipped=1

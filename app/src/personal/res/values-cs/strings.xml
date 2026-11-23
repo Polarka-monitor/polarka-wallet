@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Texty kohoutku: jen v osobním vydání, stejně jako jeho kód (src/personal). -->
+<resources>
+    <string name="faucet_title">První mince</string>
+    <string name="faucet_text">Kohoutek Polarky pošle na adresu výše malou částku, nejvýš jednou za den. Telefon pro něj nejdřív udělá kus práce: obvykle několik sekund, nejvýš pár minut. Kohoutek se dozví tuto adresu a internetovou adresu telefonu.</string>
+    <string name="faucet_go">Požádat kohoutek</string>
+    <string name="faucet_busy">Pracuji…</string>
+    <string name="faucet_stop">Zastavit</string>
+    <string name="faucet_done">Kohoutek říká, že poslal. Mince se v zůstatku ukáže, až bude v bloku, obvykle do několika minut. Transakce kohoutku:</string>
+    <string name="faucet_refused">Kohoutek odmítl (%1$s). Zkuste to později.</string>
+    <string name="faucet_not_now">Kohoutek teď nemůže platit (NOT_NOW). Pokud jste žádali před chvílí, jeho platba může být ještě na cestě: pro tuto adresu dnes už nežádejte.</string>
+    <string name="faucet_slow">Kohoutek neodpověděl včas. Zkuste to později.</string>
+    <string name="faucet_unreachable">Kohoutek není dostupný. Zkuste to později.</string>
+    <string name="faucet_unreadable">Kohoutek poslal odpověď, kterou tato aplikace nepřečte.</string>
+    <string name="faucet_too_much">Kohoutek žádá víc práce, než tato aplikace udělá.</string>
+    <string name="faucet_ran_out">Výzva kohoutku vypršela dřív, než byla práce hotová. Pokud se to stává pokaždé, zkontrolujte datum a čas v telefonu.</string>
+    <string name="faucet_no_answer">Odpověď na výzvu kohoutku se nenašla. Zkuste to znovu.</string>
+</resources>

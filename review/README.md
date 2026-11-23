@@ -9,7 +9,9 @@ review of the same version (`independent-review-0.3.1/`), the report of the same
 stand-in for a wallet server that the tests use (`standin/`), and the scripts that run the package on
 emulators (`emulator/`). `changes-0.6.1.md` says what 0.6.1 changed when a wallet server changed its answers,
 and `independent-review-0.6.1/` holds the report of the seventh look, at those changes, by a reviewer of the
-same kind that began afresh. None of it replaces a review by an independent human expert.
+same kind that began afresh. `independent-review-0.7.0/` holds the eighth look, at 0.7.0 (two editions, a
+fixed address, the faucet, Polarka's server), and `changes-0.7.md` says what 0.7.0 changed and what 0.7.1
+did with each of its findings. None of it replaces a review by an independent human expert.
 
 ## How to repeat the checks
 
@@ -20,7 +22,8 @@ about a wallet server also need python3 (3.9 or later), for the stand-in.
 
 | Check | Command | Passes when |
 |---|---|---|
-| All tests (203) | `gradle :core:test :node:test :app:testDebugUnitTest`, then `sh review/tests-summary.sh` | exit 0; 203 tests, 0 failures, 0 skipped |
+| All tests, both editions | `gradle :core:test :node:test :app:testPublicDebugUnitTest :app:testPersonalDebugUnitTest`, then `sh review/tests-summary.sh` | exit 0; 210 tests with the public edition and 218 with the personal one (core 34, node 31, app 145 and 153), 0 failures, 0 skipped |
+| What each edition does | `PublicEditionTest` (public), `PersonalEditionTest` and `FaucetTest` (personal), `ServerOwnerScreenTest` and `Version07Test` (both) | all pass |
 | The findings of the independent review, of its retest and of its later looks stay fixed | the `Audit*Test` classes in the three modules, `RetestModelTest`, `AfterRetestTest`, `AfterRetestScreenTest`, `Retest2ModelTest`, `Retest3ModelTest`, `ThirdLookTest`, `Retest4Test`, `Retest4CoreTest`, `SixthLookTest`, `SixthLookScreenTest`, `AfterSixthLookPlainTest`, `AfterSeventhLookTextsTest` | all pass |
 | A wallet server, or a public node, cannot make the wallet pay the same thing twice, take a coin for the wallet's that is not, or hold a look or a payment without end | app tests `SixthLookTest`, `ServerPayTest`, `ServerEngineTest`, `ServerModelTest`, `StandInTest`; node test `ServerClientTest` | all pass |
 | A payment that did not go through cannot arrive beside the next one | `NotGoneThroughTest`, `NotGoneThroughPlainTest`, `NotGoneThroughScreenTest`, core test `PlannerMustTest`, node test `SpendersTest` | all pass |
@@ -31,8 +34,8 @@ about a wallet server also need python3 (3.9 or later), for the stand-in.
 | A lying node cannot make the wallet lose coins | app test `ReviewTest.aLyingNodeCannotMakeTheWalletLoseCoins` | prints `REVIEW OK: foreign coin refused, ...` |
 | Coin selection and fee | core test `PlannerPropertyTest` (20,000 random wallets) | prints `PLANNER OK` |
 | Words to addresses, against two other implementations | see below | `CROSSCHECK OK: 300 phrases, 0 different` |
-| Lint | `gradle :app:lintDebug` | 0 errors |
-| Sources and release package | `gradle :app:assembleRelease`, then `sh review/static-checks.sh review/evidence-X.Y.Z` | read the files it writes |
+| Lint | `gradle :app:lintPublicDebug :app:lintPersonalDebug` | 0 errors |
+| Sources and release package | `gradle :app:assemblePublicRelease`, then `sh review/static-checks.sh review/evidence-X.Y.Z public` | read the files it writes; `06-edition.txt` must end with "public edition" before the package is published |
 | Libraries unchanged | every build reads `gradle/verification-metadata.xml` | the build stops if a library differs from its recorded SHA-256 |
 
 ### Words to addresses

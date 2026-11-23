@@ -1,0 +1,52 @@
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 54098
+listening 54098
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 57673
+listening 57673
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 58788
+listening 58788
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 50575
+listening 50575
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 65279
+listening 65279
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 56384
+listening 56384
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 62363
+listening 62363
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 57325
+listening 57325
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 50639
+listening 50639
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 51246
+listening 51246
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 57120
+listening 57120
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 52524
+listening 52524
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 49538
+listening 49538
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 60165
+listening 60165
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 65045
+listening 65045
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 64088
+listening 64088
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 51582
+listening 51582
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 62795
+listening 62795
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 49902
+listening 49902
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 56289
+listening 56289
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 49158
+listening 49158
+node: bad-txns-inputs-missingorspent (-25)
+POST /v1/transactions/broadcast 502 0.0s
+node: bad-txns-inputs-missingorspent (-25)
+POST /v1/transactions/broadcast 502 0.0s
+node: bad-txns-inputs-missingorspent (-25)
+POST /v1/transactions/broadcast 502 0.0s
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 60012
+listening 60012
+walletd: regtest, block 0 read in 0 s, ready; listening on 127.0.0.1 port 53140
+listening 53140

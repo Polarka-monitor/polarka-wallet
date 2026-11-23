@@ -281,7 +281,7 @@
     <string name="backup_other">Jsou to platná slova pro obnovu, ale jiné peněženky, ne té v tomto telefonu. Takto může vypadat i papír s jedním chybným slovem.</string>
     <!-- 0.6: a wallet server, the number of words -->
     <string name="server_setup_title">Připojení přes veřejný server</string>
-    <string name="server_intro">Nejrychlejší začátek, bez vlastního uzlu. Peněženka se ptá serveru pro peněženky TrueNorth, co je na vašich adresách, a předává mu vaše podepsané platby. Předvyplněný server provozuje projekt Northbound, ne autoři této aplikace.</string>
+    <string name="server_intro">Nejrychlejší začátek, bez vlastního uzlu. Peněženka se ptá serveru pro peněženky TrueNorth, co je na vašich adresách, a předává mu vaše podepsané platby. Tento server provozuje projekt Northbound, ne autoři této aplikace.</string>
     <string name="server_sees">Server vidí všechny adresy vaší peněženky pohromadě, každou adresu, kterou přes tuto aplikaci sledujete nebo vybíráte, a internetovou adresu telefonu. Mohl by ukázat nepravdivý zůstatek, zatajit příchozí platbu, platbu zdržet nebo tvrdit, že platba proběhla, i když neproběhla. Vaše mince vzít nemůže: slova pro obnovu ani klíče tento telefon nikdy neopouštějí. Pro větší soukromí použijte vlastní uzel.</string>
     <string name="server_address">Adresa serveru</string>
     <string name="server_go">Pokračovat</string>
@@ -334,16 +334,16 @@
     <string name="send_beside_waiting">Dřívější platba této peněženky čeká na blok déle než hodinu a stále může dorazit. Tato platba proti ní nestojí: dorazit by mohly obě. Pokud totéž platíte podruhé, zjistěte nejdřív, co se s dřívější platbou stalo; pokud jste se neptali vlastního uzlu, podívejte se na peněženku také přes jiný server nebo uzel.</string>
     <string name="problem_paper_refused">Uzel hlásí, že transakci nepřijme (%1$s). Není to váš vlastní uzel a celou transakci viděl: dokud jsou mince papírové adresy neutracené, může ji ještě předat dál. Podívejte se na adresu znovu a vyprázdněte ji znovu, přes jiný uzel, pokud tento stále odmítá. Jakmile bude adresa prázdná, transakce, kterou viděl, už dorazit nemůže. Do té doby neplaťte totéž jinou cestou.</string>
     <string name="problem_paper_refused_server">Server hlásí, že uzel za ním transakci nepřijme (%1$s). Celou transakci ale viděl: dokud jsou mince papírové adresy neutracené, může ji ještě předat dál. Podívejte se na adresu znovu a vyprázdněte ji znovu, přes jiný server nebo vlastní uzel, pokud tento stále odmítá. Jakmile bude adresa prázdná, transakce, kterou viděl, už dorazit nemůže. Do té doby neplaťte totéž jinou cestou.</string>
-    <string name="receive_note_fixed">Toto je stálá adresa peněženky: všichni platí na tutéž. Kdo ji zná, vidí všechny platby na ni; v Nastavení to lze vypnout a mít pro každou platbu novou adresu.</string>
-    <string name="fixed_address_setting">Jedna stálá přijímací adresa (vypnuto: nová adresa pro každou platbu)</string>
+    <string name="receive_note_fixed">Toto je stálá adresa peněženky: všichni platí na tutéž. Kdo ji zná, vidí všechny platby na ni i jejich součet, a jakmile se tyto mince utratí, také platby z nich a další adresy peněženky utracené spolu s nimi. Novou adresu pro každou platbu nastavíte vypnutím této volby v části Více, Peněženka v tomto telefonu.</string>
+    <string name="fixed_address_setting">Jedna stálá přijímací adresa</string>
     <string name="about_link">polarka.org: o této aplikaci</string>
     <string name="server_pick_northbound">Northbound</string>
     <string name="server_pick_polarka">Polarka</string>
     <string name="server_intro_polarka">Nejrychlejší začátek, bez vlastního uzlu. Peněženka se ptá serveru pro peněženky TrueNorth, co je na vašich adresách, a předává mu vaše podepsané platby. Tento server provozuje Polarka, autoři této aplikace, na vlastním uzlu.</string>
-    <string name="faucet_title">První mince</string>
-    <string name="faucet_text">Kohoutek Polarky pošle na adresu výše malou částku, nejvýš jednou za den. Telefon pro něj nejdřív udělá kus práce (několik sekund).</string>
-    <string name="faucet_go">Požádat kohoutek</string>
-    <string name="faucet_busy">Pracuji…</string>
-    <string name="faucet_done">Kohoutek poslal. V zůstatku se ukáže, až bude v bloku (asi dvě minuty). Jeho transakce:</string>
-    <string name="faucet_refused">Kohoutek odmítl (%1$s). Zkuste to později.</string>
+    <string name="server_intro_other">Nejrychlejší začátek, bez vlastního uzlu. Peněženka se ptá serveru pro peněženky TrueNorth, co je na vašich adresách, a předává mu vaše podepsané platby. Kdo provozuje server zadaný níže, tato aplikace neví: neručí za něj projekt Northbound ani autoři této aplikace.</string>
+    <string name="offer_run_by">Provozuje</string>
+    <string name="run_by_northbound">projekt Northbound, ne autoři této aplikace</string>
+    <string name="run_by_polarka">Polarka, autoři této aplikace</string>
+    <string name="run_by_other">tato aplikace neví</string>
+    <string name="fixed_address_note">Se stálou adresou vidí každý plátce, co na ni zaplatili všichni ostatní, a platby, které z těch mincí uděláte, lze s ní spojit. Vypnuto: nová adresa pro každou platbu, která plátce drží od sebe.</string>
 </resources>

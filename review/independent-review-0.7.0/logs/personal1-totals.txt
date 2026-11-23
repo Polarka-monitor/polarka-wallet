@@ -1,0 +1,5 @@
+org.polarka.wallet.PublicNodeTest                            tests=1 failures=0 errors=0 skipped=1
+ok   theAnswerFoundIsOneTheFaucetTakes 0.006
+ok   zeroBitsAreCountedAsTheFaucetCountsThem 0.004
+ok   fixedAddressIsKeptOnlyWhenTheOwnerSaidSo 0.003
+TOTAL tests=141 failures=0 errors=0 skipped=1

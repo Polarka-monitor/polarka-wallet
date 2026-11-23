@@ -167,6 +167,12 @@ data class WalletInfo(
     /** What the receive page does: the owner's word, else what the edition of the app does by itself. */
     val fixed: Boolean get() = fixedAddress ?: BuildConfig.FIXED_ADDRESS
 
+    /** The number of the receiving address that the app shows and pays into: the first one while the address is fixed. */
+    val shownIndex: Int get() = if (fixed) 0 else receiveIndex
+
+    /** The receiving address shown on the receive page, and the one a paper address is emptied into. */
+    fun shownAddress(): String = watchKey().address(0, shownIndex)
+
     fun watchKey(): WatchKey = WatchKey.parse(xpub, chain)
 
     /**

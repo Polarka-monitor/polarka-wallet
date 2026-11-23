@@ -1,0 +1,13 @@
+differs:   Lorg/polarka/wallet/BuildConfig;
+differs:   Lorg/polarka/wallet/ComposableSingletons$LookKt;
+differs:   Lorg/polarka/wallet/ComposableSingletons$MainActivityKt;
+differs:   Lorg/polarka/wallet/ComposableSingletons$PartsKt;
+differs:   Lorg/polarka/wallet/ComposableSingletons$TabsKt;
+differs:   Lorg/polarka/wallet/LookKt;
+differs:   Lorg/polarka/wallet/MainActivity;
+differs:   Lorg/polarka/wallet/MainActivityKt;
+differs:   Lorg/polarka/wallet/PartsKt;
+differs:   Lorg/polarka/wallet/TabsKt;
+differs:   Lorg/polarka/wallet/WalletInfo;
+differs:   Lorg/polarka/wallet/WalletModel;
+classes: 6451 6451

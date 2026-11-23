@@ -669,12 +669,16 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         change({ it.copy(price = plain, currency = currency.trim().uppercase().filter { c -> c.isLetterOrDigit() }.take(6)) }, Notice.SAVED)
     }
 
-    /** Switching the lock off is something only the owner may do. */
-    /** A fixed receiving address, or a new one for each payment. Nothing about the keys changes, only what is shown. */
+    /**
+     * A fixed receiving address, or a new one for each payment. Nothing about the keys changes, only what is shown.
+     * The fixed address is the first one. When it is switched off before anything arrived there, the next payer gets
+     * the address after it: the first one was shown as the fixed address, and anybody may have been given it.
+     */
     fun saveFixedAddress(on: Boolean) {
-        viewModelScope.launch { change({ it.copy(fixedAddress = on) }) }
+        change({ w -> w.copy(fixedAddress = on, receiveIndex = if (!on && w.fixed && w.receiveIndex == 0) 1 else w.receiveIndex) })
     }
 
+    /** Switching the lock off is something only the owner may do. */
     fun saveLock(on: Boolean, owner: Owner) {
         viewModelScope.launch {
             if (!on && !runCatching { owner.present() }.getOrDefault(false)) return@launch

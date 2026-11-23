@@ -1,0 +1,7 @@
+ok   setupFromTheClipboardThenForget 3.222
+ok   aWalletIsMadeUsedAndLocked 13.829
+ok   theSelfTestPasses 0.059
+ok   theAnswerFoundIsOneTheFaucetTakes 0.369
+ok   zeroBitsAreCountedAsTheFaucetCountsThem 0.005
+ok   fixedAddressIsKeptOnlyWhenTheOwnerSaidSo 0.017
+TOTAL tests=6 failures=0 errors=0 skipped=0

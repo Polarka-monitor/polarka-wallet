@@ -10,6 +10,9 @@ import north.core.Chain
 import north.core.Qrh
 import java.net.URI
 
+/** Whose a wallet server is, as far as the app knows: told by its address alone (see [Setup.ownerOf]). */
+enum class ServerOwner { NORTHBOUND, POLARKA, OTHER }
+
 /** Why a setup text was refused. The screen turns the reason into a sentence in the user's language. */
 class SetupError(val reason: Reason, val detail: String = "") : Exception("$reason $detail".trim()) {
     enum class Reason { TOO_LONG, NOT_JSON, WRONG_FORMAT, BAD_URL, NOT_HTTPS, BAD_USER, BAD_PASSWORD, BAD_CHAIN, NO_ADDRESS, TOO_MANY_ADDRESSES, BAD_ADDRESS }
@@ -77,6 +80,24 @@ data class Setup(
 
         /** The wallet server run by Polarka, the authors of this app, on a node of its own. Offered as a choice. */
         const val POLARKA_SERVER = "https://node.polarka.org"
+
+        /**
+         * Whose a wallet server is, as far as this app knows: Northbound's or Polarka's for exactly the two addresses
+         * that the first screen offers, however they are typed (with or without "https://", with a slash at the end,
+         * with capitals); any other address is a server the app knows nothing about.
+         */
+        fun ownerOf(url: String): ServerOwner {
+            val typed = url.trim()
+            val uri = runCatching { URI(if ("://" in typed) typed else "https://$typed") }.getOrNull() ?: return ServerOwner.OTHER
+            val plainPath = uri.rawPath.isNullOrEmpty() || uri.rawPath == "/"
+            if (uri.scheme != "https" || uri.rawUserInfo != null || uri.rawQuery != null || uri.rawFragment != null || !plainPath) return ServerOwner.OTHER
+            if (uri.port != -1 && uri.port != 443) return ServerOwner.OTHER
+            return when (uri.host?.lowercase()?.removeSuffix(".")) {
+                URI(DEFAULT_SERVER).host -> ServerOwner.NORTHBOUND
+                URI(POLARKA_SERVER).host -> ServerOwner.POLARKA
+                else -> ServerOwner.OTHER
+            }
+        }
         const val MAX_CHARS = 16 * 1024
         const val MAX_ADDRESSES = 20
 
