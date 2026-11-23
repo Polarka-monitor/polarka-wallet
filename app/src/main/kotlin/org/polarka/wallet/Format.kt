@@ -22,7 +22,10 @@ object Format {
 
     fun hex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(it) }
 
-    /** "12.5" or "12,5" to base units; null if it is not a positive amount with at most eight decimals. */
+    /**
+     * "12.5" or "12,5" to base units; null if it is not a positive amount with at most eight decimals, or if it is
+     * more than all the coins that can exist (review 9, M-3: such an amount once made a plan that wrapped around).
+     */
     fun parseCoins(text: String): Long? {
         val t = text.filter { !it.isWhitespace() && !Character.isSpaceChar(it) }.replace(',', '.')
         val parts = t.split('.')
@@ -34,7 +37,7 @@ object Format {
         } catch (e: ArithmeticException) {
             return null                     // more than a signed 64-bit number of base units: not an amount of this coin
         }
-        return if (sat > 0) sat else null
+        return if (sat in 1..north.node.NodeClient.MAX_SAT) sat else null
     }
 
     /** An amount with its sign, for the history. */

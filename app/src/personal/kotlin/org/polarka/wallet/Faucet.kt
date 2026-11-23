@@ -12,6 +12,7 @@ import java.net.URI
 import java.security.MessageDigest
 import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -114,7 +115,10 @@ object Faucet {
         asking.opened(c)
         // When the time for the whole question is over, the connection is closed under whatever waits on it, and the
         // reader gives the answer up between two reads: a byte every few seconds does not keep the button busy.
-        val watch = WATCH.schedule({ runCatching { c.disconnect() } }, withinMs, TimeUnit.MILLISECONDS)
+        // Who ended the question: nobody yet (0), its reader (1) or the clock (2). Only one of them does, as in
+        // ServerClient: the clock never closes a connection whose answer was read to its end (ninth look, L-2).
+        val ended = AtomicInteger(0)
+        val watch = WATCH.schedule({ if (ended.compareAndSet(0, 2)) runCatching { c.disconnect() } }, withinMs, TimeUnit.MILLISECONDS)
         try {
             c.instanceFollowRedirects = false           // the faucet asked is the one that answers
             c.connectTimeout = 15_000
@@ -136,19 +140,22 @@ object Faucet {
                     if (out.size() > MOST_ANSWER) throw Refused("OTHER")
                 }
             }
-            if (late()) throw Refused("SLOW")
+            if (!ended.compareAndSet(0, 1) || late()) throw Refused("SLOW")
             val answer = runCatching { Json.parseToJsonElement(out.toString(Charsets.UTF_8.name())) }.getOrNull() as? JsonObject
                 ?: throw Refused("OTHER")
             if ("error" in answer) {
                 val word = (answer["error"] as? JsonPrimitive)?.takeIf { it.isString }?.content
                 throw if (word != null && word in WORDS) Refused(word, byFaucet = true) else Refused("OTHER")
             }
+            // a failure without one of the faucet's words is no answer of the faucet (ninth look, L-2)
+            if (status !in 200..299) throw Refused("OTHER")
             return answer
         } catch (e: Refused) {
             throw if (asking.stopped) Refused("STOPPED") else e
         } catch (e: Exception) {
             throw Refused(if (asking.stopped) "STOPPED" else if (late()) "SLOW" else "UNREACHABLE")
         } finally {
+            ended.compareAndSet(0, 1)
             watch.cancel(false)
             asking.opened(null)
             c.disconnect()

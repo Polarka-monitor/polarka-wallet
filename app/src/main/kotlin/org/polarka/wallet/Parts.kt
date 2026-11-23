@@ -2,6 +2,7 @@ package org.polarka.wallet
 
 import android.app.Activity
 import android.content.ClipData
+import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
@@ -9,6 +10,7 @@ import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
 import android.os.Build
 import android.os.CancellationSignal
+import android.os.PersistableBundle
 import android.view.View
 import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
@@ -137,8 +139,18 @@ fun Tick(checked: Boolean, onChange: (Boolean) -> Unit, text: String, tag: Strin
     }
 }
 
-fun copyToClipboard(context: Context, label: String, text: String) {
-    context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(label, text))
+/**
+ * [sensitive]: the system and the keyboard show the copied text as dots in their preview and keep it out of
+ * their history of copied texts, as for a password (ninth look, L-1). The flag has its own name from Android 13.
+ */
+fun copyToClipboard(context: Context, label: String, text: String, sensitive: Boolean = false) {
+    val clip = ClipData.newPlainText(label, text)
+    if (sensitive) {
+        clip.description.extras = PersistableBundle().apply {
+            putBoolean(if (Build.VERSION.SDK_INT >= 33) ClipDescription.EXTRA_IS_SENSITIVE else "android.content.extra.IS_SENSITIVE", true)
+        }
+    }
+    context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(clip)
 }
 
 fun readClipboard(context: Context): String? =
@@ -187,6 +199,8 @@ fun NoticeCard(model: WalletModel, state: WalletState) {
         Notice.PAYMENT_BEATEN -> R.string.notice_payment_beaten
         Notice.PAYMENT_ARRIVED -> R.string.notice_payment_arrived
         Notice.PAYMENT_BACK -> pick(R.string.notice_payment_back, R.string.notice_payment_back_server)
+        Notice.WAIT_FOR_PAYMENT -> R.string.notice_wait_for_payment
+        Notice.NEW_WORDS_DROPPED -> R.string.notice_new_words_dropped
     }
     val withAmount = notice == Notice.PAYMENT_GONE || notice == Notice.PAYMENT_BEATEN || notice == Notice.PAYMENT_ARRIVED || notice == Notice.PAYMENT_BACK
     Card(Modifier.fillMaxWidth()) {
@@ -237,6 +251,7 @@ fun problemText(problem: Problem): String = when (problem.kind) {
     Problem.Kind.NO_ROOM -> stringResource(R.string.problem_no_room, WalletInfo.MAX_DROPPED)
     Problem.Kind.PAPER_REFUSED -> stringResource(pick(R.string.problem_paper_refused, R.string.problem_paper_refused_server), problem.detail)
     Problem.Kind.MOVING -> stringResource(R.string.problem_moving_server)
+    Problem.Kind.CHANGED -> stringResource(pick(R.string.problem_changed, R.string.problem_changed_server))
 }
 
 /** A count as the reader's language writes it, with its thousands apart. What is no number stays as it was. */

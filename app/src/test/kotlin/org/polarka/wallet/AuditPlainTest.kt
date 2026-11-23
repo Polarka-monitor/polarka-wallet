@@ -129,7 +129,8 @@ class AuditPlainTest {
             val plain = text.filter { !it.isWhitespace() && !Character.isSpaceChar(it) }.replace(',', '.')
             val expected = if (!Regex("[0-9]{1,11}(\\.[0-9]{0,8})?").matches(plain)) null else {
                 val sat = BigDecimal(if (plain.endsWith(".")) plain.dropLast(1) else plain).movePointRight(8)
-                if (sat.signum() > 0 && sat <= BigDecimal(Long.MAX_VALUE)) sat.longValueExact() else null
+                // no more than all the coins that can exist (2 000 000 000 NORTH, since the ninth look, M-3)
+                if (sat.signum() > 0 && sat <= BigDecimal(north.node.NodeClient.MAX_SAT)) sat.longValueExact() else null
             }
             assertEquals(expected, Format.parseCoins(text), "'$text'")
             if (expected != null) read++

@@ -2,6 +2,7 @@ package org.polarka.wallet
 
 import android.content.ClipboardManager
 import android.os.Bundle
+import android.view.View
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -63,6 +64,9 @@ class MainActivity : ComponentActivity() {
         if (!isDebugBuild(this)) window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         // no other app may draw over this one: a window laid over a confirmation could show another address than the real one
         runCatching { window.setHideOverlayWindows(true) }
+        // No field of this app is offered to a password manager or to the system's autofill: recovery words typed
+        // in must never be offered for saving outside the app (ninth look, L-1).
+        window.decorView.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
         // Android may build this screen anew while the app is in the background (the phone was turned, folded,
         // switched to dark mode). The time away is kept in the model, which survives that, and is looked at here too.
         model.returned()
@@ -303,6 +307,7 @@ private fun setupErrorText(reason: SetupError.Reason, detail: String): String = 
     SetupError.Reason.NO_ADDRESS -> stringResource(R.string.err_setup_no_address)
     SetupError.Reason.TOO_MANY_ADDRESSES -> stringResource(R.string.err_setup_too_many)
     SetupError.Reason.BAD_ADDRESS -> stringResource(R.string.err_setup_address, detail)
+    SetupError.Reason.OTHER_NETWORK -> stringResource(R.string.err_setup_other_network, detail)
 }
 
 // ---------------------------------------------------------------------------------------------- a new wallet

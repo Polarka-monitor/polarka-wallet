@@ -15,8 +15,8 @@ android {
         applicationId = "org.polarka.wallet"
         minSdk = 31
         targetSdk = 36
-        versionCode = 14
-        versionName = "0.7.1"
+        versionCode = 15
+        versionName = "0.7.2"
     }
     // Two editions from one source. "personal": the owner's own phone (a fixed address unless the owner switches it off,
     // and the faucet on the receive page; the faucet's code and texts are in src/personal alone). "public": what is

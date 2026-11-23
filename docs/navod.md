@@ -1,7 +1,8 @@
 # Polarka Wallet: krátký návod
 
-Polarka Wallet je zkušební verze. Zkontroloval ji autor s pomocí AI a nezávislý recenzent, kterým je model
-AI. Nezávislý lidský odborník ji zatím nekontroloval.
+Polarka Wallet je zkušební verze. Zkontroloval ji autor s pomocí AI, nezávislý recenzent, kterým je model AI,
+a jednou, ve verzi 0.7.1, lidé mimo tento projekt. Co našli, je ve verzi 0.7.2 opravené; opravy zatím nikdo
+nezávislý nekontroloval.
 Mějte v ní jen malé částky. Větší úspory patří na papír (studená adresa).
 
 ## Před instalací

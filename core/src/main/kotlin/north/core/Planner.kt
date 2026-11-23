@@ -98,9 +98,31 @@ object Planner {
     const val MAX_FEE_RATE = 1000L
     const val DEFAULT_FEE_RATE = 2L
     const val MAX_INPUTS = 1000
+    /**
+     * Base units of more coins than can ever exist (2 billion NORTH); no amount here is larger, and neither is the
+     * sum of the coins of one plan (NodeClient.MAX_SAT is the same number). Below it nothing in a plan can wrap
+     * around the 64 bits of a Long (review 9, M-3).
+     */
+    const val MAX_SAT = 2_000_000_000L * 100_000_000L
 
     private fun checkRate(feeRate: Long) {
         if (feeRate < MIN_FEE_RATE || feeRate > MAX_FEE_RATE) throw PlanError(PlanError.Reason.FEE_RATE)
+    }
+
+    /** Coins whose amounts can exist, one by one and all together; anything else is a fault upstream. */
+    private fun checkCoins(coins: List<Unspent>) {
+        var total = 0L
+        for (c in coins) {
+            require(c.amountSat in 0..MAX_SAT) { "a coin with an amount that cannot exist" }
+            total += c.amountSat
+            require(total <= MAX_SAT) { "coins whose amounts cannot exist together" }
+        }
+    }
+
+    /** What could be sent from the first [MAX_INPUTS] of [coins] to one output, after the fee; for NOT_ENOUGH. */
+    private fun available(coins: List<Unspent>, to: ByteArray, feeRate: Long): Long {
+        val usable = coins.take(MAX_INPUTS)
+        return maxOf(0, usable.sumOf { it.amountSat } - Spend.vsize(usable.size, listOf(to)) * feeRate)
     }
 
     private fun key(coin: Unspent): String = coin.txid + ":" + coin.vout
@@ -127,6 +149,9 @@ object Planner {
         if (amountSat < MIN_OUTPUT_SAT) throw PlanError(PlanError.Reason.AMOUNT_TOO_SMALL)
         val coins = arranged(spendable, must)
         if (coins.isEmpty()) throw PlanError(PlanError.Reason.NOTHING_TO_SPEND)
+        checkCoins(coins)
+        // an amount larger than all coins that can exist is never covered; checked before anything is subtracted
+        if (amountSat > MAX_SAT) throw PlanError(PlanError.Reason.NOT_ENOUGH, available(coins, to, feeRate))
         val least = maxOf(1, must.distinctBy { key(it) }.size)
         var sum = coins.take(least - 1).sumOf { it.amountSat }
         for (n in least..minOf(coins.size, MAX_INPUTS)) {
@@ -156,6 +181,8 @@ object Planner {
         val every = ordered(spendable)
         val coins = every.take(MAX_INPUTS)
         if (coins.isEmpty()) throw PlanError(PlanError.Reason.NOTHING_TO_SPEND)
+        checkCoins(coins)
+        if (keepSat > MAX_SAT) throw PlanError(PlanError.Reason.NOT_ENOUGH, available(coins, to, feeRate))
         val size = Spend.vsize(coins.size, listOf(to, rest))
         val all = coins.sumOf { it.amountSat }
         val left = all - keepSat - size * feeRate
@@ -174,6 +201,7 @@ object Planner {
         val every = arranged(spendable, must)
         val coins = every.take(MAX_INPUTS)
         if (coins.isEmpty()) throw PlanError(PlanError.Reason.NOTHING_TO_SPEND)
+        checkCoins(coins)
         val size = Spend.vsize(coins.size, listOf(to))
         val amount = coins.sumOf { it.amountSat } - size * feeRate
         if (amount < MIN_OUTPUT_SAT) throw PlanError(PlanError.Reason.NOT_ENOUGH, maxOf(0, amount))

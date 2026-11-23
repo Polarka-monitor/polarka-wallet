@@ -295,9 +295,17 @@ class SealedWalletStore(file: File, keys: KeyHolder) : WalletStore {
 class WordVault(private val sealed: SealedBytes) {
     fun exists(): Boolean = sealed.exists()
     fun encryptor(): Cipher = sealed.encryptor()
-    fun store(unlocked: Cipher, words: List<String>) = sealed.seal(unlocked, words.joinToString(" ").encodeToByteArray())
+    // The bytes of the words in plain text are overwritten as soon as they have been sealed or read (ninth
+    // look, L-1). The strings made of them cannot be overwritten; they go with the state that holds them.
+    fun store(unlocked: Cipher, words: List<String>) {
+        val plain = words.joinToString(" ").encodeToByteArray()
+        try { sealed.seal(unlocked, plain) } finally { plain.fill(0) }
+    }
     fun decryptor(): Cipher = sealed.decryptor()
-    fun open(unlocked: Cipher): List<String> = sealed.unseal(unlocked).decodeToString().split(" ")
+    fun open(unlocked: Cipher): List<String> {
+        val plain = sealed.unseal(unlocked)
+        try { return plain.decodeToString().split(" ") } finally { plain.fill(0) }
+    }
     fun destroy() = sealed.delete()
 }
 

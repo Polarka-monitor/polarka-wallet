@@ -47,3 +47,33 @@ The version is 0.7.1 (code 14), so that it installs over the 0.7.0 personal edit
 - No reviewer has looked at 0.7.1. The changes above were checked by their author, with the tests named.
 - 0.7.1 has not been run on an emulator or on a phone.
 - The reviewer could not rebuild the packages of 0.7.0 from their sources; neither has anybody else.
+
+## The ninth look (23 November 2026)
+
+An independent security review of 0.7.1 (commit 9eb3df1) by people outside this project, whose names are not
+given here. It read the app, `core/`, `node/` and the server software (`walletd.py`, `faucet.py`), and the
+reports of the eight looks before it; it did not run the app. It found no critical and no high fault, nothing
+through which a server, a node or another app on a phone that is not rooted could take the recovery words,
+put another address in place of the one typed, or take coins. Findings: 0 critical, 0 high, 4 medium, 5 low,
+6 notes. It asked for the medium ones and the first three low ones to be put right before a public release,
+and for 0.7.1 to be tried on an emulator and on a real phone.
+
+## 0.7.2: what was done with each finding
+
+| Finding | What was done | Where | Tests |
+|---|---|---|---|
+| M-1 (medium). Sums that were not checked could end the app: the total of the wallet and the watched addresses, and the rewards on the mining page. | Every sum the screens show is worked out once, when the look is made, with the check that no amount and no sum is larger than all coins that can exist (`NodeClient.total`); the look then fails with the node's error, shown as a problem, and nothing reaches a screen. The rewards are one of those sums. The same for a paper address. The expected coins on the mining page stay within that bound. | `Engine.kt` (`Snapshot`, `PaperFound`), `Tabs.kt` | `NinthLookTest.sumsThatCannotExistStopTheLook` |
+| M-2 (medium). A payment being signed and the removal of the wallet could meet: the removed wallet came back to life in its file. A paper address worked out with one node or server stayed when the setup changed. | While a payment is signed and sent, a paper address is emptied, or words are stored, the wallet is not removed and the setup is not changed or forgotten; the owner is told to wait. Asked again after the owner's yes. A payment whose wallet, node or server changed while it was signed is neither written down nor sent. Removing the wallet, a new setup and forgetting the setup drop the paper address, its words, and a payment waiting for the owner's yes. | `WalletModel.kt` | `NinthLookTest.theWalletIsNotRemovedWhileAPaymentIsSigned` (against a regtest node), `.whileTheWordsAreUnlockedNothingElseChangesTheWallet` |
+| M-3 (medium). A typed amount above all coins that can exist made a plan whose sums wrapped around 64 bits; a wrong transaction was signed and the wallet file could no longer be read. | A typed amount is at most 2 000 000 000 NORTH. The planner refuses coins and amounts that cannot exist before it subtracts anything, and signing checks every input and output and their sums. | `Format.kt`, `Planner.kt`, `Spend.kt` | `NinthLookCoreTest` (5 tests), `NinthLookTest.anAmountAboveAllCoinsIsNoAmount`, `FormatTest`, `AuditPlainTest` |
+| M-4 (medium). The node's client took an HTTP failure without the node's error as an empty answer ("not held", "spent"), took any block time, and had no time limit for a question as a whole. | A failure status without the node's own error is an error, and so is an answer without a result. `getmempoolentry` and `gettxout` take only the shapes the node answers with. A block time is between 1970 and the year 3000, as the server's. Each question has a time as a whole (the time to connect and one read's time more), kept by a watch as in `ServerClient`, and its connection is closed in every case. | `NodeClient.kt`, `WalletCalls.kt` | `NinthLookNodeTest` (3 tests) |
+| L-1 (low). Autofill was not switched off; new words stayed on the screen without end while the app was away; the descriptor went to the clipboard without the mark of a sensitive text; the bytes of the words were not overwritten. | The app is excluded from autofill as a whole. New words that wait to be written down are dropped after ten minutes away, with a note to throw a paper with them away. The descriptor is copied as sensitive. The bytes of the words are overwritten once they are sealed or read (the strings made of them cannot be). | `MainActivity.kt`, `WalletModel.kt`, `Parts.kt`, `Tabs.kt`, `Store.kt` | `NinthLookTest.newWordsDoNotWaitForEver`; the rest by reading |
+| L-2 (low, personal edition). The faucet's last word stayed beside another address or a new wallet; its watch could close a connection that was already read; a failure status was not refused. | What the faucet said is kept with the address it was about and shown only there. The watch and the reader are kept apart as in `ServerClient`. A failure status without one of the faucet's words is no answer. | `app/src/personal/.../Faucet.kt`, `FaucetPart.kt` | `FaucetTest.ofWhatAFaucetSendsOnlyItsWordsFromTheListAreShown` |
+| L-3 (low). A setup for another network than the wallet's was taken; one payment of many coins used up what the node is asked about the others; a second tap asked the owner twice. | A setup for another network than the wallet's is refused, when it is offered and when it is saved. The node is asked about one coin of every waiting payment before a second coin of any; the number of questions stays as it was. Building the wallet again from stored words runs once at a time. | `WalletModel.kt`, `Setup.kt`, `Engine.kt`, `Tabs.kt` | `NinthLookTest.aSetupForAnotherNetworkIsNotTaken`, `.whileTheWordsAreUnlockedNothingElseChangesTheWallet` |
+| L-4, L-5 (low). The server software (`walletd.py`, `faucet.py`). | Not in this repository: put right in polarka-agent (a time for a whole request to arrive, a revision that starts at a number drawn at random, an address named back as it was asked, ids in a history cursor read in either case; with `--trust-proxy` the faucet listens on loopback only, and its asker keeps to its own bounds). | polarka-agent | its tests |
+| N-1 to N-6 (notes). | Not changed in 0.7.2, apart from what the fixes above touch. | | |
+
+The version is 0.7.2 (code 15).
+
+## What was not done in 0.7.2
+
+- Nobody independent has looked at the fixes. They were checked by their author, with the tests named.

@@ -21,6 +21,10 @@ import java.net.SocketTimeoutException
 import java.net.URI
 import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ScheduledThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * The node answered, but with an error; or it could not be reached (httpStatus 0).
@@ -87,7 +91,10 @@ class NodeClient(url: String, private val user: String, private val password: St
 
     private class TooLong : RuntimeException()
 
-    private fun read(stream: InputStream?): String {
+    private class Late : RuntimeException()
+
+    /** Reads an answer to its end, as long as it is not too long and the time for the whole question ([until]) is not over. */
+    private fun read(stream: InputStream?, until: Long): String {
         if (stream == null) return ""
         stream.use { input ->
             val out = java.io.ByteArrayOutputStream()
@@ -97,11 +104,21 @@ class NodeClient(url: String, private val user: String, private val password: St
                 if (n < 0) break
                 if (out.size() + n > MAX_ANSWER_BYTES) throw TooLong()
                 out.write(buffer, 0, n)
+                if (now() > until) throw Late()
             }
             return out.toByteArray().decodeToString()
         }
     }
 
+    private fun late() = NodeError(0, NodeError.TIMEOUT, "the node did not answer in time")
+
+    /**
+     * One question to the node. Besides the time each read may wait, the whole question has a time of its own:
+     * the time to connect and one read's time more. A node that sends its answer one byte at a time, each just
+     * before the read gives up, is not waited for without end; that would hold a payment and the lock of the
+     * app with it (ninth look, M-4). The clock and the reader are kept apart as in [ServerClient]: only one of
+     * them ends a question. The connection is closed in every case; it is not kept for another question.
+     */
     private fun once(method: String, params: JsonArray, readTimeoutMs: Int): Answer {
         val body = buildJsonObject {
             put("jsonrpc", JsonPrimitive("1.0"))
@@ -110,8 +127,16 @@ class NodeClient(url: String, private val user: String, private val password: St
             put("params", params)
         }.toString().encodeToByteArray()
         var asked = false
+        val open = AtomicReference<HttpURLConnection?>()
+        // who ended the question: nobody yet (0), its reader with the whole answer or with a failure (1), or the clock (2)
+        val ended = AtomicInteger(0)
+        val withinMs = timeoutMs.toLong() + readTimeoutMs
+        val until = now() + withinMs
+        val watch = WATCH.schedule({ if (ended.compareAndSet(0, 2)) runCatching { open.get()?.disconnect() } }, withinMs, TimeUnit.MILLISECONDS)
         try {
             val c = endpoint.toURL().openConnection() as HttpURLConnection
+            open.set(c)
+            if (ended.get() == 2) throw java.io.IOException("the time was over before the question was asked")
             c.requestMethod = "POST"
             c.connectTimeout = timeoutMs
             c.readTimeout = readTimeoutMs
@@ -124,19 +149,33 @@ class NodeClient(url: String, private val user: String, private val password: St
             c.outputStream.use { it.write(body) }
             asked = true
             val status = c.responseCode
-            val text = read(if (status in 200..299) c.inputStream else c.errorStream)
+            val text = read(if (status in 200..299) c.inputStream else c.errorStream, until)
             val retry = c.getHeaderField("Retry-After")?.trim()?.toIntOrNull()
-            c.disconnect()
+            // the clock was first: the answer came too late to count
+            if (!ended.compareAndSet(0, 1)) throw Late()
             return Answer(status, text, retry)
         } catch (e: TooLong) {
             throw NodeError(200, null, "the node sent an answer that is too long")
+        } catch (e: Late) {
+            throw late()
         } catch (e: SocketTimeoutException) {
-            if (asked) throw NodeError(0, NodeError.TIMEOUT, "the node did not answer in time")
+            if (asked || ended.get() == 2) throw late()
             throw NodeError(0, null, "the node cannot be reached (${e.javaClass.simpleName})")
         } catch (e: java.io.IOException) {
+            if (ended.get() == 2) throw late()
             throw NodeError(0, null, "the node cannot be reached (${e.javaClass.simpleName})")
+        } catch (e: RuntimeException) {
+            // a connection that is closed under its reader can fail in ways of its own
+            if (ended.get() != 2) throw e
+            throw late()
+        } finally {
+            ended.compareAndSet(0, 1)
+            watch.cancel(false)
+            runCatching { open.get()?.disconnect() }
         }
     }
+
+    private fun now(): Long = System.nanoTime() / 1_000_000
 
     /**
      * One call. A gateway that asks to slow down (429) or is busy (503), and a node that is still running an
@@ -177,7 +216,11 @@ class NodeClient(url: String, private val user: String, private val password: St
             val code = runCatching { e["code"]?.jsonPrimitive?.int }.getOrNull()
             throw NodeError(status, code, clean(runCatching { e["message"]?.jsonPrimitive?.content }.getOrNull() ?: "error"))
         }
-        return json["result"] ?: JsonNull
+        // A failure without the node's own error is no answer of the node: a gateway in front of it can send one
+        // ({"message": "bad gateway"}). Taken as an empty result, it would say that the node does not hold a
+        // payment or that a coin is spent (ninth look, M-4). An answer without a result is none either.
+        if (status !in 200..299) throw NodeError(status, null, "the node or a gateway in front of it failed (HTTP $status)")
+        return json["result"] ?: throw NodeError(status, null, "the node sent an answer without a result")
     }
 
     /** Runs [block] when no other scan of this app is running on the same node: the node does one scan at a time. */
@@ -229,10 +272,17 @@ class NodeClient(url: String, private val user: String, private val password: St
     /** True if the node holds this transaction among those that wait for a block. */
     fun waiting(txid: String): Boolean {
         require(isId(txid)) { "this is not a transaction id" }
-        return try {
-            call("getmempoolentry", buildJsonArray { add(JsonPrimitive(txid)) }) is JsonObject
+        val entry = try {
+            call("getmempoolentry", buildJsonArray { add(JsonPrimitive(txid)) })
         } catch (e: NodeError) {
-            if (e.code == -5) false else throw e
+            if (e.code == -5) return false else throw e
+        }
+        // An entry, or "not held": the node's error -5, or a result of null as some stand-ins answer. A failure of a
+        // gateway is refused before this (result()); any other shape is no answer.
+        return when (entry) {
+            is JsonObject -> true
+            is JsonNull -> false
+            else -> throw NodeError(200, null, "the node sent an answer in an unknown form (getmempoolentry)")
         }
     }
 
@@ -242,7 +292,12 @@ class NodeClient(url: String, private val user: String, private val password: St
      */
     fun unspent(txid: String, vout: Long): Boolean {
         require(isId(txid) && vout in 0..MAX_VOUT) { "this is not an output" }
-        return call("gettxout", buildJsonArray { add(JsonPrimitive(txid)); add(JsonPrimitive(vout)); add(JsonPrimitive(true)) }) !is JsonNull
+        // an output that is there, or null for one that is spent or never was; anything else is no answer
+        return when (call("gettxout", buildJsonArray { add(JsonPrimitive(txid)); add(JsonPrimitive(vout)); add(JsonPrimitive(true)) })) {
+            is JsonObject -> true
+            is JsonNull -> false
+            else -> throw NodeError(200, null, "the node sent an answer in an unknown form (gettxout)")
+        }
     }
 
     private fun JsonObject.text(name: String): String = this[name]!!.jsonPrimitive.content
@@ -255,6 +310,8 @@ class NodeClient(url: String, private val user: String, private val password: St
         const val MAX_WAIT_MS = 45_000L
         const val SCAN_TIMEOUT_MS = 120_000
         private val LOCKS = ConcurrentHashMap<String, Any>()
+        private val WATCH = ScheduledThreadPoolExecutor(1) { work -> Thread(work, "node-deadline").apply { isDaemon = true } }
+            .apply { removeOnCancelPolicy = true }
 
         /** An amount as the node prints it (a decimal number of coins) to base units, exactly; refused if it cannot exist. */
         fun sats(e: JsonElement): Long {

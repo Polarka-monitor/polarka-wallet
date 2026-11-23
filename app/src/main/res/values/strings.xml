@@ -4,7 +4,7 @@
     <string name="brand" translatable="false">Polarka</string>
 
     <string name="banner_title">Test build %1$s</string>
-    <string name="banner_text">This wallet has been checked several times with the help of AI, but not yet by an independent human expert. Use it with small amounts only.</string>
+    <string name="banner_text">This wallet was checked several times with the help of AI and once by people outside this project; what they found is put right in this version, and nobody independent has looked at those fixes yet. Use it with small amounts only.</string>
 
     <string name="refresh">Refresh</string>
     <string name="cancel">Cancel</string>
@@ -347,4 +347,10 @@
     <string name="run_by_polarka">Polarka, the authors of this app</string>
     <string name="run_by_other">not known to this app</string>
     <string name="fixed_address_note">With a fixed address every payer can see what all the others paid to it, and the payments you make with those coins can be linked to it. Off: a new address for each payment, which keeps payers apart.</string>
+    <!-- ninth look (0.7.2) -->
+    <string name="notice_wait_for_payment">Nothing was changed: a payment, a paper address or the recovery words are being dealt with right now. Wait until that is done, then try again.</string>
+    <string name="problem_changed">Nothing was sent: the wallet or the node changed while the payment was being signed. Nothing was written down either. Work the payment out again.</string>
+    <string name="problem_changed_server">Nothing was sent: the wallet or the server changed while the payment was being signed. Nothing was written down either. Work the payment out again.</string>
+    <string name="err_setup_other_network">This setup is for another network than the wallet in this phone, which is for %1$s. A node of another network cannot see the wallet\'s coins. Choose a node or server of the wallet\'s network, or remove the wallet first, with its recovery words on paper in your hand.</string>
+    <string name="notice_new_words_dropped">The new recovery words were dropped: the app was away for more than ten minutes while they waited to be written down. Nothing was stored. Throw away a paper that holds them, and start again; new words are made.</string>
 </resources>

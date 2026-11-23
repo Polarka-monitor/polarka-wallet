@@ -1,6 +1,7 @@
 package north.node
 
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
@@ -111,8 +112,18 @@ fun NodeClient.block(hash: String): ChainBlock {
             )
         }
         if (NodeClient.id(b.str("hash")) != hash) throw NodeError(200, null, "the node sent another block than the one asked for")
-        ChainBlock(hash, NodeClient.height(b["height"]!!), b["time"]!!.jsonPrimitive.long, txs)
+        ChainBlock(hash, NodeClient.height(b["height"]!!), timeOf(b["time"]!!), txs)
     }
+}
+
+/**
+ * A time written in a block, in seconds since 1970, up to the year 3000 as the wallet server's are. A time
+ * beyond would end the app when the history shows it as a date (ninth look, M-4).
+ */
+private fun timeOf(e: JsonElement): Long {
+    val t = e.jsonPrimitive.long
+    if (t !in 0..ServerClient.MAX_TIME) throw NodeError(200, null, "the node sent a block time that cannot be a date")
+    return t
 }
 
 private fun outputNumber(n: Long): Long = if (n in 0..NodeClient.MAX_VOUT) n else throw NodeError(200, null, "the node sent an output number that cannot exist")
@@ -132,7 +143,7 @@ fun NodeClient.networkHashps(blocks: Int = 120): Double {
 /** The time written in the block at [height], in seconds since 1970. */
 fun NodeClient.blockTime(height: Int): Long {
     val hash = blockHash(height)
-    return shaped("getblockheader") { call("getblockheader", buildJsonArray { add(JsonPrimitive(hash)) }).jsonObject["time"]!!.jsonPrimitive.long }
+    return shaped("getblockheader") { timeOf(call("getblockheader", buildJsonArray { add(JsonPrimitive(hash)) }).jsonObject["time"]!!) }
 }
 
 object History {

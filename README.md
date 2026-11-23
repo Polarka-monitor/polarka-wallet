@@ -3,13 +3,15 @@
 A wallet for TrueNorth (NORTH) on Android. It keeps its keys in the phone, signs there, and asks a wallet
 server or a TrueNorth Core node what its addresses hold. There is no account and no analytics.
 
-**State: test build 0.7.1, a pre-release.** The wallet has been checked by its author and, in eight looks, by
-independent reviewers: AI models that had not seen the code being written (`review/independent-review-0.3.1`,
-`-0.4.0`, `-0.4.2`, `-0.5.1`, `-0.6.0`, `-0.6.1` and `-0.7.0`). The sixth look found that a wallet server could
-have made the wallet pay the same thing twice. That was put right before 0.6.0, and the reviewer looked at the
-fixes. The eighth look, at 0.7.0, found nothing that weakens that safeguard, and five small faults; 0.7.1 puts
-them right (`review/changes-0.7.md`). No reviewer has looked at 0.7.1 itself. All of that was AI-assisted; a
-review by an independent human expert is still recommended. Until then it is for small amounts.
+**State: test build 0.7.2, a pre-release.** The wallet has been checked by its author, in eight looks by
+independent reviewers that were AI models and had not seen the code being written (`review/independent-review-0.3.1`,
+`-0.4.0`, `-0.4.2`, `-0.5.1`, `-0.6.0`, `-0.6.1` and `-0.7.0`), and in a ninth look by people: an independent
+security review of 0.7.1 by people outside this project, whose names are not given here. That review found no
+critical and no high fault, and nothing through which a server, a node or another app could take the recovery
+words, put another address in place of the one typed, or take coins. It found four medium and five low faults;
+0.7.2 puts right the four medium ones and the three low ones that concern the app, and the other two are put
+right in the server software (`review/changes-0.7.md`). Nobody independent has looked at those fixes yet. It
+remains a test build for small amounts, and it comes without any warranty (`LICENSE`).
 
 0.7 adds three things to 0.6.1. The first screen offers a second wallet server beside the Northbound project's:
 Polarka's own, at `node.polarka.org`, run by the authors of this app. The owner can ask for one fixed receiving
@@ -27,12 +29,12 @@ install apps. A later package installs over an earlier one and the wallet stays 
 
 | | |
 |---|---|
-| File | `polarka-wallet-0.7.1.apk`, built from the commit that the tag `v0.7.1` names |
+| File | `polarka-wallet-0.7.2.apk`, built from the commit that the tag `v0.7.2` names |
 | SHA-256 of the file | written here by the commit after that one, and on the download page: a commit cannot name the checksum of a package that is built from it |
 | SHA-256 of the signer's certificate | `f441275239c880d0855a40525ca2449a2aa4992b4d4c2e63143d36c088ce103b` |
 
-Compare both before installing: `shasum -a 256 polarka-wallet-0.7.1.apk` (or `sha256sum`), and
-`apksigner verify --print-certs polarka-wallet-0.7.1.apk` from the Android build tools. Every later package
+Compare both before installing: `shasum -a 256 polarka-wallet-0.7.2.apk` (or `sha256sum`), and
+`apksigner verify --print-certs polarka-wallet-0.7.2.apk` from the Android build tools. Every later package
 carries the same certificate, and a phone refuses to put a package with another certificate over this one.
 No app store offers the package.
 

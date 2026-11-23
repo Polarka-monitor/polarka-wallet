@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import north.core.Plan
 import north.core.Planner
 import north.node.Movement
+import north.node.NodeClient
 
 @Composable
 private fun Page(content: @Composable () -> Unit) {
@@ -74,7 +75,7 @@ private fun NoWallet(model: WalletModel, state: WalletState, owner: Owner) {
         Block(stringResource(R.string.stored_words_title)) {
             Text(stringResource(R.string.stored_words_text))
             ProblemCard(state.walletProblem, "wallet-problem")
-            Button(onClick = { model.rebuildWallet(owner) }, modifier = Modifier.fillMaxWidth().testTag("wallet-rebuild")) { Text(stringResource(R.string.stored_words_rebuild)) }
+            Button(onClick = { model.rebuildWallet(owner) }, enabled = !state.walletBusy, modifier = Modifier.fillMaxWidth().testTag("wallet-rebuild")) { Text(stringResource(R.string.stored_words_rebuild)) }
             TextButton(onClick = { askDiscard = true }, modifier = Modifier.fillMaxWidth().testTag("words-discard")) { Text(stringResource(R.string.stored_words_discard)) }
         }
         if (askDiscard) {
@@ -452,7 +453,7 @@ fun MiningTab(model: WalletModel, state: WalletState) {
         val lastDay = rewards.count { it.time >= dayAgo }
         Block(stringResource(R.string.mining_found)) {
             Field(stringResource(R.string.mining_blocks), rewards.size.toString(), "mining-blocks")
-            Field(stringResource(R.string.mining_coins), Format.coins(rewards.sumOf { it.receivedSat }))
+            Field(stringResource(R.string.mining_coins), Format.coins(snapshot.rewardsSat))
             Field(stringResource(R.string.mining_last_day), lastDay.toString())
             if (LocalOverServer.current) Text(stringResource(R.string.mining_found_note_server), style = MaterialTheme.typography.bodySmall)
             val waiting = snapshot.coins.filter { it.coinbase && !it.spendableAt(snapshot.tip) }.map { it.height } + (snapshot.watched?.immature?.map { it.height } ?: emptyList())
@@ -486,7 +487,7 @@ fun MiningTab(model: WalletModel, state: WalletState) {
                 val perDay = share * 86_400 / seconds
                 Field(stringResource(R.string.mining_share), Format.decimal(share * 100, 1) + " %", "mining-share")
                 Field(stringResource(R.string.mining_expected), Format.decimal(perDay, 1))
-                rewards.maxByOrNull { it.height }?.let { Field(stringResource(R.string.mining_expected_coins), Format.coins((perDay * it.receivedSat).toLong())) }
+                rewards.maxByOrNull { it.height }?.let { Field(stringResource(R.string.mining_expected_coins), Format.coins((perDay * it.receivedSat).coerceIn(0.0, NodeClient.MAX_SAT.toDouble()).toLong())) }
                 if (perDay > 0) Field(stringResource(R.string.mining_luck), Format.decimal(lastDay / perDay * 100, 0) + " %")
                 Text(stringResource(R.string.mining_note), style = MaterialTheme.typography.bodySmall)
             }
@@ -542,7 +543,7 @@ fun MoreTab(model: WalletModel, state: WalletState, owner: Owner, go: (Section) 
                 Text(stringResource(R.string.wallet_export_text), style = MaterialTheme.typography.bodySmall)
                 val descriptor = remember(wallet.xpub) { wallet.watchKey().descriptor(0) }
                 Mono(descriptor)
-                OutlinedButton(onClick = { copyToClipboard(context, "descriptor", descriptor) }) { Text(stringResource(R.string.copy)) }
+                OutlinedButton(onClick = { copyToClipboard(context, "descriptor", descriptor, sensitive = true) }) { Text(stringResource(R.string.copy)) }
                 Tick(wallet.lockOnOpen, { model.saveLock(it, owner) }, stringResource(R.string.lock_setting), "lock-setting")
                 Tick(wallet.fixed, { model.saveFixedAddress(it) }, stringResource(R.string.fixed_address_setting), "fixed-address-setting")
                 Text(stringResource(R.string.fixed_address_note), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("fixed-address-note"))

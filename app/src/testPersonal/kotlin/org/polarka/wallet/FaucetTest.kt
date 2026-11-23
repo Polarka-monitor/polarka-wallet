@@ -75,9 +75,16 @@ class FaucetTest {
                 """{"challenge":"x","bits":8,"expires":1}""" to ("RAN_OUT" to false),
             )
             for ((body, expected) in cases) {
-                faucet.misbehave = { if (it == "/v1/challenge") FaucetStandIn.Raw(FaucetStandIn.http(400, body)) else null }
+                // a refusal comes with a failure status; a challenge, however odd, with success (since the ninth look)
+                val status = if ("\"error\"" in body) 400 else 200
+                faucet.misbehave = { if (it == "/v1/challenge") FaucetStandIn.Raw(FaucetStandIn.http(status, body)) else null }
                 val e = refused { Faucet.ask(address, faucet.url) }
                 assertEquals(expected, e.reason to e.byFaucet, body)
+            }
+            // ninth look, L-2: a failure status without one of the faucet's words is no answer, even with a challenge in it
+            for (status in listOf(400, 500, 502)) {
+                faucet.misbehave = { if (it == "/v1/challenge") FaucetStandIn.Raw(FaucetStandIn.http(status, """{"challenge":"x","bits":8,"expires":9999999999}""")) else null }
+                assertEquals("OTHER" to false, refused { Faucet.ask(address, faucet.url) }.let { it.reason to it.byFaucet }, "HTTP $status")
             }
             // a claim whose answer names no transaction, or not one of 64 hex characters
             for (body in listOf("""{"asked":"x"}""", """{"transaction_id":"${"A".repeat(64)}"}""", """{"transaction_id":"12"}""")) {

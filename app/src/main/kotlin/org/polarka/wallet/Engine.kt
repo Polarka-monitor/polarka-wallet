@@ -41,6 +41,8 @@ data class Problem(val kind: Kind, val detail: String = "") {
         PAPER_REFUSED,
         /** The picture of the chain that a wallet server shows kept changing while it was read, and no look of one piece came of it. */
         MOVING,
+        /** The wallet, the node or the server changed while a payment was being signed; nothing was written or sent. */
+        CHANGED,
     }
 
     companion object {
@@ -115,21 +117,35 @@ data class Snapshot(
      */
     val historyWhole: Boolean = true,
 ) {
+    // Every sum the screens show is worked out here, once, when the look is made: on the thread that asked the
+    // node or the server. Amounts that cannot exist together stop the look with an error that the app shows
+    // as a problem; they never reach a screen, where a sum that runs over would end the app (ninth look, M-1).
     private fun free(coin: Unspent): Boolean = (coin.txid + ":" + coin.vout) !in inWaiting
-    val spendableSat: Long get() = NodeClient.total(coins.filter { it.spendableAt(tip) && free(it) }.map { it.amountSat })
-    val waitingSat: Long get() = NodeClient.total(coins.filter { it.spendableAt(tip) && !free(it) }.map { it.amountSat })
-    val immatureSat: Long get() = NodeClient.total(coins.filter { !it.spendableAt(tip) }.map { it.amountSat })
-    val walletSat: Long get() = NodeClient.total(coins.map { it.amountSat })
-    val watchedSat: Long get() = watched?.totalSat ?: 0
-    val totalSat: Long get() = NodeClient.total(listOf(walletSat, watchedSat))
+    val spendableSat: Long = NodeClient.total(coins.filter { it.spendableAt(tip) && free(it) }.map { it.amountSat })
+    val waitingSat: Long = NodeClient.total(coins.filter { it.spendableAt(tip) && !free(it) }.map { it.amountSat })
+    val immatureSat: Long = NodeClient.total(coins.filter { !it.spendableAt(tip) }.map { it.amountSat })
+    val walletSat: Long = NodeClient.total(coins.map { it.amountSat })
+    // the parts of a checked sum (what can be spent, what is maturing) are sums of fewer amounts and fit as well
+    val watchedSat: Long = watched?.totalSat ?: 0
+    val totalSat: Long = NodeClient.total(listOf(walletSat, watchedSat))
+    /** All block rewards in the history of the wallet and of the watched addresses. */
+    val rewardsSat: Long = NodeClient.total((moves + watchedMoves).filter { it.coinbase }.map { it.receivedSat })
+
+    init {
+        NodeClient.total(listOf(arrivingSat))
+    }
 }
 
-/** What a paper address (its recovery words typed in for one use) holds. */
+/** What a paper address (its recovery words typed in for one use) holds. Its sums are checked as it is made. */
 class PaperFound(val address: String, val tip: Int, val coins: List<Unspent>) {
     val spendable: List<Unspent> get() = coins.filter { it.spendableAt(tip) }
-    val spendableSat: Long get() = spendable.sumOf { it.amountSat }
+    val spendableSat: Long = NodeClient.total(spendable.map { it.amountSat })
     val immature: List<Unspent> get() = coins.filter { !it.spendableAt(tip) }
-    val immatureSat: Long get() = immature.sumOf { it.amountSat }
+    val immatureSat: Long = NodeClient.total(immature.map { it.amountSat })
+
+    init {
+        NodeClient.total(coins.map { it.amountSat })
+    }
 
     /** Blocks until the last reward on the address can be spent; 0 if nothing is maturing. */
     val blocksUntilRipe: Int get() = immature.maxOfOrNull { it.height + Planner.MATURITY - tip } ?: 0
@@ -285,12 +301,20 @@ class Engine(private val setup: Setup, private val node: NodeClient = NodeClient
         val held = HashSet<String>()
         val busy = HashSet<String>()
         val present = coins.associateBy { it.txid + ":" + it.vout }
-        var asked = 0
+        val queues = ArrayList<ArrayDeque<String>>()
         for (payment in wallet?.pending.orEmpty().take(MAX_CHECKED)) {
             if (node.waiting(payment.txid)) held.add(payment.txid)
-            for (input in payment.inputs) {
-                val coin = present[input] ?: continue
-                if (asked++ >= MAX_CHECKED) break
+            queues.add(ArrayDeque(payment.inputs.filter { it in present }))
+        }
+        // One coin of every waiting payment is asked about before a second coin of any: a payment of many coins
+        // does not use up the questions that the others need (ninth look, L-3). The questions stay as many as before.
+        var asked = 0
+        while (asked < MAX_CHECKED && queues.any { it.isNotEmpty() }) {
+            for (queue in queues) {
+                if (asked >= MAX_CHECKED) break
+                val input = queue.removeFirstOrNull() ?: continue
+                val coin = present.getValue(input)
+                asked++
                 if (!node.unspent(coin.txid, coin.vout)) busy.add(input)
             }
         }

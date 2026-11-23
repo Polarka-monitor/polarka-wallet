@@ -25,14 +25,20 @@ import kotlinx.coroutines.withContext
  * lets a second one start beside it, and the owner can stop it. Only in the personal edition.
  */
 class FaucetModel : ViewModel() {
-    /** What the faucet said last: the id of its transaction, or why there is none. */
-    data class Said(val txid: String? = null, val refused: Faucet.Refused? = null)
+    /**
+     * What the faucet said last about [address]: the id of its transaction, or why there is none. It is shown only
+     * beside that address: not beside the next one, nor in a wallet made after this one was removed (ninth look, L-2).
+     */
+    data class Said(val address: String, val txid: String? = null, val refused: Faucet.Refused? = null)
 
     var busy by mutableStateOf(false)
         private set
     var said by mutableStateOf<Said?>(null)
         private set
     private var asking: Faucet.Asking? = null
+
+    /** What the faucet said about [address], if it was about that address. */
+    fun saidAbout(address: String): Said? = said?.takeIf { it.address == address }
 
     fun ask(address: String) {
         if (busy) return
@@ -43,7 +49,7 @@ class FaucetModel : ViewModel() {
         viewModelScope.launch {
             // the network waits and the work both stand on threads made for waiting, not on the few that compute
             val outcome = withContext(Dispatchers.IO) {
-                try { Said(txid = Faucet.ask(address, base, now)) } catch (e: Faucet.Refused) { Said(refused = e) }
+                try { Said(address, txid = Faucet.ask(address, base, now)) } catch (e: Faucet.Refused) { Said(address, refused = e) }
             }
             if (asking === now) {
                 said = outcome.takeIf { it.refused?.reason != "STOPPED" }
@@ -80,7 +86,7 @@ internal fun FaucetPart(address: String) {
         } else {
             Button(onClick = { faucet.ask(address) }, modifier = Modifier.testTag("faucet-go")) { Text(stringResource(R.string.faucet_go)) }
         }
-        faucet.said?.let { said ->
+        faucet.saidAbout(address)?.let { said ->
             val txid = said.txid
             val refused = said.refused
             if (txid != null) {

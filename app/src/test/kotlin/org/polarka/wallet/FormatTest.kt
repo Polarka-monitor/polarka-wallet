@@ -27,7 +27,10 @@ class FormatTest {
         for (bad in listOf("", "0", "0.0", "-1", "1e5", "1.000000001", "1.2.3", "abc", ".5", "12 NORTH", "99999999999", "92233720369")) {
             assertEquals(null, Format.parseCoins(bad), bad)
         }
-        assertEquals(9_223_372_036_800_000_000L, Format.parseCoins("92233720368"))
+        // since the ninth look (M-3) no more than all the coins that can exist: 2 000 000 000 NORTH
+        assertEquals(200_000_000_000_000_000L, Format.parseCoins("2000000000"))
+        assertEquals(null, Format.parseCoins("92233720368"))
+        assertEquals(null, Format.parseCoins("2000000000.00000001"))
     }
 
     @Test

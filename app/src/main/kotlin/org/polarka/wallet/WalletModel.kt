@@ -41,6 +41,10 @@ enum class SelfTest { NOT_RUN, RUNNING, PASSED, FAILED }
 enum class Notice {
     FILE_DELETED, FILE_NOT_DELETED, CLIPBOARD_CLEARED, FILE_UNREADABLE, CLIPBOARD_EMPTY, WALLET_READY, WALLET_REMOVED, SAVED,
     PAYMENT_GONE, ADDRESS_LIMIT, WORDS_REMOVED, LOOK_LIMIT, PAYMENT_BEATEN, PAYMENT_ARRIVED, PAYMENT_BACK, WALLET_MADE,
+    /** The setup or the wallet was not changed: a payment, a paper address or the words were being dealt with. */
+    WAIT_FOR_PAYMENT,
+    /** New words that waited to be written down were dropped after a long time away. */
+    NEW_WORDS_DROPPED,
 }
 
 /** Recovery words on their way through the app's state. A printed state or a log line never shows them. */
@@ -178,11 +182,23 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         leftAtMillis = if (now == 0L) 1L else now
     }
 
-    /** The app is in front again. After more than a minute away it locks; also when the clock seems to have run backwards. */
+    /**
+     * The app is in front again. After more than a minute away it locks; also when the clock seems to have run
+     * backwards. New words that wait to be written down are dropped after ten minutes away: they do not stay in
+     * memory and on the screen for ever. Nothing was stored yet; the owner starts again with new words, and
+     * throws away a paper that holds the dropped ones (ninth look, L-1).
+     */
     fun returned(now: Long = SystemClock.elapsedRealtime()) {
-        val away = leftAtMillis != 0L && (now - leftAtMillis > LOCK_AFTER_MILLIS || now < leftAtMillis)
+        val gone = when {
+            leftAtMillis == 0L -> 0L
+            now < leftAtMillis -> Long.MAX_VALUE
+            else -> now - leftAtMillis
+        }
         leftAtMillis = 0L
-        if (away) lock()
+        if (gone > NEW_WORDS_AFTER_MILLIS && state.newWords != null && !state.walletBusy) {
+            state = state.copy(newWords = null, notice = Notice.NEW_WORDS_DROPPED, noticeDetail = "")
+        }
+        if (gone > LOCK_AFTER_MILLIS) lock()
     }
 
     /**
@@ -221,33 +237,44 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
     // ------------------------------------------------------------------------------------------ node setup
 
     /** A setup text arrived (from a file or the clipboard). It is only checked here; nothing is stored yet. */
-    fun offer(text: String, from: Uri? = null): Boolean {
-        state = try {
-            state.copy(offered = Setup.parse(text), offeredFrom = from, offerError = null, offerDetail = "", problem = null, notice = null)
-        } catch (e: SetupError) {
-            state.copy(offered = null, offeredFrom = null, offerError = e.reason, offerDetail = e.detail, notice = null)
-        }
-        return state.offered != null
-    }
+    fun offer(text: String, from: Uri? = null): Boolean = offered(from) { Setup.parse(text) }
 
     /** The address of a public node was typed in. Like a setup file, it is only checked here. */
-    fun offerPublic(url: String): Boolean {
+    fun offerPublic(url: String): Boolean = offered(null) { Setup.publicNode(url) }
+
+    /** The address of a wallet server was typed in, or the offered one was left as it is. Only checked here. */
+    fun offerServer(url: String): Boolean = offered(null) { Setup.server(url) }
+
+    private fun offered(from: Uri?, read: () -> Setup): Boolean {
         state = try {
-            state.copy(offered = Setup.publicNode(url), offeredFrom = null, offerError = null, offerDetail = "", problem = null, notice = null)
+            val setup = read()
+            otherNetwork(setup)?.let { state.copy(offered = null, offeredFrom = null, offerError = SetupError.Reason.OTHER_NETWORK, offerDetail = it, notice = null) }
+                ?: state.copy(offered = setup, offeredFrom = from, offerError = null, offerDetail = "", problem = null, notice = null)
         } catch (e: SetupError) {
             state.copy(offered = null, offeredFrom = null, offerError = e.reason, offerDetail = e.detail, notice = null)
         }
         return state.offered != null
     }
 
-    /** The address of a wallet server was typed in, or the offered one was left as it is. Only checked here. */
-    fun offerServer(url: String): Boolean {
-        state = try {
-            state.copy(offered = Setup.server(url), offeredFrom = null, offerError = null, offerDetail = "", problem = null, notice = null)
-        } catch (e: SetupError) {
-            state.copy(offered = null, offeredFrom = null, offerError = e.reason, offerDetail = e.detail, notice = null)
-        }
-        return state.offered != null
+    /**
+     * The network of the wallet in this phone if [setup] is for another one, else null. Such a setup is not
+     * taken: the wallet's keys and addresses belong to its own network, and a node of another one would be
+     * asked about addresses it cannot read (ninth look, L-3). The wallet is removed first, its paper in hand.
+     */
+    private fun otherNetwork(setup: Setup): String? {
+        val wallet = state.wallet ?: return null
+        return if (wallet.chain == setup.chain) null else Setup.nameOf(wallet.chain)
+    }
+
+    /**
+     * True, with a note to the owner, while a payment or the emptying of a paper address is under way, or
+     * words are being stored. The setup and the wallet then stay as they are: what is being signed and sent
+     * belongs to them (ninth look, M-2).
+     */
+    private fun busyWithMoney(): Boolean {
+        if (!state.sending && !state.paperBusy && !state.walletBusy) return false
+        state = state.copy(notice = Notice.WAIT_FOR_PAYMENT, noticeDetail = "")
+        return true
     }
 
     /** Reads a setup file the user picked. Only the beginning is read: a setup is small. */
@@ -284,6 +311,11 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
     /** Stores the offered setup, and if asked deletes the file it came from: the password in it is plain text. */
     fun acceptOffer(deleteFile: Boolean) {
         val setup = state.offered ?: return
+        if (busyWithMoney()) return
+        otherNetwork(setup)?.let {
+            state = state.copy(offered = null, offeredFrom = null, offerError = SetupError.Reason.OTHER_NETWORK, offerDetail = it)
+            return
+        }
         val from = state.offeredFrom
         viewModelScope.launch {
             val saved = withContext(io) { runCatching { setups.save(setup) } }
@@ -299,7 +331,13 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
                 notice = if (gone) Notice.FILE_DELETED else Notice.FILE_NOT_DELETED
             }
             engine = Gateway.of(setup)
-            state = state.copy(setup = setup, offered = null, offeredFrom = null, offerError = null, snapshot = null, problem = null, notice = notice)
+            // what was worked out with the other node or server goes: a payment waiting for the owner's yes, a
+            // paper address and its words (ninth look, M-2)
+            paperDrop()
+            state = state.copy(
+                setup = setup, offered = null, offeredFrom = null, offerError = null, snapshot = null, problem = null, notice = notice,
+                draft = null, sendProblem = null, sentTxid = null,
+            )
             // The owner's yes to looking at more keys was given for the node that was asked then. Another node is
             // not told more by itself; the keys in use are looked at in any case.
             if ((state.wallet?.lookTo ?: 0) != 0) change({ it.copy(lookTo = 0) })
@@ -309,11 +347,14 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
 
     /** Forgets the node and the watched addresses. The wallet, if there is one, stays; its owner is asked first. */
     fun forgetSetup(owner: Owner) {
+        if (busyWithMoney()) return
         viewModelScope.launch {
             if (state.wallet != null && !runCatching { owner.present() }.getOrDefault(false)) return@launch
+            if (busyWithMoney()) return@launch
             withContext(io) { runCatching { setups.clear() } }
             engine = null
-            state = state.copy(setup = null, snapshot = null, problem = null, draft = null, sentTxid = null)
+            paperDrop()
+            state = state.copy(setup = null, snapshot = null, problem = null, draft = null, sendProblem = null, sentTxid = null)
         }
     }
 
@@ -562,7 +603,10 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
      * built again from the stored words, which the owner unlocks. Its key numbers are found from the chain.
      */
     fun rebuildWallet(owner: Owner) {
+        // a second tap would ask the owner twice at the same time (ninth look, L-3)
+        if (state.walletBusy) return
         val chain = state.setup?.chain ?: Chain.MAIN
+        state = state.copy(walletBusy = true)
         viewModelScope.launch {
             val outcome = runCatching {
                 val cipher = withContext(io) { vault.decryptor() }
@@ -572,8 +616,8 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             state = outcome.fold(
-                { state.copy(wallet = it, walletProblem = null, wordsWithoutWallet = false, notice = Notice.WALLET_READY) },
-                { state.copy(walletProblem = walletProblemOf(it)) },
+                { state.copy(walletBusy = false, wallet = it, walletProblem = null, wordsWithoutWallet = false, notice = Notice.WALLET_READY) },
+                { state.copy(walletBusy = false, walletProblem = walletProblemOf(it)) },
             )
             if (state.wallet != null) refresh()
         }
@@ -590,15 +634,21 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
 
     /** Removes the wallet from this phone: the sealed words, their key and the public information. The coins stay on the chain. */
     fun removeWallet(owner: Owner) {
+        if (busyWithMoney()) return
         viewModelScope.launch {
             if (!runCatching { owner.present() }.getOrDefault(false)) return@launch
+            // asked again after the owner's yes: a payment begun meanwhile is finished first (ninth look, M-2)
+            if (busyWithMoney()) return@launch
+            // no payment begins while the words and the file go (confirmSend waits for walletBusy)
+            state = state.copy(walletBusy = true)
             withContext(io) {
                 runCatching { vault.destroy() }
                 runCatching { wallets.clear() }
             }
+            paperDrop()
             state = state.copy(
-                wallet = null, draft = null, sentTxid = null, locked = false, wordsWithoutWallet = false, notice = Notice.WALLET_REMOVED,
-                backupSame = null, backupProblem = null,
+                walletBusy = false, wallet = null, draft = null, sendProblem = null, sentTxid = null, locked = false, wordsWithoutWallet = false,
+                notice = Notice.WALLET_REMOVED, backupSame = null, backupProblem = null,
             )
             refresh()
         }
@@ -744,7 +794,7 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
         val engine = engine ?: return
         val wallet = state.wallet ?: return
         val draft = state.draft ?: return
-        if (state.sending) return
+        if (state.sending || state.walletBusy) return
         if (wallet.pending.size >= WalletInfo.MAX_PENDING) {
             // more waiting payments than the wallet's file can hold are not started; they clear with the next blocks
             state = state.copy(sendProblem = Problem(Problem.Kind.TOO_MANY_WAITING))
@@ -794,7 +844,15 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
                 plan.inputs.map { it.txid + ":" + it.vout }.toSet(), unsure = true, atMillis = System.currentTimeMillis(),
                 inputSat = plan.inputs.sumOf { it.amountSat },
             )
-            val before = state.wallet ?: wallet
+            // While the owner was asked and the payment signed, the wallet must have stayed the one it was made for,
+            // and the node or server the one that worked it out. Otherwise nothing is written and nothing is sent:
+            // a wallet that was removed would come back to life in its file, and its change would go to words
+            // that are gone (ninth look, M-2). The signed transaction has been shown to nobody.
+            val before = state.wallet
+            if (before == null || before.xpub != wallet.xpub || before.chain != wallet.chain || this.engine !== engine) {
+                state = state.copy(sending = false, draft = null, sendProblem = Problem(Problem.Kind.CHANGED))
+                return
+            }
             // The change key moves on for the next payment, but never further than a wallet brought back from its
             // words would look (twenty past the last key the chain shows as used), nor past what the app looks at.
             val top = minOf(engine.allowed(before) - 1, (state.snapshot?.nextChange ?: 0) + WalletInfo.GAP - 1)
@@ -1044,6 +1102,7 @@ class WalletModel(app: Application) : AndroidViewModel(app) {
     companion object {
         const val STALE_MILLIS = 60_000L
         const val LOCK_AFTER_MILLIS = 60_000L
+        const val NEW_WORDS_AFTER_MILLIS = 10 * 60_000L
         const val GONE_AFTER_MILLIS = 60_000L
         const val MAX_RELOOKS = 2
         val FEE_RATES = listOf(1L, Planner.DEFAULT_FEE_RATE, 5L)

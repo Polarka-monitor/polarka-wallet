@@ -55,9 +55,22 @@ object Spend {
         require(coins.isNotEmpty()) { "nothing to spend" }
         require(payments.isNotEmpty()) { "nowhere to pay" }
         require(coins.map { it.txid to it.vout }.toSet().size == coins.size) { "the same output is listed twice" }
-        val fee = coins.sumOf { it.amountSat } - payments.sumOf { it.amountSat }
+        // Every amount, and each of the two sums, is one that can exist; the sums cannot wrap around a Long, so
+        // the fee below is the real difference (review 9, M-3).
+        var inputs = 0L
+        for (c in coins) {
+            require(c.amountSat in 0..Planner.MAX_SAT) { "an input with an amount that cannot exist" }
+            inputs += c.amountSat
+            require(inputs <= Planner.MAX_SAT) { "inputs whose amounts cannot exist together" }
+        }
+        var outputs = 0L
+        for (p in payments) {
+            require(p.amountSat in 1..Planner.MAX_SAT) { "a payment must be positive and an amount that can exist" }
+            outputs += p.amountSat
+            require(outputs <= Planner.MAX_SAT) { "payments whose amounts cannot exist together" }
+        }
+        val fee = inputs - outputs
         require(fee >= 0) { "the payments exceed the inputs" }
-        require(payments.all { it.amountSat > 0 }) { "a payment must be positive" }
 
         val spent = coins.map { TxOut(Satoshi(it.amountSat), account.script(it.branch, it.index)) }
         val unsigned = Transaction(

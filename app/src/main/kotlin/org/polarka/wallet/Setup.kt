@@ -15,7 +15,11 @@ enum class ServerOwner { NORTHBOUND, POLARKA, OTHER }
 
 /** Why a setup text was refused. The screen turns the reason into a sentence in the user's language. */
 class SetupError(val reason: Reason, val detail: String = "") : Exception("$reason $detail".trim()) {
-    enum class Reason { TOO_LONG, NOT_JSON, WRONG_FORMAT, BAD_URL, NOT_HTTPS, BAD_USER, BAD_PASSWORD, BAD_CHAIN, NO_ADDRESS, TOO_MANY_ADDRESSES, BAD_ADDRESS }
+    enum class Reason {
+        TOO_LONG, NOT_JSON, WRONG_FORMAT, BAD_URL, NOT_HTTPS, BAD_USER, BAD_PASSWORD, BAD_CHAIN, NO_ADDRESS, TOO_MANY_ADDRESSES, BAD_ADDRESS,
+        /** The setup is in order, but for another network than the wallet in this phone; the detail names the wallet's. */
+        OTHER_NETWORK,
+    }
 }
 
 /**
