@@ -1,0 +1,8 @@
+Android 16, polarka-wallet-0.7.1.apk, then polarka-wallet-0.7.2.apk over it
+ok     1  version 0.7.1: a wallet with 25 NORTH and a payment of 5 NORTH that waits for a block
+ok     2  version 0.7.2 installed over it: the same wallet opens after the fingerprint and still knows the waiting payment
+ok     3  the new package signs with the words the old one stored: a payment of 3 NORTH went through, 16.99999348 NORTH are left
+ok     4  the paper written with version 0.7.1 is found right by version 0.7.2
+ok     5  the setup removed and a wallet server saved in its place: the same wallet shows the same 16.99999348 NORTH and its history there, and a payment of 2 NORTH through the server went into a block
+UPGRADE: ALL 5 STEPS PASSED (0.7.1 -> 0.7.2)
+exit 0

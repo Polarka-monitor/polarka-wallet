@@ -1,0 +1,9 @@
+== Which edition app/build/outputs/apk/public/release/app-public-release.apk is, read from its code
+BuildConfig.FLAVOR        "public"
+BuildConfig.FIXED_ADDRESS false
+class Faucet                not in the package
+class FaucetModel           not in the package
+address faucet.polarka.org  not in the package
+text faucet_go              not in the package
+
+public edition: as it must be

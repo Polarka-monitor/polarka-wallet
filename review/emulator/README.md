@@ -72,6 +72,31 @@ written on (`~/north-build`); change `emu-env.sh`, `emu-start.sh`, `make_ca.sh`,
 the first lines of `emu.py` for another one. An emulator that was restarted shows its lock screen and has
 forgotten the test authority: unlock it and run `trust_ca.sh` again.
 
+## What was run for 0.7.2
+
+0.7.0 and 0.7.1 were not run on an emulator. On 23 November 2026 two packages of 0.7.2 went through the seven
+runs of 0.6.0 on Android 16, with `t05_upgrade.py` over the signed package of 0.7.1. The first (SHA-256
+`be54f0d35c0679b1468fe0e790685a42ec2a7278eba143023be91ba00d4d46db`, built from commit 482911d) passed
+`NOT GONE THROUGH: ALL 6 STEPS PASSED`, `UPGRADE: ALL 5 STEPS PASSED (0.7.1 -> 0.7.2)` and `A SERVER THAT SAYS
+NO: ALL 6 STEPS PASSED`. The runs with a node of one's own, through the gateway and with a wallet server stopped
+at the step that removes the wallet, and the lock run after them, because of the scripts: the More page has
+grown in 0.7, a fast swipe carried "Remove the wallet from this phone" past the screen between two looks, and
+after the wallet went, the page stayed where it was and the notice at its top was out of sight. The wallet had
+been removed: the page showed "Store the wallet", which is there only without one. The scripts now swipe
+slowly, without a fling, and read the notice from the top of the page (commit d94fbcb); the app is not changed.
+The logs of these runs are not kept here.
+
+The package of the release (SHA-256 `ac27e19bd64c9fdeeaa707975dd2d7fe3b53cde77eca353a5cd113e9779aa9b9`, built
+from commit d94fbcb; its texts no longer advise small amounts only) then went through all seven without a
+repeat: `ALL 12 STEPS PASSED` with a node of one's own and through the gateway, `LOCK STEPS PASSED: 4`, `NOT GONE
+THROUGH: ALL 6 STEPS PASSED`, `UPGRADE: ALL 5 STEPS PASSED (0.7.1 -> 0.7.2)`, `ALL 18 STEPS PASSED` with a wallet
+server and `A SERVER THAT SAYS NO: ALL 6 STEPS PASSED`. The logs are in `../evidence-0.7.2`.
+
+Not run for 0.7.2: Android 12 and 14, `t08_server_changed.py`, and the two runs against the public Northbound
+server (`t06_real_server.py`, `t09_real_server_watch.py`). What the ninth look put right and no run here reaches
+(an amount above all coins that can exist, a node that answers an HTTP failure, the removal of the wallet while
+a payment is signed) has tests in the suite instead (`../changes-0.7.md`).
+
 ## What was run for 0.6.1
 
 0.6.1 was built twice; `../changes-0.6.1.md` says why. On 16 November 2026 the package of the release (SHA-256

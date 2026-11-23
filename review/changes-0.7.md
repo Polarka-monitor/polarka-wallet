@@ -69,11 +69,20 @@ and for 0.7.1 to be tried on an emulator and on a real phone.
 | L-1 (low). Autofill was not switched off; new words stayed on the screen without end while the app was away; the descriptor went to the clipboard without the mark of a sensitive text; the bytes of the words were not overwritten. | The app is excluded from autofill as a whole. New words that wait to be written down are dropped after ten minutes away, with a note to throw a paper with them away. The descriptor is copied as sensitive. The bytes of the words are overwritten once they are sealed or read (the strings made of them cannot be). | `MainActivity.kt`, `WalletModel.kt`, `Parts.kt`, `Tabs.kt`, `Store.kt` | `NinthLookTest.newWordsDoNotWaitForEver`; the rest by reading |
 | L-2 (low, personal edition). The faucet's last word stayed beside another address or a new wallet; its watch could close a connection that was already read; a failure status was not refused. | What the faucet said is kept with the address it was about and shown only there. The watch and the reader are kept apart as in `ServerClient`. A failure status without one of the faucet's words is no answer. | `app/src/personal/.../Faucet.kt`, `FaucetPart.kt` | `FaucetTest.ofWhatAFaucetSendsOnlyItsWordsFromTheListAreShown` |
 | L-3 (low). A setup for another network than the wallet's was taken; one payment of many coins used up what the node is asked about the others; a second tap asked the owner twice. | A setup for another network than the wallet's is refused, when it is offered and when it is saved. The node is asked about one coin of every waiting payment before a second coin of any; the number of questions stays as it was. Building the wallet again from stored words runs once at a time. | `WalletModel.kt`, `Setup.kt`, `Engine.kt`, `Tabs.kt` | `NinthLookTest.aSetupForAnotherNetworkIsNotTaken`, `.whileTheWordsAreUnlockedNothingElseChangesTheWallet` |
-| L-4, L-5 (low). The server software (`walletd.py`, `faucet.py`). | Not in this repository: put right in polarka-agent (a time for a whole request to arrive, a revision that starts at a number drawn at random, an address named back as it was asked, ids in a history cursor read in either case; with `--trust-proxy` the faucet listens on loopback only, and its asker keeps to its own bounds). | polarka-agent | its tests |
+| L-4, L-5 (low). The server software (`walletd.py`, `faucet.py`). | Not in this repository: put right in polarka-agent 0.2.6, which runs on the server since 23 November (a time for a whole request to arrive, a revision that starts at a number drawn at random, an address named back as it was asked, ids in a history cursor read in either case; with `--trust-proxy` the faucet listens on loopback only, and its asker keeps to its own bounds). | polarka-agent | its tests |
 | N-1 to N-6 (notes). | Not changed in 0.7.2, apart from what the fixes above touch. | | |
 
 The version is 0.7.2 (code 15).
 
+Besides the findings, 0.7.2 no longer advises small amounts only (the banner, the README and both guides, commit
+329befe); `gradle/verification-metadata.xml` holds the eight files that a build on a clean machine asked for and
+that it lacked, each checked against two sources (1baf179); and the emulator scripts search the longer More page
+slowly and read the notice from the top of the page (d94fbcb). The review asked for a try on an emulator and on a
+real phone: 0.7.2 went through the seven emulator runs on Android 16 (`emulator/README.md`, logs in
+`evidence-0.7.2`), and its owner tried the personal edition by hand on his phone, without a log.
+
 ## What was not done in 0.7.2
 
 - Nobody independent has looked at the fixes. They were checked by their author, with the tests named.
+- It ran on one emulator, Android 16: not on Android 12 and 14, and not the runs against the public Northbound
+  server or the one with a server that changed its answers.

@@ -221,12 +221,14 @@ While such a payment has no coin among those the server lists, the wallet makes 
 - When one look at the node has two things to say about payments, one notice is shown. The Overview and the
   History show both payments.
 - Version 0.3.1 was tried on one real phone (Android 16), and 0.6.0 was installed there over 0.5.1: the
-  wallet was there and worked with its owner's node. The versions since 0.3.1 were tried on emulators with
-  Android 12, 14 and 16; `review/emulator/README.md` says what was run for each of them. On 16 November
+  wallet was there and worked with its owner's node. The versions from 0.3.1 to 0.6.1 were tried on emulators
+  with Android 12, 14 and 16; `review/emulator/README.md` says what was run for each of them. On 16 November
   2026 0.6.1 was installed on that phone over 0.6.0, and payments were sent from the wallet and received,
   through its owner's node and through the public Northbound server. All went through. That was one test by
-  hand: no log was kept of it and nothing was measured. 0.7.1 has not yet been tried on an emulator or on a
-  real phone.
+  hand: no log was kept of it and nothing was measured. 0.7.0 and 0.7.1 were not run on an emulator. 0.7.2
+  went through the seven emulator runs on Android 16 on 23 November 2026, and on the same day its owner tried
+  its personal edition by hand on his phone (built from 482911d: the same code, with the texts before the last
+  change of 0.7.2): it ran as it should. No log was kept of that.
 - Polarka's server at `node.polarka.org` answers one request at a time and has no limit of its own on how
   often it is asked; somebody can make it slow or unreachable. The wallet then shows an error and judges
   nothing, and it can be connected to Northbound's server or a node instead.
