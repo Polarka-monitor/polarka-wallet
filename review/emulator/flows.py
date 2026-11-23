@@ -60,13 +60,15 @@ def tab(p, name):
     raise RuntimeError("no page %r in the bar at the bottom; on screen: %s" % (name, p.texts()[:12]))
 
 
-def scroll_to(p, text, tries=8, exact=False):
+def scroll_to(p, text, tries=16, exact=False):
     hide_keyboard(p)            # a swipe that begins on an open keyboard moves nothing
     for _ in range(tries):
         found = p.find(text, exact, nodes=visible(p.nodes()))
         if found:
             return found[0]
-        p.swipe_up()
+        # slowly and without a fling: a fast swipe can carry a button past the screen between two looks (run72)
+        p.sh("input swipe 540 1500 540 900 900")
+        time.sleep(0.6)
     raise RuntimeError("%r is not on the screen; there is: %s" % (text, p.texts()[:30]))
 
 
@@ -164,6 +166,7 @@ def remove_wallet(p):
     p.tap("Remove the wallet from this phone")
     p.wait("Remove the wallet?", 10)
     p.tap("I have the words, remove")
+    top(p)                      # the notice is at the top of the page, which stays where it was (run72)
     p.wait("The wallet was removed", 10)
     p.tap("OK", exact=True)
 
@@ -275,6 +278,7 @@ def remove_wallet_04(p):
     p.wait("Remove the wallet?", 10)
     p.tap("I have the words, remove")
     fingerprint(p)
+    top(p)                      # the notice is at the top of the page, which stays where it was (run72)
     p.wait("The wallet was removed", 15)
     p.tap("OK", exact=True)
 
