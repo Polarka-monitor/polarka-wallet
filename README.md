@@ -41,9 +41,8 @@ No app store offers the package.
 Write the recovery words on paper before any coins arrive. The app is excluded from backups, so the words
 are the only way back to the wallet.
 
-What you find is welcome as an issue at the mirror. If it puts coins at risk, please write first only that
-you found something, to @Polarka_monitor on X, as https://polarka.org asks; the details are then passed on
-privately.
+What you find is welcome as an issue at the mirror. If it puts coins at risk, please write there first only
+that you found something, as https://polarka.org asks; the details are then passed on privately.
 
 ## Two editions
 
